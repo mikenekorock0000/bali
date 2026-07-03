@@ -8,7 +8,6 @@ import '../models/scenario.dart';
 import '../models/scenario_config.dart';
 import 'scenario_auditor.dart';
 import 'scenario_validator.dart';
-import 'settings_service.dart';
 
 typedef ProgressCallback = void Function(GenerationProgress progress);
 
@@ -24,15 +23,17 @@ class ScenarioGenerator {
   final ScenarioValidator validator;
   final ScenarioAuditor Function(String apiKey)? _auditorFactory;
   final _uuid = const Uuid();
+  late String _apiKey;
 
   Future<Scenario> generate(
     ScenarioConfig config, {
+    required String? apiKey,
     ProgressCallback? onProgress,
   }) async {
-    final apiKey = SettingsService.instance.apiKey;
     if (apiKey == null || apiKey.isEmpty) {
       throw ScenarioGenerationException('Gemini APIキーが設定されていません');
     }
+    _apiKey = apiKey;
 
     final creativeModel = _createModel(
       AiPipelineConfig.primaryModel,
@@ -178,7 +179,7 @@ class ScenarioGenerator {
   genai.GenerativeModel _createModel(String modelName, double temperature) {
     return genai.GenerativeModel(
       model: modelName,
-      apiKey: SettingsService.instance.apiKey!,
+      apiKey: _apiKey,
       generationConfig: genai.GenerationConfig(
         temperature: temperature,
         responseMimeType: 'application/json',

@@ -7,23 +7,20 @@
 ///   dart run tool/generate_test.dart --players=2
 import 'dart:io';
 
+import 'package:madamis_app/config/api_key_source.dart';
 import 'package:madamis_app/models/scenario_config.dart';
 import 'package:madamis_app/services/scenario_generator.dart';
 import 'package:madamis_app/services/scenario_validator.dart';
-import 'package:madamis_app/services/settings_service.dart';
 
 Future<void> main(List<String> args) async {
-  await SettingsService.instance.load();
-
-  if (!SettingsService.instance.hasApiKey) {
+  final apiKey = ApiKeySource.resolve(null);
+  if (apiKey == null || apiKey.isEmpty) {
     stderr.writeln('❌ GEMINI_API_KEY が未設定です');
     stderr.writeln('   export GEMINI_API_KEY=your_key');
     exit(1);
   }
 
-  final source = SettingsService.instance.isApiKeyFromEnvironment
-      ? '環境変数'
-      : '保存済みキー';
+  final source = ApiKeySource.isFromEnvironment(null) ? '環境変数' : 'dart-define';
   stdout.writeln('✓ APIキー読み込み ($source)');
 
   var playerCount = 4;
@@ -48,6 +45,7 @@ Future<void> main(List<String> args) async {
     final generator = ScenarioGenerator(maxAttempts: 3);
     final scenario = await generator.generate(
       config,
+      apiKey: apiKey,
       onProgress: (p) {
         stdout.writeln('  [${p.currentStep}/8] ${p.message} (試行 ${p.attempt})');
         if (p.errors.isNotEmpty) {

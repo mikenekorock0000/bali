@@ -108,6 +108,7 @@ class AppState extends ChangeNotifier {
     try {
       final scenario = await _generator.generate(
         config,
+        apiKey: SettingsService.instance.apiKey,
         onProgress: (p) {
           _generationProgress = p;
           notifyListeners();

@@ -14,6 +14,7 @@ void main() {
           playerCount: 4,
           theme: 'テスト',
         ),
+        apiKey: null,
       ),
       throwsA(isA<ScenarioGenerationException>()),
     );
