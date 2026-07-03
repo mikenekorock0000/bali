@@ -5,9 +5,12 @@
 ///   export GEMINI_API_KEY=your_key
 ///   dart run tool/generate_test.dart
 ///   dart run tool/generate_test.dart --players=2
+///   dart run tool/generate_test.dart --players=8 --save
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:madamis_app/config/api_key_source.dart';
+import 'package:madamis_app/models/scenario.dart';
 import 'package:madamis_app/models/scenario_config.dart';
 import 'package:madamis_app/services/scenario_generator.dart';
 import 'package:madamis_app/services/scenario_validator.dart';
@@ -24,9 +27,14 @@ Future<void> main(List<String> args) async {
   stdout.writeln('✓ APIキー読み込み ($source)');
 
   var playerCount = 4;
+  var save = true;
   for (final arg in args) {
     if (arg.startsWith('--players=')) {
       playerCount = int.tryParse(arg.split('=').last) ?? 4;
+    } else if (arg == '--no-save') {
+      save = false;
+    } else if (arg == '--save') {
+      save = true;
     }
   }
 
@@ -70,10 +78,51 @@ Future<void> main(List<String> args) async {
       }
       exit(2);
     }
+
+    if (save) {
+      final path = saveScenario(scenario, config);
+      stdout.writeln('   保存: $path');
+    }
   } on ScenarioGenerationException catch (e) {
     stopwatch.stop();
     stderr.writeln('');
     stderr.writeln('❌ 生成失敗 (${stopwatch.elapsed.inSeconds}秒): $e');
     exit(1);
   }
+}
+
+String saveScenario(Scenario scenario, ScenarioConfig config) {
+  final dir = Directory('assets/scenarios');
+  if (!dir.existsSync()) dir.createSync(recursive: true);
+
+  final slug = _slugify(scenario.title);
+  final fileName = 'generated_${config.playerCount}p_$slug.json';
+  final path = '${dir.path}/$fileName';
+
+  final payload = {
+    'savedAt': DateTime.now().toUtc().toIso8601String(),
+    'config': {
+      'genre': config.genre,
+      'difficulty': config.difficulty,
+      'estimatedMinutes': config.estimatedMinutes,
+      'playerCount': config.playerCount,
+      'theme': config.theme,
+    },
+    'scenario': scenario.toJson(),
+  };
+
+  File(path).writeAsStringSync(
+    const JsonEncoder.withIndent('  ').convert(payload),
+  );
+  return path;
+}
+
+String _slugify(String title) {
+  final normalized = title
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9\u3040-\u9fff]+'), '_')
+      .replaceAll(RegExp(r'_+'), '_')
+      .replaceAll(RegExp(r'^_|_$'), '');
+  if (normalized.isEmpty) return 'untitled';
+  return normalized.length > 40 ? normalized.substring(0, 40) : normalized;
 }
