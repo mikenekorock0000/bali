@@ -70,7 +70,7 @@ class GeneratingScreen extends StatelessWidget {
                               : Colors.grey,
                     ),
                     title: Text(
-                      '[${step.index}/6] ${step.label}',
+                      '[${step.index}/${GenerationStep.steps.length}] ${step.label}',
                       style: TextStyle(
                         fontWeight: current ? FontWeight.bold : FontWeight.normal,
                       ),

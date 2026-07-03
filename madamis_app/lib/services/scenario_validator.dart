@@ -42,7 +42,11 @@ class ScenarioValidator {
     };
   }
 
-  ValidationReport validate(Scenario scenario, ScenarioConfig config) {
+  ValidationReport validate(
+    Scenario scenario,
+    ScenarioConfig config, {
+    bool strict = false,
+  }) {
     final isCoop = config.playerCount <= 3;
     final checks = [
       _checkCharacterCount(scenario, config),
@@ -55,7 +59,7 @@ class ScenarioValidator {
       ] else
         _checkCulpritIsPlayer(scenario),
       _checkMotiveConsistency(scenario),
-      _checkRequiredFields(scenario),
+      _checkRequiredFields(scenario, strict: strict),
       _checkUniqueCharacterIds(scenario),
       _checkUniqueClueIds(scenario),
       _checkAlibiPresent(scenario),
@@ -155,15 +159,31 @@ class ScenarioValidator {
     );
   }
 
-  ValidationCheck _checkRequiredFields(Scenario scenario) {
+  ValidationCheck _checkRequiredFields(Scenario scenario, {bool strict = false}) {
     final errors = <String>[];
     if (scenario.title.isEmpty) errors.add('タイトルが空');
-    if (scenario.synopsis.length < 100) errors.add('あらすじが短すぎる（100字以上）');
-    if (scenario.epilogue.isEmpty) errors.add('後日談が空');
-    for (final c in scenario.characters.where((c) => c.isPlayer)) {
-      if (c.privateScript.secrets.isEmpty) errors.add('${c.name}の秘密が空');
-      if (c.privateScript.alibi.isEmpty) errors.add('${c.name}のアリバイが空');
+
+    if (strict) {
+      if (scenario.synopsis.length < 200) errors.add('あらすじが短すぎる（200字以上）');
+      if (scenario.epilogue.length < 80) errors.add('後日談が短すぎる（80字以上）');
+      if (scenario.truth.explanation.length < 200) {
+        errors.add('真相解説が短すぎる（200字以上）');
+      }
+      for (final c in scenario.characters.where((c) => c.isPlayer)) {
+        if (c.privateScript.secrets.length < 2) {
+          errors.add('${c.name}の秘密が不足（2個以上）');
+        }
+        if (c.privateScript.alibi.isEmpty) errors.add('${c.name}のアリバイが空');
+      }
+    } else {
+      if (scenario.synopsis.length < 100) errors.add('あらすじが短すぎる（100字以上）');
+      if (scenario.epilogue.isEmpty) errors.add('後日談が空');
+      for (final c in scenario.characters.where((c) => c.isPlayer)) {
+        if (c.privateScript.secrets.isEmpty) errors.add('${c.name}の秘密が空');
+        if (c.privateScript.alibi.isEmpty) errors.add('${c.name}のアリバイが空');
+      }
     }
+
     return ValidationCheck(name: 'required_fields', passed: errors.isEmpty, errors: errors);
   }
 

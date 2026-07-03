@@ -1,10 +1,12 @@
 import 'dart:convert';
 
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:google_generative_ai/google_generative_ai.dart' as genai;
 import 'package:uuid/uuid.dart';
 
+import '../config/ai_pipeline_config.dart';
 import '../models/scenario.dart';
 import '../models/scenario_config.dart';
+import 'scenario_auditor.dart';
 import 'scenario_validator.dart';
 import 'settings_service.dart';
 
@@ -12,12 +14,15 @@ typedef ProgressCallback = void Function(GenerationProgress progress);
 
 class ScenarioGenerator {
   ScenarioGenerator({
-    this.maxAttempts = 5,
+    this.maxAttempts = AiPipelineConfig.maxAttempts,
     ScenarioValidator? validator,
-  }) : validator = validator ?? ScenarioValidator();
+    ScenarioAuditor? auditor,
+  })  : validator = validator ?? ScenarioValidator(),
+        _auditorFactory = auditor != null ? ((_) => auditor) : null;
 
   final int maxAttempts;
   final ScenarioValidator validator;
+  final ScenarioAuditor Function(String apiKey)? _auditorFactory;
   final _uuid = const Uuid();
 
   Future<Scenario> generate(
@@ -29,24 +34,25 @@ class ScenarioGenerator {
       throw ScenarioGenerationException('Gemini APIキーが設定されていません');
     }
 
+    final creativeModel = _createModel(
+      AiPipelineConfig.primaryModel,
+      AiPipelineConfig.creativeTemperature,
+    );
+    final auditModel = _createModel(
+      AiPipelineConfig.auditModel,
+      AiPipelineConfig.auditTemperature,
+    );
+    final repairModel = _createModel(
+      AiPipelineConfig.auditModel,
+      AiPipelineConfig.repairTemperature,
+    );
+    final auditor = _auditorFactory?.call(apiKey) ?? ScenarioAuditor(apiKey: apiKey);
+
     final progress = GenerationProgress(maxAttempts: maxAttempts);
     progress.status = GenerationStatus.running;
 
-    GenerativeModel? model;
-    try {
-      model = GenerativeModel(
-        model: 'gemini-2.0-flash',
-        apiKey: apiKey,
-        generationConfig: GenerationConfig(
-          temperature: 0.8,
-          responseMimeType: 'application/json',
-        ),
-      );
-    } catch (e) {
-      throw ScenarioGenerationException('Gemini初期化失敗: $e');
-    }
-
     ScenarioGenerationException? lastError;
+    var previousErrors = <String>[];
 
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       progress.attempt = attempt;
@@ -54,39 +60,98 @@ class ScenarioGenerator {
       onProgress?.call(progress);
 
       try {
-        // Step 1-3: Generate full scenario
-        _updateProgress(progress, 1, onProgress);
-        final scenarioJson = await _generateScenarioJson(model, config, attempt);
+        final scenarioJson = await _generateMultiStep(
+          creativeModel,
+          config,
+          progress,
+          onProgress,
+          previousErrors: previousErrors,
+        );
 
-        _updateProgress(progress, 2, onProgress);
-        final scenario = _parseScenario(scenarioJson, config);
+        var scenario = _parseScenario(scenarioJson, config);
 
-        _updateProgress(progress, 3, onProgress);
+        // Step 5: Code validation + repair loop
+        _setStep(progress, 5, onProgress);
+        var validationPassed = false;
+        for (var repair = 0; repair <= AiPipelineConfig.maxRepairPasses; repair++) {
+          final report = validator.validate(scenario, config, strict: true);
+          if (report.passed) {
+            validationPassed = true;
+            break;
+          }
 
-        // Step 4: Code validation
-        _updateProgress(progress, 4, onProgress);
-        final report = validator.validate(scenario, config);
-        if (!report.passed) {
           progress.errors = report.allErrors;
-          lastError = ScenarioGenerationException(
-            '整合性チェック失敗 (試行 $attempt/$maxAttempts): ${report.allErrors.first}',
+          if (repair == AiPipelineConfig.maxRepairPasses) {
+            lastError = ScenarioGenerationException(
+              '整合性チェック失敗 (試行 $attempt/$maxAttempts): ${report.allErrors.first}',
+            );
+            previousErrors = report.allErrors;
+            break;
+          }
+
+          _setStep(progress, 5, onProgress, message: '整合性エラーを修復中... (${repair + 1})');
+          final repaired = await _repairScenario(
+            repairModel,
+            scenario,
+            config,
+            report.allErrors,
           );
+          scenario = _parseScenario(repaired, config);
+        }
+        if (!validationPassed) continue;
+
+        // Step 6: AI comprehensive audit
+        _setStep(progress, 6, onProgress);
+        final audit = await auditor.audit(scenario, config);
+        if (!audit.passed) {
+          progress.errors = [
+            ...audit.issues,
+            ...audit.failedCheckNames.map((n) => 'AI監査: $n 不合格'),
+          ];
+          previousErrors = progress.errors;
+
+          if (attempt <= maxAttempts) {
+            _setStep(progress, 6, onProgress, message: '監査指摘を反映して修復中...');
+            final repaired = await _repairScenario(
+              repairModel,
+              scenario,
+              config,
+              progress.errors,
+              auditHint: audit.simulatedPlaythrough,
+            );
+            scenario = _parseScenario(repaired, config);
+
+            final reAudit = await auditor.audit(scenario, config);
+            if (!reAudit.passed) {
+              lastError = ScenarioGenerationException(
+                'AI監査失敗 (試行 $attempt/$maxAttempts): ${reAudit.issues.firstOrNull ?? reAudit.failedCheckNames.first}',
+              );
+              previousErrors = [
+                ...reAudit.issues,
+                ...reAudit.failedCheckNames.map((n) => 'AI監査: $n 不合格'),
+              ];
+              continue;
+            }
+          }
+        }
+
+        // Step 7: Polish narrative
+        _setStep(progress, 7, onProgress);
+        final polished = await _polishScenario(auditModel, scenario, config);
+        scenario = _parseScenario(polished, config);
+
+        final finalReport = validator.validate(scenario, config, strict: true);
+        if (!finalReport.passed) {
+          progress.errors = finalReport.allErrors;
+          lastError = ScenarioGenerationException(
+            '仕上げ後の整合性チェック失敗: ${finalReport.allErrors.first}',
+          );
+          previousErrors = finalReport.allErrors;
           continue;
         }
 
-        // Step 5: AI solvability check
-        _updateProgress(progress, 5, onProgress);
-        final solvable = await _verifySolvability(model, scenario);
-        if (!solvable) {
-          progress.errors = ['AI検証: 推理可能なルートが確認できませんでした'];
-          lastError = ScenarioGenerationException(
-            '正解ルート検証失敗 (試行 $attempt/$maxAttempts)',
-          );
-          continue;
-        }
-
-        // Step 6: Success
-        _updateProgress(progress, 6, onProgress);
+        // Step 8: Success
+        _setStep(progress, 8, onProgress);
         progress.status = GenerationStatus.success;
         progress.message = 'シナリオ完成！';
         onProgress?.call(progress);
@@ -94,10 +159,12 @@ class ScenarioGenerator {
       } on ScenarioGenerationException catch (e) {
         lastError = e;
         progress.errors = [e.message];
+        previousErrors = [e.message];
         onProgress?.call(progress);
       } catch (e) {
         lastError = ScenarioGenerationException('生成エラー: $e');
         progress.errors = [e.toString()];
+        previousErrors = [e.toString()];
         onProgress?.call(progress);
       }
     }
@@ -108,123 +175,329 @@ class ScenarioGenerator {
     throw lastError ?? ScenarioGenerationException('シナリオ生成に失敗しました');
   }
 
-  void _updateProgress(GenerationProgress progress, int step, ProgressCallback? cb) {
-    progress.currentStep = step;
-    progress.message = GenerationStep.steps[step - 1].message;
-    cb?.call(progress);
+  genai.GenerativeModel _createModel(String modelName, double temperature) {
+    return genai.GenerativeModel(
+      model: modelName,
+      apiKey: SettingsService.instance.apiKey!,
+      generationConfig: genai.GenerationConfig(
+        temperature: temperature,
+        responseMimeType: 'application/json',
+      ),
+    );
   }
 
-  Future<Map<String, dynamic>> _generateScenarioJson(
-    GenerativeModel model,
+  Future<Map<String, dynamic>> _generateMultiStep(
+    genai.GenerativeModel model,
     ScenarioConfig config,
-    int attempt,
-  ) async {
-    final clueCount = ScenarioValidator.clueCountForPlayers(config.playerCount);
-    final isCoop = config.playerCount <= 3;
-    final retryHint = attempt > 1
-        ? '\n\n前回の生成は整合性チェックに失敗しました。アリバイと犯行時刻の矛盾がないこと、'
-            'critical手がかりが2枚以上あり犯人特定に到達できることを必ず守ってください。'
-        : '';
+    GenerationProgress progress,
+    ProgressCallback? onProgress, {
+    List<String> previousErrors = const [],
+  }) async {
+    final errorHint = previousErrors.isEmpty
+        ? ''
+        : '\n\n## 前回の失敗（必ず修正）\n${previousErrors.take(5).map((e) => '- $e').join('\n')}';
 
-    final prompt = '''
-あなたはプロのマーダーミステリーシナリオライターです。
-以下の条件で完全なシナリオをJSON形式で生成してください。
+    _setStep(progress, 1, onProgress);
+    final foundation = await _callJson(model, _worldPrompt(config, errorHint));
+
+    _setStep(progress, 2, onProgress);
+    final charactersJson = await _callJson(
+      model,
+      _charactersPrompt(config, foundation, errorHint),
+    );
+
+    _setStep(progress, 3, onProgress);
+    final scriptsJson = await _callJson(
+      model,
+      _scriptsPrompt(config, foundation, charactersJson, errorHint),
+    );
+
+    _setStep(progress, 4, onProgress);
+    final cluesJson = await _callJson(
+      model,
+      _cluesPrompt(config, foundation, charactersJson, scriptsJson, errorHint),
+    );
+
+    return _assembleScenario(foundation, charactersJson, scriptsJson, cluesJson);
+  }
+
+  String _worldPrompt(ScenarioConfig config, String errorHint) {
+    final isCoop = config.playerCount <= 3;
+    final culpritRule = isCoop
+        ? '犯人(culpritId)はNPC容疑者(isPlayer:false)の1人。プレイヤーは探偵チーム。'
+        : '犯人(culpritId)はプレイヤーキャラ(isPlayer:true)の1人。全員容疑者。';
+
+    return '''
+プロのマーダーミステリーライターとして、シナリオの骨格を設計してください。
 
 ## 条件
 - ジャンル: ${config.genre}
 - 難易度: ${config.difficulty}
 - プレイ時間: ${config.estimatedMinutes}分
-- プレイ人数: ${config.playerCount}人
+- 人数: ${config.playerCount}人
 - テーマ: ${config.theme}
-- 手がかり数: ${clueCount}枚（critical: 3枚, important: 4枚, supplementary: 残り）
-- 言語: 日本語
-- モード: ${isCoop ? '協力推理（2-3人、NPC容疑者を追加可）' : '対立推理（全員容疑者）'}
+- モード: ${isCoop ? '協力推理' : '対立推理'}
+- $culpritRule
 
-## 必須ルール
-1. 犯人はプレイヤーキャラ(${config.playerCount}人)の中の1人だけ
-2. アリバイと犯行時刻に矛盾がないこと
-3. critical手がかりを組み合わせれば犯人に到達できること
-4. 各キャラに秘密2-3個、ついてよい嘘1-2個、動機、アリバイ、目標を設定
-5. 犯人以外にも動機を持つキャラ（赤ヘリング）を含める
-6. あらすじは300-600字、後日談は100-200字
+## 品質要件
+- あらすじ400-700字、後日談150-250字
+- 真相解説600-900字
+- timelineは5-8イベント、犯行時刻と全員の動きが追えること
+- 犯人のアリバイは犯行時刻と矛盾するよう設計（後工程で台本化）
 
-## JSON形式（この構造を厳守）
+## JSON出力
 {
-  "title": "シナリオタイトル",
+  "title": "タイトル",
   "genre": "${config.genre}",
-  "synopsis": "共通あらすじ",
+  "synopsis": "あらすじ",
   "epilogue": "後日談",
   "truth": {
-    "culpritId": "char_xxx",
+    "culpritId": "char_or_npc_id",
     "crimeDescription": "事件概要",
     "method": "犯行手法",
     "motive": "動機",
     "timeOfCrime": "22:15",
     "location": "犯行場所",
-    "explanation": "真相解説（500字程度）"
+    "explanation": "真相解説"
   },
+  "timeline": [
+    {"time": "22:00", "event": "出来事", "location": "場所", "characterIds": ["char_1"]}
+  ]
+}
+$errorHint
+''';
+  }
+
+  String _charactersPrompt(
+    ScenarioConfig config,
+    Map<String, dynamic> foundation,
+    String errorHint,
+  ) {
+    final isCoop = config.playerCount <= 3;
+    final npcRule = isCoop
+        ? 'isPlayer:trueを${config.playerCount}人（探偵）。NPC容疑者(isPlayer:false)を最低2人追加。'
+        : 'isPlayer:trueを${config.playerCount}人。NPCは不要。';
+
+    return '''
+以下の事件骨格に基づき、登場人物を設計してください。
+犯人ID: ${(foundation['truth'] as Map)['culpritId']}
+
+## 骨格
+${jsonEncode(foundation)}
+
+## ルール
+- $npcRule
+- 各キャラにユニークなid（char_xxx / npc_xxx）
+- publicProfileは100-150字
+- privateScriptは次ステップで詳細化するため、ここでは roleOutline のみ
+
+## JSON出力
+{
   "characters": [
     {
-      "id": "char_xxx",
+      "id": "char_1",
       "name": "名前",
       "age": 30,
       "occupation": "職業",
-      "publicProfile": "公開情報",
+      "publicProfile": "公開プロフィール",
       "isPlayer": true,
-      "privateScript": {
-        "role": "役割",
-        "relationship": "関係",
-        "secrets": ["秘密1", "秘密2"],
-        "allowedLies": ["嘘1"],
-        "motive": "動機",
-        "alibi": "22:00-22:30 場所と行動",
-        "objectives": ["目標1"]
-      }
-    }
-  ],
-  "clues": [
-    {
-      "id": "clue_xxx",
-      "title": "手がかりタイトル",
-      "content": "内容",
-      "type": "physical|testimony|document|digital",
-      "importance": "critical|important|supplementary"
+      "roleOutline": "この人物の役割概要"
     }
   ]
 }
+$errorHint
+''';
+  }
 
-charactersはisPlayer:trueを${config.playerCount}人。
-${isCoop ? 'NPC容疑者(isPlayer:false)を1-2人追加してよい。' : '全員isPlayer:true。'}
-$retryHint
+  String _scriptsPrompt(
+    ScenarioConfig config,
+    Map<String, dynamic> foundation,
+    Map<String, dynamic> charactersJson,
+    String errorHint,
+  ) {
+    final culpritId = (foundation['truth'] as Map)['culpritId'];
+    return '''
+各キャラクターの個人台本を作成してください。
+
+## 骨格
+${jsonEncode(foundation)}
+
+## キャラクター
+${jsonEncode(charactersJson)}
+
+## ルール
+- 犯人($culpritId)のアリバイは犯行時刻 ${(foundation['truth'] as Map)['timeOfCrime']} と両立しないこと
+- 犯人以外: 秘密2-3個、ついてよい嘘1-2個、説得力ある動機
+- プレイヤーキャラ: objectives 2-3個
+- NPC容疑者: objectives は空配列可
+- アリバイは「HH:MM-HH:MM 場所と行動」形式
+
+## JSON出力
+{
+  "privateScripts": {
+    "char_1": {
+      "role": "役割",
+      "relationship": "被害者との関係",
+      "secrets": ["秘密1", "秘密2"],
+      "allowedLies": ["嘘1"],
+      "motive": "動機",
+      "alibi": "22:00-22:30 場所と行動",
+      "objectives": ["目標1"]
+    }
+  }
+}
+$errorHint
+''';
+  }
+
+  String _cluesPrompt(
+    ScenarioConfig config,
+    Map<String, dynamic> foundation,
+    Map<String, dynamic> charactersJson,
+    Map<String, dynamic> scriptsJson,
+    String errorHint,
+  ) {
+    final clueCount = ScenarioValidator.clueCountForPlayers(config.playerCount);
+    final critical = 3;
+    final important = 4;
+    final supplementary = clueCount - critical - important;
+
+    return '''
+手がかりと正解ルートを設計してください。
+
+## 骨格
+${jsonEncode(foundation)}
+
+## キャラクター
+${jsonEncode(charactersJson)}
+
+## 台本
+${jsonEncode(scriptsJson)}
+
+## ルール
+- 手がかり合計: $clueCount 枚（critical:$critical, important:$important, supplementary:$supplementary）
+- critical手がかりだけで犯人 ${(foundation['truth'] as Map)['culpritId']} に到達可能
+- 各手がかりは120-200字、具体的な内容
+- 赤 herring 用 important を2枚以上
+- solutionPath.deductionSteps は5-8ステップ
+
+## JSON出力
+{
+  "clues": [
+    {
+      "id": "clue_1",
+      "title": "タイトル",
+      "content": "内容",
+      "type": "physical",
+      "importance": "critical"
+    }
+  ],
+  "solutionPath": {
+    "requiredClueIds": ["clue_1", "clue_2"],
+    "deductionSteps": ["推理ステップ1", "推理ステップ2"],
+    "redHerringClueIds": ["clue_5"]
+  }
+}
+$errorHint
+''';
+  }
+
+  Map<String, dynamic> _assembleScenario(
+    Map<String, dynamic> foundation,
+    Map<String, dynamic> charactersJson,
+    Map<String, dynamic> scriptsJson,
+    Map<String, dynamic> cluesJson,
+  ) {
+    final scripts = scriptsJson['privateScripts'] as Map<String, dynamic>? ?? {};
+    final characters = (charactersJson['characters'] as List)
+        .map((c) {
+          final char = Map<String, dynamic>.from(c as Map<String, dynamic>);
+          final id = char['id'] as String;
+          char.remove('roleOutline');
+          char['privateScript'] = scripts[id] ?? _emptyScript();
+          return char;
+        })
+        .toList();
+
+    return {
+      'title': foundation['title'],
+      'genre': foundation['genre'],
+      'synopsis': foundation['synopsis'],
+      'epilogue': foundation['epilogue'],
+      'truth': foundation['truth'],
+      'characters': characters,
+      'clues': cluesJson['clues'],
+    };
+  }
+
+  Map<String, dynamic> _emptyScript() => {
+        'role': '',
+        'relationship': '',
+        'secrets': [],
+        'allowedLies': [],
+        'motive': '',
+        'alibi': '',
+        'objectives': [],
+      };
+
+  Future<Map<String, dynamic>> _repairScenario(
+    genai.GenerativeModel model,
+    Scenario scenario,
+    ScenarioConfig config,
+    List<String> errors, {
+    String auditHint = '',
+  }) async {
+    final prompt = '''
+以下のマーダーミステリーシナリオJSONに問題があります。修正版を全文出力してください。
+
+## 問題点
+${errors.map((e) => '- $e').join('\n')}
+
+${auditHint.isNotEmpty ? '## 推理シミュレーション参考\n$auditHint\n' : ''}
+
+## プレイ人数: ${config.playerCount}人
+## モード: ${config.playerCount <= 3 ? '協力推理（犯人はNPC）' : '対立推理（犯人はプレイヤー）'}
+
+## 現在のシナリオ
+${jsonEncode(scenario.toJson())}
+
+## 出力
+修正済みの完全なシナリオJSON（title, genre, synopsis, epilogue, truth, characters, clues を含む）
 ''';
 
-    final response = await model.generateContent([Content.text(prompt)]);
+    return _callJson(model, prompt);
+  }
+
+  Future<Map<String, dynamic>> _polishScenario(
+    genai.GenerativeModel model,
+    Scenario scenario,
+    ScenarioConfig config,
+  ) async {
+    final prompt = '''
+以下のシナリオの文章品質を向上させてください。構造・ID・人数・手がかり数は変えないこと。
+
+## 改善点
+- あらすじ・後日談・真相解説を読みやすく演出
+- 手がかりの content を具体化（数値・固有名詞を追加）
+- キャラクターの secrets / objectives をプレイしやすく
+
+## シナリオ
+${jsonEncode(scenario.toJson())}
+
+## 出力
+同じJSON構造の完成版
+''';
+
+    return _callJson(model, prompt);
+  }
+
+  Future<Map<String, dynamic>> _callJson(genai.GenerativeModel model, String prompt) async {
+    final response = await model.generateContent([genai.Content.text(prompt)]);
     final text = response.text;
     if (text == null || text.isEmpty) {
       throw ScenarioGenerationException('Geminiから空の応答');
     }
     return _extractJson(text);
-  }
-
-  Future<bool> _verifySolvability(GenerativeModel model, Scenario scenario) async {
-    final prompt = '''
-以下のマーダーミステリーシナリオについて、プレイヤー視点で推理シミュレーションを行い、
-critical/importance手がかりだけで犯人を特定できるか検証してください。
-
-シナリオJSON:
-${jsonEncode(scenario.toJson())}
-
-以下のJSON形式のみで回答:
-{"solvable": true/false, "reason": "理由"}
-''';
-
-    try {
-      final response = await model.generateContent([Content.text(prompt)]);
-      final json = _extractJson(response.text ?? '{"solvable": false}');
-      return json['solvable'] == true;
-    } catch (_) {
-      return true; // AI check failure doesn't block if code validation passed
-    }
   }
 
   Scenario _parseScenario(Map<String, dynamic> json, ScenarioConfig config) {
@@ -237,7 +510,7 @@ ${jsonEncode(scenario.toJson())}
       epilogue: json['epilogue'] as String? ?? '',
       truth: ScenarioTruth.fromJson(json['truth'] as Map<String, dynamic>),
       characters: (json['characters'] as List)
-          .map((e) => ScenarioCharacter.fromJson(e as Map<String, dynamic>))
+          .map((e) => _parseCharacter(e as Map<String, dynamic>))
           .toList(),
       clues: (json['clues'] as List)
           .map((e) => ScenarioClue.fromJson(e as Map<String, dynamic>))
@@ -245,6 +518,27 @@ ${jsonEncode(scenario.toJson())}
       playerCount: config.playerCount,
       gameMode: config.playerCount <= 3 ? 'cooperative' : 'competitive',
     );
+  }
+
+  ScenarioCharacter _parseCharacter(Map<String, dynamic> json) {
+    return ScenarioCharacter(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      age: _parseInt(json['age'], defaultValue: 30),
+      occupation: json['occupation'] as String? ?? '',
+      publicProfile: json['publicProfile'] as String? ?? '',
+      isPlayer: json['isPlayer'] as bool? ?? true,
+      privateScript: PrivateScript.fromJson(
+        json['privateScript'] as Map<String, dynamic>,
+      ),
+    );
+  }
+
+  int _parseInt(dynamic value, {required int defaultValue}) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? defaultValue;
+    return defaultValue;
   }
 
   Map<String, dynamic> _extractJson(String text) {
@@ -259,6 +553,17 @@ ${jsonEncode(scenario.toJson())}
       throw ScenarioGenerationException('JSONが見つかりません');
     }
     return jsonDecode(cleaned.substring(start, end + 1)) as Map<String, dynamic>;
+  }
+
+  void _setStep(
+    GenerationProgress progress,
+    int step,
+    ProgressCallback? cb, {
+    String? message,
+  }) {
+    progress.currentStep = step;
+    progress.message = message ?? GenerationStep.steps[step - 1].message;
+    cb?.call(progress);
   }
 }
 
