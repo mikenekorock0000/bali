@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/api_key_source.dart';
+
 class SettingsService {
   SettingsService._();
   static final SettingsService instance = SettingsService._();
@@ -8,18 +10,19 @@ class SettingsService {
   static const _soundEnabledKey = 'sound_enabled';
   static const _volumeKey = 'volume';
 
-  String? _apiKey;
+  String? _storedApiKey;
   bool _soundEnabled = true;
   double _volume = 0.8;
 
-  String? get apiKey => _apiKey;
-  bool get hasApiKey => _apiKey != null && _apiKey!.isNotEmpty;
+  String? get apiKey => ApiKeySource.resolve(_storedApiKey);
+  bool get hasApiKey => apiKey != null && apiKey!.isNotEmpty;
+  bool get isApiKeyFromEnvironment => ApiKeySource.isFromEnvironment(_storedApiKey);
   bool get soundEnabled => _soundEnabled;
   double get volume => _volume;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    _apiKey = prefs.getString(_apiKeyKey);
+    _storedApiKey = prefs.getString(_apiKeyKey);
     _soundEnabled = prefs.getBool(_soundEnabledKey) ?? true;
     _volume = prefs.getDouble(_volumeKey) ?? 0.8;
   }
@@ -27,13 +30,13 @@ class SettingsService {
   Future<void> saveApiKey(String key) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_apiKeyKey, key.trim());
-    _apiKey = key.trim();
+    _storedApiKey = key.trim();
   }
 
   Future<void> clearApiKey() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_apiKeyKey);
-    _apiKey = null;
+    _storedApiKey = null;
   }
 
   Future<void> setSoundEnabled(bool enabled) async {

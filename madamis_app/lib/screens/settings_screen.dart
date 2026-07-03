@@ -46,14 +46,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 8),
           Text(
             'Google AI Studio でAPIキーを取得してください。\n'
-            'https://aistudio.google.com/apikey',
+            'https://aistudio.google.com/apikey\n\n'
+            'Cloud Agent / CI では環境変数 GEMINI_API_KEY でも読み込めます。',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
           ),
           const SizedBox(height: 16),
           if (app.hasApiKey)
             Chip(
-              avatar: const Icon(Icons.check, size: 16),
-              label: const Text('APIキー設定済み'),
+              avatar: Icon(
+                SettingsService.instance.isApiKeyFromEnvironment
+                    ? Icons.cloud
+                    : Icons.check,
+                size: 16,
+              ),
+              label: Text(
+                SettingsService.instance.isApiKeyFromEnvironment
+                    ? 'APIキー: 環境変数 GEMINI_API_KEY'
+                    : 'APIキー設定済み',
+              ),
             ),
           const SizedBox(height: 8),
           TextField(
