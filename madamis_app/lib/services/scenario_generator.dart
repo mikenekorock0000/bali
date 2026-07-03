@@ -91,7 +91,7 @@ class ScenarioGenerator {
           }
 
           _setStep(progress, 5, onProgress, message: '整合性エラーを修復中... (${repair + 1})');
-          final repaired = await _repairScenario(
+          final repaired = await _repairForErrors(
             repairModel,
             scenario,
             config,
@@ -378,7 +378,11 @@ ${jsonEncode(scriptsJson)}
 ## ルール
 - 手がかり合計: $clueCount 枚（critical:$critical, important:$important, supplementary:$supplementary）
 - critical手がかりだけで犯人 ${(foundation['truth'] as Map)['culpritId']} に到達可能
-- 各手がかりは120-200字、具体的な内容
+- critical手がかり（$critical枚）には必ず以下のいずれかを明示すること:
+  * 犯行手法「${(foundation['truth'] as Map)['method']}」に関する具体的情報
+  * 動機「${(foundation['truth'] as Map)['motive']}」に関する手がかり
+  * 犯行時刻 ${(foundation['truth'] as Map)['timeOfCrime']} や犯行場所に関する証拠
+- 各手がかりは120-200字、具体的な内容（固有名詞・数値を含む）
 - 赤 herring 用 important を2枚以上
 - solutionPath.deductionSteps は5-8ステップ
 
@@ -441,6 +445,58 @@ $errorHint
         'objectives': [],
       };
 
+  Future<Map<String, dynamic>> _repairForErrors(
+    genai.GenerativeModel model,
+    Scenario scenario,
+    ScenarioConfig config,
+    List<String> errors, {
+    String auditHint = '',
+  }) async {
+    final clueOnly = errors.every((e) => e.contains('clue_reachability'));
+    if (clueOnly) {
+      return _repairCluesOnly(model, scenario, errors);
+    }
+    return _repairScenario(model, scenario, config, errors, auditHint: auditHint);
+  }
+
+  Future<Map<String, dynamic>> _repairCluesOnly(
+    genai.GenerativeModel model,
+    Scenario scenario,
+    List<String> errors,
+  ) async {
+    final truth = scenario.truth;
+    final critical = scenario.clues.where((c) => c.importance == 'critical').toList();
+    final prompt = '''
+critical手がかりに犯行関連情報が不足しています。手がかりのみ修正してください。
+
+## 問題
+${errors.map((e) => '- $e').join('\n')}
+
+## 真相（参照用・変更不可）
+- 犯行手法: ${truth.method}
+- 動機: ${truth.motive}
+- 犯行時刻: ${truth.timeOfCrime}
+- 犯行場所: ${truth.location}
+- 犯人ID: ${truth.culpritId}
+
+## 現在のcritical手がかり
+${jsonEncode(critical.map((c) => c.toJson()).toList())}
+
+## 修正ルール
+- critical手がかりの content を書き換え、各枚に犯行手法・動機・時刻のいずれかを具体的に含める
+- id / importance / type / 手がかり総数は変えない
+- 他の importance の手がかりも含めた clues 配列全体を返す
+
+## 出力
+{ "clues": [ ...全手がかり... ] }
+''';
+
+    final result = await _callJson(model, prompt);
+    final json = scenario.toJson();
+    json['clues'] = result['clues'];
+    return json;
+  }
+
   Future<Map<String, dynamic>> _repairScenario(
     genai.GenerativeModel model,
     Scenario scenario,
@@ -453,6 +509,7 @@ $errorHint
 
 ## 問題点
 ${errors.map((e) => '- $e').join('\n')}
+${_repairHintsFor(errors)}
 
 ${auditHint.isNotEmpty ? '## 推理シミュレーション参考\n$auditHint\n' : ''}
 
@@ -490,6 +547,27 @@ ${jsonEncode(scenario.toJson())}
 ''';
 
     return _callJson(model, prompt);
+  }
+
+  String _repairHintsFor(List<String> errors) {
+    final hints = <String>[];
+    if (errors.any((e) => e.contains('clue_reachability'))) {
+      hints.add('''
+## clue_reachability 修正指示
+- critical手がかりの本文に、犯行手法・動機・犯行時刻のいずれかを具体的な固有名詞付きで記述すること
+- 「事件」「調査」だけの抽象表現は不可。証拠物・記録・証言など具体的な内容にすること''');
+    }
+    if (errors.any((e) => e.contains('required_fields'))) {
+      hints.add('''
+## required_fields 修正指示
+- 全プレイヤーキャラに secrets を2個以上、alibi を「HH:MM-HH:MM 場所と行動」形式で記述すること''');
+    }
+    if (errors.any((e) => e.contains('motive_culprit_match'))) {
+      hints.add('''
+## motive_culprit_match 修正指示
+- 犯人キャラの privateScript.motive を truth.motive と同じテーマ・キーワードを含むよう修正すること''');
+    }
+    return hints.isEmpty ? '' : hints.join('\n');
   }
 
   Future<Map<String, dynamic>> _callJson(genai.GenerativeModel model, String prompt) async {

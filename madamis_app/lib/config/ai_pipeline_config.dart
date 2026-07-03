@@ -10,7 +10,7 @@ class AiPipelineConfig {
   static const maxAttempts = 8;
 
   /// 1試行あたりのAI修復パス（整合性エラー時）
-  static const maxRepairPasses = 2;
+  static const maxRepairPasses = 4;
 
   static const creativeTemperature = 0.85;
   static const auditTemperature = 0.15;

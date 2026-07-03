@@ -109,27 +109,54 @@ class ScenarioValidator {
     if (critical.length < 2) {
       errors.add('critical手がかりが${critical.length}枚（最低2枚必要）');
     }
+
     final culpritId = scenario.truth.culpritId;
-    final implicatesCulprit = critical.any((c) {
-      final text = '${c.title} ${c.content}'.toLowerCase();
-      final culprit = scenario.characters.firstWhere((ch) => ch.id == culpritId);
-      return text.contains(culprit.name.toLowerCase()) ||
-          culprit.privateScript.secrets.any((s) => text.contains(s.substring(0, s.length.clamp(0, 10))));
-    });
-    if (!implicatesCulprit && critical.isNotEmpty) {
-      // Soft check: at least one critical clue should relate to crime method/motive
-      final hasCrimeHint = critical.any((c) =>
-          c.content.contains('毒') ||
-          c.content.contains('犯') ||
-          c.content.contains('動機') ||
-          c.content.contains('遺言') ||
-          c.content.contains('記録') ||
-          c.content.contains('証言'));
+    final culprit = _findCharacter(scenario, culpritId);
+    final implicatesCulprit = culprit != null &&
+        critical.any((c) {
+          final text = '${c.title} ${c.content}'.toLowerCase();
+          return text.contains(culprit.name.toLowerCase()) ||
+              culprit.privateScript.secrets.any(
+                (s) => s.length >= 4 && text.contains(s.substring(0, 4)),
+              );
+        });
+
+    if (!implicatesCulprit) {
+      final hasCrimeHint = critical.any((c) => _clueRelatesToCrime(c, scenario.truth));
       if (!hasCrimeHint) {
         errors.add('critical手がかりに犯行関連の情報が不足');
       }
     }
     return ValidationCheck(name: 'clue_reachability', passed: errors.isEmpty, errors: errors);
+  }
+
+  ScenarioCharacter? _findCharacter(Scenario scenario, String id) {
+    for (final c in scenario.characters) {
+      if (c.id == id) return c;
+    }
+    return null;
+  }
+
+  bool _clueRelatesToCrime(ScenarioClue clue, ScenarioTruth truth) {
+    final text = '${clue.title} ${clue.content}';
+    const crimeKeywords = [
+      '毒', '犯', '動機', '遺言', '記録', '証言', '殺', '死', '凶器',
+      '血', '手法', '犯行', '密室', '死因', '目撃', 'アリバイ', '時刻',
+      '傷', '事故', '事件', '被害', '遺体',
+    ];
+    if (crimeKeywords.any(text.contains)) return true;
+
+    for (final field in [
+      truth.method,
+      truth.motive,
+      truth.crimeDescription,
+      truth.location,
+      truth.timeOfCrime,
+    ]) {
+      final words = field.split(RegExp(r'[、。\s・「」『』]+')).where((w) => w.length >= 2);
+      if (words.any(text.contains)) return true;
+    }
+    return false;
   }
 
   ValidationCheck _checkCulpritIsPlayer(Scenario scenario) {
@@ -146,7 +173,14 @@ class ScenarioValidator {
   }
 
   ValidationCheck _checkMotiveConsistency(Scenario scenario) {
-    final culprit = scenario.characters.firstWhere((c) => c.id == scenario.truth.culpritId);
+    final culprit = _findCharacter(scenario, scenario.truth.culpritId);
+    if (culprit == null) {
+      return ValidationCheck(
+        name: 'motive_culprit_match',
+        passed: false,
+        errors: ['犯人キャラが見つからない'],
+      );
+    }
     final truthMotive = scenario.truth.motive.toLowerCase();
     final charMotive = culprit.privateScript.motive.toLowerCase();
     // Motives should share some semantic overlap (simple keyword check)

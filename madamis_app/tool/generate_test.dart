@@ -42,7 +42,7 @@ Future<void> main(List<String> args) async {
   final stopwatch = Stopwatch()..start();
 
   try {
-    final generator = ScenarioGenerator(maxAttempts: 3);
+    final generator = ScenarioGenerator(maxAttempts: 2);
     final scenario = await generator.generate(
       config,
       apiKey: apiKey,
