@@ -50,6 +50,14 @@ class LobbyScreen extends StatelessWidget {
                     style: Theme.of(context).textTheme.headlineMedium,
                     textAlign: TextAlign.center,
                   ),
+                  if (app.engine.session?.scenario.gameMode == 'cooperative')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Chip(
+                        label: const Text('協力推理モード'),
+                        avatar: const Icon(Icons.groups, size: 16),
+                      ),
+                    ),
                   const SizedBox(height: 4),
                   Text(
                     'ルーム ${app.roomId}',

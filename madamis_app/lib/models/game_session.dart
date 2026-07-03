@@ -125,6 +125,7 @@ class GameSession {
     List<ClueTransfer>? transfers,
     this.startedAt,
     this.isStarted = false,
+    this.sharedTokensRemaining,
   })  : phaseStartedAt = phaseStartedAt ?? DateTime.now(),
         phaseTimeoutAt = phaseTimeoutAt,
         players = players ?? [],
@@ -148,6 +149,9 @@ class GameSession {
   List<ClueTransfer> transfers;
   DateTime? startedAt;
   bool isStarted;
+  int? sharedTokensRemaining;
+
+  bool get isCooperative => scenario.gameMode == 'cooperative';
 
   bool get allCharactersSelected {
     if (players.isEmpty) return false;
@@ -177,6 +181,8 @@ class GameSession {
         'startedAt': startedAt?.toIso8601String(),
         'isStarted': isStarted,
         'canStart': canStart,
+        'sharedTokensRemaining': sharedTokensRemaining,
+        'gameMode': scenario.gameMode,
       };
 
   factory GameSession.fromJson(Map<String, dynamic> json) {

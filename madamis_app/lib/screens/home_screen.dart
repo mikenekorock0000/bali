@@ -50,12 +50,12 @@ class _HomeBodyState extends State<_HomeBody> {
         ],
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Spacer(),
+              const SizedBox(height: 16),
               Icon(
                 Icons.theater_comedy,
                 size: 80,
@@ -77,7 +77,7 @@ class _HomeBodyState extends State<_HomeBody> {
                       color: Colors.grey,
                     ),
               ),
-              const Spacer(),
+              const SizedBox(height: 32),
               FilledButton.icon(
                 onPressed: widget.app.goToScenarioConfig,
                 icon: const Icon(Icons.auto_awesome),
@@ -91,7 +91,16 @@ class _HomeBodyState extends State<_HomeBody> {
               OutlinedButton.icon(
                 onPressed: () => widget.app.startHostWithFixedScenario(maxPlayers: _playerCount),
                 icon: const Icon(Icons.play_arrow),
-                label: const Text('固定シナリオで遊ぶ（デモ）'),
+                label: const Text('固定シナリオで遊ぶ（4人・対立）'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => widget.app.startHostWithCoopScenario(playerCount: 2),
+                icon: const Icon(Icons.groups),
+                label: const Text('協力推理デモ（2人）'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -104,7 +113,7 @@ class _HomeBodyState extends State<_HomeBody> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'デモ人数: $_playerCount 人',
+                        '対立デモ人数: $_playerCount 人',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Slider(

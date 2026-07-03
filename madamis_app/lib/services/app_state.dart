@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../data/coop_scenario.dart';
 import '../models/game_phase.dart';
 import '../models/scenario.dart';
 import '../models/scenario_config.dart';
@@ -63,6 +64,11 @@ class AppState extends ChangeNotifier {
   void goToHome() {
     _screen = AppScreen.home;
     notifyListeners();
+  }
+
+  Future<void> startHostWithCoopScenario({int playerCount = 2}) async {
+    final scenario = createCoopScenario(playerCount: playerCount);
+    await _startServer(createRoom: () => _engine.createRoomWithScenario(scenario));
   }
 
   Future<void> startHostWithFixedScenario({int maxPlayers = 4}) async {

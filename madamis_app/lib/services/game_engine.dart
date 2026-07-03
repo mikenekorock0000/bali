@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:uuid/uuid.dart';
 
 import '../config/constants.dart';
+import '../config/game_rules.dart';
 import '../data/fixed_scenario.dart';
 import '../models/game_phase.dart';
 import '../models/game_session.dart';
@@ -26,11 +27,15 @@ class GameEngine {
   String createRoom({int playerCount = 4, Scenario? scenario}) {
     final s = scenario ?? createFixedScenario(playerCount: playerCount);
     final roomId = (_random.nextInt(9000) + 1000).toString();
+    final isCoop = GameRules.isCooperativeMode(s.gameMode);
     _session = GameSession(
       id: _uuid.v4(),
       roomId: roomId,
       scenario: s,
       deckClues: s.clues.map((c) => c.id).toList()..shuffle(_random),
+      sharedTokensRemaining: isCoop
+          ? GameRules.sharedTokensForPlayers(s.playerCount)
+          : null,
     );
     return roomId;
   }
@@ -71,7 +76,8 @@ class GameEngine {
     final taken = session.players.any((p) => p.characterId == characterId);
     if (taken) return false;
 
-    final validChar = session.scenario.characters.any((c) => c.id == characterId);
+    final validChar = session.scenario.characters
+        .any((c) => c.id == characterId && c.isPlayer);
     if (!validChar) return false;
 
     final player = session.players.firstWhere((p) => p.id == playerId);
@@ -115,9 +121,17 @@ class GameEngine {
     if (session == null || session.phase != GamePhase.investigation) return null;
 
     final player = session.players.firstWhere((p) => p.id == playerId);
-    if (player.tokensRemaining <= 0 || session.deckClues.isEmpty) return null;
 
-    player.tokensRemaining--;
+    if (session.isCooperative) {
+      if ((session.sharedTokensRemaining ?? 0) <= 0 || session.deckClues.isEmpty) {
+        return null;
+      }
+      session.sharedTokensRemaining = session.sharedTokensRemaining! - 1;
+    } else {
+      if (player.tokensRemaining <= 0 || session.deckClues.isEmpty) return null;
+      player.tokensRemaining--;
+    }
+
     final clueId = session.deckClues.removeAt(0);
     player.handClues.add(clueId);
 
@@ -125,6 +139,7 @@ class GameEngine {
     _emit('clue_drawn', {
       'playerId': playerId,
       'clue': clue.toJson(),
+      'sharedTokensRemaining': session.sharedTokensRemaining,
     });
     return clue;
   }
@@ -223,18 +238,56 @@ class GameEngine {
           (voteCounts[vote.targetCharacterId] ?? 0) + 1;
     }
 
-    final scores = session.players.map((p) {
-      final playerVote = session.votes.firstWhere((v) => v.playerId == p.id);
-      final correct = playerVote.targetCharacterId == culpritId;
-      final cluesFound = p.handClues.length + p.publicClues.length;
-      return {
-        'playerId': p.id,
-        'nickname': p.nickname,
-        'voteCorrect': correct,
-        'cluesFound': cluesFound,
-        'totalScore': (correct ? 100 : 0) + cluesFound * 10,
+    final List<Map<String, dynamic>> scores;
+    final Map<String, dynamic> winner;
+
+    if (session.isCooperative) {
+      final teamChoice = _majorityVote(voteCounts);
+      final teamCorrect = teamChoice == culpritId;
+      final totalClues = session.players.fold<int>(
+        0,
+        (sum, p) => sum + p.handClues.length + p.publicClues.length,
+      );
+      final teamScore = (teamCorrect ? GameRules.teamScoreCorrect() : 0) +
+          totalClues * GameRules.teamScoreClueBonus();
+
+      scores = session.players
+          .map((p) => {
+                'playerId': p.id,
+                'nickname': p.nickname,
+                'voteCorrect': teamCorrect,
+                'cluesFound': p.handClues.length + p.publicClues.length,
+                'totalScore': teamScore,
+                'teamScore': teamScore,
+              })
+          .toList();
+
+      winner = {
+        'type': 'team',
+        'teamCorrect': teamCorrect,
+        'teamChoice': teamChoice,
+        'totalScore': teamScore,
       };
-    }).toList();
+    } else {
+      scores = session.players.map((p) {
+        final playerVote = session.votes.firstWhere((v) => v.playerId == p.id);
+        final correct = playerVote.targetCharacterId == culpritId;
+        final cluesFound = p.handClues.length + p.publicClues.length;
+        return {
+          'playerId': p.id,
+          'nickname': p.nickname,
+          'voteCorrect': correct,
+          'cluesFound': cluesFound,
+          'totalScore':
+              (correct ? GameRules.competitiveScoreCorrect() : 0) +
+                  cluesFound * GameRules.competitiveScoreClueBonus(),
+        };
+      }).toList();
+
+      winner = scores.reduce(
+        (a, b) => (a['totalScore'] as int) > (b['totalScore'] as int) ? a : b,
+      );
+    }
 
     _emit('all_voted', {'votes': session.votes.map((v) => v.toJson()).toList()});
     _advanceToPhase(GamePhase.truthReveal);
@@ -250,12 +303,16 @@ class GameEngine {
         _emit('results', {
           'scores': scores,
           'culpritId': culpritId,
-          'winner': scores.reduce(
-            (a, b) => (a['totalScore'] as int) > (b['totalScore'] as int) ? a : b,
-          ),
+          'winner': winner,
+          'gameMode': session.scenario.gameMode,
         });
       });
     });
+  }
+
+  String? _majorityVote(Map<String, int> voteCounts) {
+    if (voteCounts.isEmpty) return null;
+    return voteCounts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
   }
 
   void _advanceFromCurrentPhase() {
@@ -354,6 +411,8 @@ class GameEngine {
         'phaseLabel': session.phase.label,
         'phaseTimeoutAt': session.phaseTimeoutAt?.toIso8601String(),
         'isStarted': session.isStarted,
+        'gameMode': session.scenario.gameMode,
+        'sharedTokensRemaining': session.sharedTokensRemaining,
         'synopsis': session.scenario.synopsis,
         'epilogue': session.phase.index >= GamePhase.epilogue.index
             ? session.scenario.epilogue
@@ -386,14 +445,22 @@ class GameEngine {
                 'connectionStatus': p.connectionStatus,
               })
           .toList(),
-      'characters': session.scenario.playerCharacters
+      'characters': _voteTargets(session)
           .map((c) => {
                 'id': c.id,
                 'name': c.name,
                 'occupation': c.occupation,
+                'isNpc': !c.isPlayer,
               })
           .toList(),
     };
+  }
+
+  List<ScenarioCharacter> _voteTargets(GameSession session) {
+    if (session.isCooperative) {
+      return session.scenario.characters.where((c) => !c.isPlayer).toList();
+    }
+    return session.scenario.playerCharacters;
   }
 
   void _emit(String type, Map<String, dynamic> data) {

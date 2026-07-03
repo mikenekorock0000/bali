@@ -43,16 +43,22 @@ class ScenarioValidator {
   }
 
   ValidationReport validate(Scenario scenario, ScenarioConfig config) {
+    final isCoop = config.playerCount <= 3;
     final checks = [
       _checkCharacterCount(scenario, config),
       _checkCulpritExists(scenario),
       _checkClueCount(scenario, config),
       _checkCriticalClues(scenario),
-      _checkCulpritIsPlayer(scenario),
+      if (isCoop) ...[
+        _checkCoopNpcs(scenario),
+        _checkCoopCulpritIsSuspect(scenario),
+      ] else
+        _checkCulpritIsPlayer(scenario),
       _checkMotiveConsistency(scenario),
       _checkRequiredFields(scenario),
       _checkUniqueCharacterIds(scenario),
       _checkUniqueClueIds(scenario),
+      _checkAlibiPresent(scenario),
     ];
 
     return ValidationReport(
@@ -178,6 +184,49 @@ class ScenarioValidator {
       name: 'unique_clue_ids',
       passed: ids.length == unique.length,
       errors: ids.length == unique.length ? [] : ['手がかりIDが重複'],
+    );
+  }
+
+  ValidationCheck _checkCoopNpcs(Scenario scenario) {
+    final npcs = scenario.characters.where((c) => !c.isPlayer).length;
+    final ok = npcs >= 2;
+    return ValidationCheck(
+      name: 'coop_npc_suspects',
+      passed: ok,
+      errors: ok ? [] : ['協力モード: NPC容疑者が${npcs}人（最低2人必要）'],
+    );
+  }
+
+  ValidationCheck _checkCoopCulpritIsSuspect(Scenario scenario) {
+    final matching =
+        scenario.characters.where((c) => c.id == scenario.truth.culpritId);
+    if (matching.isEmpty) {
+      return ValidationCheck(
+        name: 'coop_culprit_is_npc',
+        passed: false,
+        errors: ['犯人キャラが見つからない'],
+      );
+    }
+    final culprit = matching.first;
+    final ok = !culprit.isPlayer;
+    return ValidationCheck(
+      name: 'coop_culprit_is_npc',
+      passed: ok,
+      errors: ok ? [] : ['協力モード: 犯人はNPC容疑者である必要がある'],
+    );
+  }
+
+  ValidationCheck _checkAlibiPresent(Scenario scenario) {
+    final errors = <String>[];
+    for (final c in scenario.characters) {
+      if (c.privateScript.alibi.trim().length < 5) {
+        errors.add('${c.name}のアリバイが不十分');
+      }
+    }
+    return ValidationCheck(
+      name: 'alibi_present',
+      passed: errors.isEmpty,
+      errors: errors,
     );
   }
 }

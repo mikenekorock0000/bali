@@ -78,7 +78,7 @@ function handleWsEvent(data) {
     renderTruth(data.truth, data.epilogue);
     showScreen('truth');
   } else if (data.type === 'results') {
-    renderResults(data.scores, data.culpritId);
+    renderResults(data.scores, data.culpritId, data.gameMode);
     showScreen('results');
   }
 }
@@ -115,7 +115,10 @@ function renderState() {
   } else if (phase === 'private_reading' && character) {
     renderScript(character);
   } else if (phase === 'investigation') {
-    document.getElementById('tokens-display').textContent = `トークン: ${player.tokensRemaining}`;
+    const isCoop = session.gameMode === 'cooperative';
+    const tokens = isCoop ? session.sharedTokensRemaining : player.tokensRemaining;
+    document.getElementById('tokens-display').textContent =
+      isCoop ? `共有トークン: ${tokens}` : `トークン: ${tokens}`;
     renderClues('hand-clues', handClues, true);
     renderClues('public-clues', publicClues, false);
   } else if (phase === 'voting') {
@@ -176,7 +179,7 @@ function renderVoteList(characters) {
   const el = document.getElementById('vote-list');
   el.innerHTML = (characters || []).map(c => `
     <div class="character-card" onclick="vote('${c.id}')">
-      <h3>${c.name}</h3>
+      <h3>${c.name}${c.isNpc ? ' <span style="font-size:0.75rem;color:#888">(容疑者)</span>' : ''}</h3>
       <div class="meta">${c.occupation}</div>
     </div>
   `).join('');
@@ -192,8 +195,25 @@ function renderTruth(truth, epilogue) {
   `;
 }
 
-function renderResults(scores, culpritId) {
-  document.getElementById('results-content').innerHTML = `
+function renderResults(scores, culpritId, gameMode) {
+  const isCoop = gameMode === 'cooperative';
+  const teamScore = scores && scores[0] ? scores[0].totalScore : 0;
+  const teamCorrect = scores && scores[0] ? scores[0].voteCorrect : false;
+  document.getElementById('results-content').innerHTML = isCoop ? `
+    <p class="subtitle" style="margin-bottom:12px">
+      ${teamCorrect ? '🎉 チーム成功！' : '❌ チーム失敗'}
+    </p>
+    <p class="subtitle" style="margin-bottom:12px">犯人ID: ${culpritId}</p>
+    <div class="score-item winner">
+      <span>チームスコア</span>
+      <span>${teamScore}点</span>
+    </div>
+    ${(scores||[]).map(s => `
+      <div class="score-item">
+        <span>${s.nickname}（発見手がかり: ${s.cluesFound}）</span>
+      </div>
+    `).join('')}
+  ` : `
     <p class="subtitle" style="margin-bottom:12px">犯人: ${culpritId}</p>
     ${(scores||[]).map(s => `
       <div class="score-item ${s.voteCorrect ? 'winner' : ''}">
