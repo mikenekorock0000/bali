@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/game_phase.dart';
 import '../models/game_session.dart';
 import '../services/app_state.dart';
+import '../widgets/phase_overlay.dart';
 import '../widgets/phase_timer.dart';
 import '../widgets/player_list.dart';
 
@@ -27,36 +28,41 @@ class GameDashboardScreen extends StatelessWidget {
           const SizedBox(width: 16),
         ],
       ),
-      body: Row(
+      body: Stack(
         children: [
-          Expanded(
-            flex: 3,
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: _PhaseContent(phase: phase, session: session),
-            ),
-          ),
-          Expanded(
-            child: Container(
-              color: Theme.of(context).colorScheme.surface,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text('プレイヤー', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  Expanded(child: PlayerList(players: session.players, showDetails: true)),
-                  if (phase == GamePhase.results) ...[
-                    const Divider(),
-                    FilledButton(
-                      onPressed: () => app.stopHost(),
-                      child: const Text('ゲーム終了'),
-                    ),
-                  ],
-                ],
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: _PhaseContent(phase: phase, session: session),
+                ),
               ),
-            ),
+              Expanded(
+                child: Container(
+                  color: Theme.of(context).colorScheme.surface,
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('プレイヤー', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      Expanded(child: PlayerList(players: session.players, showDetails: true)),
+                      if (phase == GamePhase.results) ...[
+                        const Divider(),
+                        FilledButton(
+                          onPressed: () => app.stopHost(),
+                          child: const Text('ゲーム終了'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
+          const PhaseOverlay(),
         ],
       ),
     );

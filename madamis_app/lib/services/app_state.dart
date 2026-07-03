@@ -32,6 +32,8 @@ class AppState extends ChangeNotifier {
   String? _joinUrl;
   String? _roomId;
   String? _lastEvent;
+  GamePhase? _phaseOverlay;
+  Timer? _phaseOverlayTimer;
   StreamSubscription<Map<String, dynamic>>? _eventSub;
   Timer? _autoSaveTimer;
   bool _isRunning = false;
@@ -48,6 +50,7 @@ class AppState extends ChangeNotifier {
   GameEngine get engine => _engine;
   bool get isRunning => _isRunning;
   String? get lastEvent => _lastEvent;
+  GamePhase? get phaseOverlay => _phaseOverlay;
   GenerationProgress get generationProgress => _generationProgress;
   Scenario? get generatedScenario => _generatedScenario;
   String? get generationError => _generationError;
@@ -176,7 +179,14 @@ class AppState extends ChangeNotifier {
     if (_lastEvent == 'phase_changed') {
       final phaseId = event['phase'] as String?;
       if (phaseId != null) {
-        AudioService.instance.onPhaseChanged(GamePhase.fromId(phaseId));
+        final phase = GamePhase.fromId(phaseId);
+        AudioService.instance.onPhaseChanged(phase);
+        _phaseOverlay = phase;
+        _phaseOverlayTimer?.cancel();
+        _phaseOverlayTimer = Timer(const Duration(seconds: 3), () {
+          _phaseOverlay = null;
+          notifyListeners();
+        });
       }
     }
 
@@ -245,6 +255,7 @@ class AppState extends ChangeNotifier {
   void dispose() {
     _eventSub?.cancel();
     _autoSaveTimer?.cancel();
+    _phaseOverlayTimer?.cancel();
     _server?.stop();
     NetworkService.instance.stopHotspot();
     AudioService.instance.stopAll();

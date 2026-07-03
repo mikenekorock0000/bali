@@ -108,6 +108,15 @@ class _HomeBodyState extends State<_HomeBody> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
               ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => widget.app.startHostWithCoopScenario(playerCount: 3),
+                icon: const Icon(Icons.groups_3),
+                label: const Text('協力推理デモ（3人）'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
               const SizedBox(height: 16),
               Card(
                 child: Padding(

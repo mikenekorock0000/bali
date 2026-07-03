@@ -72,6 +72,24 @@ Scenario createCoopScenario({int playerCount = 2}) {
             objectives: ['科学的証拠を集める'],
           ),
         ),
+      if (playerCount >= 3)
+        ScenarioCharacter(
+          id: 'char_detective_3',
+          name: '探偵・白川',
+          age: 35,
+          occupation: '刑事（退職）',
+          publicProfile: '現場経験豊富なベテラン。証言の矛盾を見抜く。',
+          isPlayer: true,
+          privateScript: PrivateScript(
+            role: '探偵',
+            relationship: '現場に駆けつけた協力者',
+            secrets: ['佐藤の過去の不正を知っている'],
+            allowedLies: [],
+            motive: '事件解決と正義',
+            alibi: '21:00-22:00 店内で容疑者を監視',
+            objectives: ['証言の矛盾を突く'],
+          ),
+        ),
       // NPC容疑者
       ScenarioCharacter(
         id: 'npc_staff',

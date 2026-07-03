@@ -83,6 +83,56 @@ class GameEngine {
     return null;
   }
 
+  Player? getPlayerById(String id) {
+    final session = _session;
+    if (session == null) return null;
+    for (final p in session.players) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
+  void setPlayerConnection(String playerId, {required bool connected}) {
+    final session = _session;
+    if (session == null) return;
+    final matches = session.players.where((p) => p.id == playerId);
+    if (matches.isEmpty) return;
+    final player = matches.first;
+    player.connectionStatus = connected ? 'connected' : 'disconnected';
+    _emit(connected ? 'player_reconnected' : 'player_left', {
+      'player': player.toJson(),
+    });
+  }
+
+  bool whisper({
+    required String fromId,
+    required String toId,
+    String? clueId,
+    required String message,
+  }) {
+    final session = _session;
+    if (session == null || session.phase != GamePhase.investigation) return false;
+
+    final from = session.players.firstWhere((p) => p.id == fromId);
+    if (clueId != null && !from.handClues.contains(clueId)) return false;
+
+    session.whispers.add(Whisper(
+      fromPlayerId: fromId,
+      toPlayerId: toId,
+      clueId: clueId,
+      message: message,
+      timestamp: DateTime.now(),
+    ));
+
+    _emit('whisper_sent', {
+      'fromPlayerId': fromId,
+      'toPlayerId': toId,
+      'clueId': clueId,
+      'message': message,
+    });
+    return true;
+  }
+
   bool selectCharacter(String playerId, String characterId) {
     final session = _session;
     if (session == null || session.isStarted) return false;
@@ -466,6 +516,17 @@ class GameEngine {
                 'occupation': c.occupation,
                 'isNpc': !c.isPlayer,
               })
+          .toList(),
+      'otherPlayers': session.players
+          .where((p) => p.id != playerId)
+          .map((p) => {
+                'id': p.id,
+                'nickname': p.nickname,
+              })
+          .toList(),
+      'whispers': session.whispers
+          .where((w) => w.toPlayerId == playerId)
+          .map((w) => w.toJson())
           .toList(),
     };
   }

@@ -115,6 +115,33 @@ pre {
 .clue-card h4 { font-size: 0.95rem; margin-bottom: 4px; }
 .clue-card p { font-size: 0.85rem; color: var(--muted); }
 
+.clue-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.btn-sm { padding: 8px 12px; font-size: 0.85rem; width: auto; display: inline-block; }
+
+select {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
+
+.whisper-list { margin-top: 16px; }
+.whisper-card {
+  background: var(--surface);
+  border-left: 4px solid var(--primary);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+.whisper-from { font-size: 0.8rem; color: var(--primary); margin-bottom: 4px; }
+.whisper-clue { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+
+.timer-badge { background: var(--primary); }
+
 .section-title {
   font-size: 0.85rem;
   color: var(--muted);

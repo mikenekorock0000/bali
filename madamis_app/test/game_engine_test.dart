@@ -49,4 +49,57 @@ void main() {
     expect(clue, isNotNull);
     expect(p1.tokensRemaining, 2);
   });
+
+  test('player can transfer clue during investigation', () {
+    final engine = GameEngine();
+    engine.createRoom(playerCount: 4);
+
+    final p1 = engine.joinPlayer('Alice')!;
+    final p2 = engine.joinPlayer('Bob')!;
+
+    engine.selectCharacter(p1.id, 'char_doctor');
+    engine.selectCharacter(p2.id, 'char_niece');
+    engine.startGame();
+    engine.session!.phase = GamePhase.investigation;
+
+    final clue = engine.drawClue(p1.id)!;
+    final ok = engine.transferClue(p1.id, p2.id, clue.id);
+    expect(ok, isTrue);
+    expect(p1.handClues, isEmpty);
+    expect(p2.handClues, contains(clue.id));
+  });
+
+  test('player can whisper during investigation', () {
+    final engine = GameEngine();
+    engine.createRoom(playerCount: 4);
+
+    final p1 = engine.joinPlayer('Alice')!;
+    final p2 = engine.joinPlayer('Bob')!;
+
+    engine.selectCharacter(p1.id, 'char_doctor');
+    engine.selectCharacter(p2.id, 'char_niece');
+    engine.startGame();
+    engine.session!.phase = GamePhase.investigation;
+
+    final ok = engine.whisper(
+      fromId: p1.id,
+      toId: p2.id,
+      message: '秘密の情報',
+    );
+    expect(ok, isTrue);
+    expect(engine.session!.whispers.length, 1);
+    expect(engine.session!.whispers.first.message, '秘密の情報');
+  });
+
+  test('connection status updates on disconnect', () {
+    final engine = GameEngine();
+    engine.createRoom(playerCount: 4);
+
+    final p1 = engine.joinPlayer('Alice')!;
+    engine.setPlayerConnection(p1.id, connected: false);
+    expect(p1.connectionStatus, 'disconnected');
+
+    engine.setPlayerConnection(p1.id, connected: true);
+    expect(p1.connectionStatus, 'connected');
+  });
 }

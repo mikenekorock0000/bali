@@ -109,6 +109,30 @@ class ClueTransfer {
       };
 }
 
+class Whisper {
+  Whisper({
+    required this.fromPlayerId,
+    required this.toPlayerId,
+    this.clueId,
+    required this.message,
+    required this.timestamp,
+  });
+
+  final String fromPlayerId;
+  final String toPlayerId;
+  final String? clueId;
+  final String message;
+  final DateTime timestamp;
+
+  Map<String, dynamic> toJson() => {
+        'fromPlayerId': fromPlayerId,
+        'toPlayerId': toPlayerId,
+        'clueId': clueId,
+        'message': message,
+        'timestamp': timestamp.toIso8601String(),
+      };
+}
+
 class GameSession {
   GameSession({
     required this.id,
@@ -123,6 +147,7 @@ class GameSession {
     List<Vote>? votes,
     List<Accusation>? accusations,
     List<ClueTransfer>? transfers,
+    List<Whisper>? whispers,
     this.startedAt,
     this.isStarted = false,
     this.sharedTokensRemaining,
@@ -133,7 +158,8 @@ class GameSession {
         globalPublicClues = globalPublicClues ?? [],
         votes = votes ?? [],
         accusations = accusations ?? [],
-        transfers = transfers ?? [];
+        transfers = transfers ?? [],
+        whispers = whispers ?? [];
 
   final String id;
   final String roomId;
@@ -147,6 +173,7 @@ class GameSession {
   List<Vote> votes;
   List<Accusation> accusations;
   List<ClueTransfer> transfers;
+  List<Whisper> whispers;
   DateTime? startedAt;
   bool isStarted;
   int? sharedTokensRemaining;
@@ -178,6 +205,7 @@ class GameSession {
         'votes': votes.map((v) => v.toJson()).toList(),
         'accusations': accusations.map((a) => a.toJson()).toList(),
         'transfers': transfers.map((t) => t.toJson()).toList(),
+        'whispers': whispers.map((w) => w.toJson()).toList(),
         'startedAt': startedAt?.toIso8601String(),
         'isStarted': isStarted,
         'canStart': canStart,
@@ -229,6 +257,19 @@ class GameSession {
                   clueId: m['clueId'] as String,
                   fromPlayerId: m['fromPlayerId'] as String,
                   toPlayerId: m['toPlayerId'] as String,
+                  timestamp: DateTime.parse(m['timestamp'] as String),
+                );
+              })
+              .toList() ??
+          [],
+      whispers: (json['whispers'] as List?)
+              ?.map((e) {
+                final m = e as Map<String, dynamic>;
+                return Whisper(
+                  fromPlayerId: m['fromPlayerId'] as String,
+                  toPlayerId: m['toPlayerId'] as String,
+                  clueId: m['clueId'] as String?,
+                  message: m['message'] as String,
                   timestamp: DateTime.parse(m['timestamp'] as String),
                 );
               })

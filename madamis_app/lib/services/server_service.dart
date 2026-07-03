@@ -49,6 +49,7 @@ class ServerService {
     router.post('/api/game/clue/reveal', _handleRevealClue);
     router.post('/api/game/accuse', _handleAccuse);
     router.post('/api/game/vote', _handleVote);
+    router.post('/api/game/whisper', _handleWhisper);
     router.get('/api/players/me', _handleGetMe);
     router.get('/assets/<file|.*>', _serveAsset);
 
@@ -59,7 +60,7 @@ class ServerService {
     final wsHandler = webSocketHandler((WebSocketChannel channel) {
       channel.stream.listen(
         (message) => _handleWsMessage(channel, message),
-        onDone: () => _clients.remove(channel),
+        onDone: () => _handleWsDisconnect(channel),
       );
     });
 
@@ -91,6 +92,25 @@ class ServerService {
     _broadcastController.add({'type': type, ...data});
   }
 
+  void _sendToToken(String token, String type, Map<String, dynamic> data) {
+    final message = jsonEncode({'type': type, ...data});
+    for (final entry in _clients.entries) {
+      if (entry.value == token) {
+        entry.key.sink.add(message);
+      }
+    }
+  }
+
+  void _handleWsDisconnect(WebSocketChannel channel) {
+    final token = _clients.remove(channel);
+    if (token == null || token == 'tablet') return;
+
+    final player = engine.getPlayerByToken(token);
+    if (player != null) {
+      engine.setPlayerConnection(player.id, connected: false);
+    }
+  }
+
   void _handleWsMessage(WebSocketChannel channel, dynamic message) {
     try {
       final data = jsonDecode(message as String) as Map<String, dynamic>;
@@ -99,7 +119,11 @@ class ServerService {
       if (type == 'auth') {
         final token = data['token'] as String?;
         if (token != null && engine.getPlayerByToken(token) != null) {
+          final player = engine.getPlayerByToken(token)!;
           _clients[channel] = token;
+          if (player.connectionStatus == 'disconnected') {
+            engine.setPlayerConnection(player.id, connected: true);
+          }
           channel.sink.add(jsonEncode({
             'type': 'auth_ok',
             'session': engine.session?.toJson(),
@@ -315,5 +339,46 @@ class ServerService {
     if (player == null) return _jsonResponse({'error': 'Unauthorized'}, statusCode: 401);
 
     return _jsonResponse(engine.getPlayerView(player.id));
+  }
+
+  Future<Response> _handleWhisper(Request request) async {
+    final token = _getToken(request);
+    if (token == null) return _jsonResponse({'error': 'Unauthorized'}, statusCode: 401);
+
+    final player = engine.getPlayerByToken(token);
+    if (player == null) return _jsonResponse({'error': 'Unauthorized'}, statusCode: 401);
+
+    final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+    final toPlayerId = body['toPlayerId'] as String;
+    final clueId = body['clueId'] as String?;
+    final message = body['message'] as String? ?? '';
+
+    final ok = engine.whisper(
+      fromId: player.id,
+      toId: toPlayerId,
+      clueId: clueId,
+      message: message,
+    );
+    if (!ok) return _jsonResponse({'error': 'Cannot whisper'}, statusCode: 400);
+
+    final toPlayer = engine.getPlayerById(toPlayerId);
+    if (toPlayer != null) {
+      Map<String, dynamic>? clue;
+      if (clueId != null) {
+        final session = engine.session!;
+        clue = session.scenario.clues
+            .firstWhere((c) => c.id == clueId)
+            .toJson();
+      }
+      _sendToToken(toPlayer.token, 'whisper_received', {
+        'fromPlayerId': player.id,
+        'fromNickname': player.nickname,
+        'clueId': clueId,
+        'clue': clue,
+        'message': message,
+      });
+    }
+
+    return _jsonResponse({'ok': true});
   }
 }

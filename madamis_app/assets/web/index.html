@@ -2,7 +2,12 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0f0f1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="マーダーミステリー参加アプリ">
   <title>マダミス</title>
   <link rel="stylesheet" href="/assets/style.css">
 </head>
@@ -61,18 +66,37 @@
       <div class="card">
         <button id="btn-draw" class="btn primary">手がかりを引く（1トークン）</button>
       </div>
+      <div class="section-title">あなたの手がかり</div>
       <div id="hand-clues" class="clue-list"></div>
       <div class="section-title">全員公開の手がかり</div>
       <div id="public-clues" class="clue-list"></div>
+      <div class="card">
+        <div class="section-title" style="margin-top:0">🤫 密談</div>
+        <label>相手</label>
+        <select id="whisper-target"></select>
+        <label>手がかり（任意）</label>
+        <select id="whisper-clue">
+          <option value="">なし</option>
+        </select>
+        <label>メッセージ</label>
+        <textarea id="whisper-message" rows="2" placeholder="相手だけに伝える内容"></textarea>
+        <button id="btn-whisper" class="btn secondary">密談を送る</button>
+      </div>
+      <div id="whispers-received" class="whisper-list"></div>
     </div>
 
     <!-- Discussion -->
     <div id="screen-discussion" class="screen">
-      <div class="header"><h2>💬 議論</h2></div>
+      <div class="header">
+        <h2>💬 議論</h2>
+        <span id="discussion-timer" class="badge timer-badge hidden"></span>
+      </div>
       <div class="card">
         <p>他のプレイヤーと話し合い、手がかりを整理してください。</p>
         <p class="hint">口頭で議論し、推理を練りましょう。</p>
       </div>
+      <div class="section-title">全員公開の手がかり</div>
+      <div id="discussion-clues" class="clue-list"></div>
     </div>
 
     <!-- Accusation -->

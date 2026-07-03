@@ -21,6 +21,20 @@ void main() {
     expect(report.passed, isTrue, reason: report.allErrors.join(', '));
   });
 
+  test('coop scenario passes validation for 3 players', () {
+    final scenario = createCoopScenario(playerCount: 3);
+    const config = ScenarioConfig(
+      genre: '現代',
+      difficulty: '初級',
+      estimatedMinutes: 60,
+      playerCount: 3,
+      theme: 'カフェ',
+    );
+    final report = validator.validate(scenario, config);
+    expect(report.passed, isTrue, reason: report.allErrors.join(', '));
+    expect(scenario.playerCharacters.length, 3);
+  });
+
   test('cooperative mode uses shared tokens', () {
     final engine = GameEngine();
     engine.createRoomWithScenario(createCoopScenario(playerCount: 2));

@@ -3,6 +3,7 @@ let token = localStorage.getItem('madamis_token') || '';
 let playerId = localStorage.getItem('madamis_playerId') || '';
 let ws = null;
 let state = {};
+let timerInterval = null;
 
 const phaseScreens = {
   lobby: 'waiting',
@@ -53,7 +54,11 @@ function connectWs() {
   ws = new WebSocket(`${proto}://${location.host}/ws`);
   ws.onopen = () => {
     ws.send(JSON.stringify({ type: 'auth', token }));
-    setInterval(() => ws.send(JSON.stringify({ type: 'ping' })), 30000);
+    setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 30000);
   };
   ws.onmessage = (e) => {
     const data = JSON.parse(e.data);
@@ -72,6 +77,23 @@ function handleWsEvent(data) {
   } else if (data.type === 'clue_revealed') {
     showToast(`手がかりが公開されました: ${data.clue.title}`);
     refreshState();
+  } else if (data.type === 'clue_transferred') {
+    if (data.to === playerId) {
+      showToast('手がかりを受け取りました');
+    } else if (data.from === playerId) {
+      showToast('手がかりを譲渡しました');
+    }
+    refreshState();
+  } else if (data.type === 'whisper_received') {
+    const cluePart = data.clue ? ` [${data.clue.title}]` : '';
+    showToast(`密談: ${data.fromNickname}${cluePart}`);
+    refreshState();
+  } else if (data.type === 'player_left') {
+    showToast(`${data.player.nickname} が切断しました`);
+    refreshState();
+  } else if (data.type === 'player_reconnected') {
+    showToast(`${data.player.nickname} が再接続しました`);
+    refreshState();
   } else if (data.type === 'character_selected' || data.type === 'player_joined') {
     refreshState();
   } else if (data.type === 'truth_revealed') {
@@ -89,8 +111,38 @@ async function refreshState() {
   renderState();
 }
 
+function formatTimeRemaining(timeoutAt) {
+  if (!timeoutAt) return null;
+  const diff = Math.max(0, Math.floor((new Date(timeoutAt) - Date.now()) / 1000));
+  const m = Math.floor(diff / 60);
+  const s = diff % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function startPhaseTimer(timeoutAt, elementId) {
+  if (timerInterval) clearInterval(timerInterval);
+  const el = document.getElementById(elementId);
+  if (!el || !timeoutAt) {
+    if (el) el.classList.add('hidden');
+    return;
+  }
+
+  function tick() {
+    const remaining = formatTimeRemaining(timeoutAt);
+    if (remaining === null || remaining === '0:00') {
+      el.textContent = '0:00';
+      return;
+    }
+    el.textContent = `残り ${remaining}`;
+    el.classList.remove('hidden');
+  }
+
+  tick();
+  timerInterval = setInterval(tick, 1000);
+}
+
 function renderState() {
-  const { session, player, character, availableCharacters, handClues, publicClues, players } = state;
+  const { session, player, character, availableCharacters, handClues, publicClues, players, otherPlayers, whispers } = state;
   if (!session) return;
 
   const phase = session.phase;
@@ -119,8 +171,13 @@ function renderState() {
     const tokens = isCoop ? session.sharedTokensRemaining : player.tokensRemaining;
     document.getElementById('tokens-display').textContent =
       isCoop ? `共有トークン: ${tokens}` : `トークン: ${tokens}`;
-    renderClues('hand-clues', handClues, true);
+    renderClues('hand-clues', handClues, true, otherPlayers);
     renderClues('public-clues', publicClues, false);
+    renderWhisperForm(otherPlayers, handClues);
+    renderWhispers(whispers, otherPlayers);
+  } else if (phase === 'discussion') {
+    startPhaseTimer(session.phaseTimeoutAt, 'discussion-timer');
+    renderClues('discussion-clues', publicClues, false);
   } else if (phase === 'voting') {
     renderVoteList(state.characters);
   } else if (phase === 'truth_reveal' || phase === 'epilogue') {
@@ -130,9 +187,11 @@ function renderState() {
 
 function renderPlayerList(players) {
   const ul = document.getElementById('player-list');
-  ul.innerHTML = (players || []).map(p =>
-    `<li><span>${p.nickname}</span><span>${p.characterId ? '✓ 配役済' : '選択中...'}</span></li>`
-  ).join('');
+  ul.innerHTML = (players || []).map(p => {
+    const status = p.connectionStatus === 'disconnected' ? ' 🔴' : '';
+    const charStatus = p.characterId ? '✓ 配役済' : '選択中...';
+    return `<li><span>${p.nickname}${status}</span><span>${charStatus}</span></li>`;
+  }).join('');
 }
 
 function renderCharacters(chars) {
@@ -164,15 +223,62 @@ function renderScript(char) {
   `;
 }
 
-function renderClues(containerId, clues, showActions) {
+function renderClues(containerId, clues, showActions, otherPlayers) {
   const el = document.getElementById(containerId);
-  el.innerHTML = (clues || []).map(c => `
-    <div class="clue-card ${c.importance}">
-      <h4>${c.title}</h4>
-      <p>${c.content}</p>
-      ${showActions ? `<button class="btn secondary" onclick="revealClue('${c.id}')">全員公開</button>` : ''}
-    </div>
-  `).join('') || '<p class="hint">手がかりなし</p>';
+  el.innerHTML = (clues || []).map(c => {
+    const transferBtns = showActions && otherPlayers && otherPlayers.length
+      ? otherPlayers.map(p =>
+          `<button class="btn secondary btn-sm" onclick="transferClue('${c.id}','${p.id}')">${p.nickname}に譲渡</button>`
+        ).join('')
+      : '';
+    return `
+      <div class="clue-card ${c.importance}">
+        <h4>${c.title}</h4>
+        <p>${c.content}</p>
+        ${showActions ? `
+          <div class="clue-actions">
+            <button class="btn secondary btn-sm" onclick="revealClue('${c.id}')">全員公開</button>
+            ${transferBtns}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('') || '<p class="hint">手がかりなし</p>';
+}
+
+function renderWhisperForm(otherPlayers, handClues) {
+  const targetEl = document.getElementById('whisper-target');
+  const clueEl = document.getElementById('whisper-clue');
+  if (!targetEl || !clueEl) return;
+
+  targetEl.innerHTML = (otherPlayers || []).map(p =>
+    `<option value="${p.id}">${p.nickname}</option>`
+  ).join('') || '<option value="">相手なし</option>';
+
+  const currentClue = clueEl.value;
+  clueEl.innerHTML = '<option value="">なし</option>' +
+    (handClues || []).map(c =>
+      `<option value="${c.id}">${c.title}</option>`
+    ).join('');
+  if (currentClue && handClues?.some(c => c.id === currentClue)) {
+    clueEl.value = currentClue;
+  }
+}
+
+function renderWhispers(whispers, otherPlayers) {
+  const el = document.getElementById('whispers-received');
+  if (!el) return;
+  const nameMap = Object.fromEntries((otherPlayers || []).map(p => [p.id, p.nickname]));
+  el.innerHTML = (whispers || []).length ? `
+    <div class="section-title">受信した密談</div>
+    ${whispers.map(w => `
+      <div class="whisper-card">
+        <div class="whisper-from">From: ${nameMap[w.fromPlayerId] || '不明'}</div>
+        ${w.clueId ? `<div class="whisper-clue">手がかり参照あり</div>` : ''}
+        <p>${w.message}</p>
+      </div>
+    `).join('')}
+  ` : '';
 }
 
 function renderVoteList(characters) {
@@ -253,6 +359,27 @@ async function revealClue(clueId) {
   refreshState();
 }
 
+async function transferClue(clueId, toPlayerId) {
+  const res = await api('POST', '/api/game/clue/transfer', { clueId, toPlayerId });
+  if (res.error) showToast(res.error);
+  else refreshState();
+}
+
+async function sendWhisper() {
+  const toPlayerId = document.getElementById('whisper-target').value;
+  const clueId = document.getElementById('whisper-clue').value || null;
+  const message = document.getElementById('whisper-message').value.trim();
+  if (!toPlayerId) return showToast('相手を選んでください');
+  if (!message && !clueId) return showToast('メッセージまたは手がかりを指定してください');
+  const res = await api('POST', '/api/game/whisper', { toPlayerId, clueId, message });
+  if (res.error) showToast(res.error);
+  else {
+    document.getElementById('whisper-message').value = '';
+    showToast('密談を送りました');
+    refreshState();
+  }
+}
+
 async function vote(targetCharacterId) {
   const res = await api('POST', '/api/game/vote', { targetCharacterId });
   if (res.error) showToast(res.error);
@@ -270,6 +397,7 @@ document.getElementById('btn-synopsis-ready').addEventListener('click', () => ma
 document.getElementById('btn-script-ready').addEventListener('click', () => markReady('private_reading'));
 document.getElementById('btn-draw').addEventListener('click', drawClue);
 document.getElementById('btn-accuse').addEventListener('click', accuse);
+document.getElementById('btn-whisper').addEventListener('click', sendWhisper);
 
 if (token) {
   connectWs();
