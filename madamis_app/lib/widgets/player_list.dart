@@ -31,19 +31,31 @@ class PlayerList extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: p.connectionStatus == 'connected'
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.grey,
-              child: Text(p.nickname[0].toUpperCase()),
+              backgroundColor: p.characterId != null
+                  ? Colors.green.withValues(alpha: 0.2)
+                  : Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+              child: Icon(
+                p.characterId != null ? Icons.check : Icons.person,
+                color: p.characterId != null ? Colors.green : Theme.of(context).colorScheme.primary,
+                size: 20,
+              ),
             ),
             title: Text(p.nickname),
             subtitle: showDetails
-                ? Text('トークン: ${p.tokensRemaining} / 手がかり: ${p.handClues.length}')
-                : Text(p.characterId != null ? '配役済み ✓' : '配役選択中...'),
-            trailing: Icon(
-              p.connectionStatus == 'connected' ? Icons.wifi : Icons.wifi_off,
-              color: p.connectionStatus == 'connected' ? Colors.green : Colors.grey,
-              size: 18,
+                ? Text('トークン ${p.tokensRemaining} · 手がかり ${p.handClues.length}枚')
+                : Text(
+                    p.characterId != null ? '配役済み ✓' : 'キャラ選択中...',
+                    style: TextStyle(
+                      color: p.characterId != null ? Colors.green : Colors.orange.shade300,
+                    ),
+                  ),
+            trailing: Tooltip(
+              message: p.connectionStatus == 'connected' ? '接続中' : '切断',
+              child: Icon(
+                p.connectionStatus == 'connected' ? Icons.wifi : Icons.wifi_off,
+                color: p.connectionStatus == 'connected' ? Colors.green : Colors.grey,
+                size: 18,
+              ),
             ),
           ),
         );

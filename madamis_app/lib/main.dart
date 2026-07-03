@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'screens/home_screen.dart';
 import 'services/app_state.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,16 +20,7 @@ class MadamisApp extends StatelessWidget {
       child: MaterialApp(
         title: 'マダミス GM',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          colorScheme: ColorScheme.dark(
-            primary: const Color(0xFFE94560),
-            secondary: const Color(0xFF533483),
-            surface: const Color(0xFF1A1A2E),
-          ),
-          scaffoldBackgroundColor: const Color(0xFF0F0F1A),
-          useMaterial3: true,
-        ),
+        theme: AppTheme.build(),
         home: const HomeScreen(),
       ),
     );

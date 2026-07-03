@@ -9,6 +9,7 @@ import 'scenario_config_screen.dart';
 import 'settings_screen.dart';
 import '../widgets/save_list_section.dart';
 import '../widgets/saved_scenario_section.dart';
+import '../widgets/ui_helpers.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -39,118 +40,106 @@ class _HomeBody extends StatefulWidget {
 
 class _HomeBodyState extends State<_HomeBody> {
   int _playerCount = 4;
+  bool _showDemo = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        title: const Text('マダミス GM'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
+            tooltip: '設定',
             onPressed: widget.app.goToSettings,
           ),
         ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 16),
-              Icon(
-                Icons.theater_comedy,
-                size: 80,
-                color: Theme.of(context).colorScheme.primary,
+              const StepGuideCard(),
+              const SizedBox(height: 20),
+              const SaveListSection(),
+              const SizedBox(height: 20),
+              const SectionHeader(
+                title: '保存シナリオ',
+                subtitle: '生成済みのシナリオをタップしてすぐ開始',
+                icon: Icons.auto_stories,
               ),
+              const SavedScenarioSection(),
+              if (widget.app.savedScenarioError != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  widget.app.savedScenarioError!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
               const SizedBox(height: 24),
-              Text(
-                'マダミス GM',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+              const SectionHeader(
+                title: '新しく始める',
+                subtitle: 'AIがシナリオを自動生成します（要APIキー）',
+                icon: Icons.auto_awesome,
               ),
-              const SizedBox(height: 8),
-              Text(
-                '準備いらず、その場で始まる\nマーダーミステリー',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Colors.grey,
-                    ),
-              ),
-                const SizedBox(height: 24),
-                const SaveListSection(),
-                const SizedBox(height: 16),
-                const SavedScenarioSection(),
-                if (widget.app.savedScenarioError != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.app.savedScenarioError!,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                FilledButton.icon(
+              FilledButton.icon(
                 onPressed: widget.app.goToScenarioConfig,
                 icon: const Icon(Icons.auto_awesome),
-                label: const Text('AIでシナリオ生成'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: const TextStyle(fontSize: 18),
-                ),
+                label: const Text('AIでシナリオを作る'),
               ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => widget.app.startHostWithFixedScenario(maxPlayers: _playerCount),
-                icon: const Icon(Icons.play_arrow),
-                label: const Text('固定シナリオで遊ぶ（4人・対立）'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => widget.app.startHostWithCoopScenario(playerCount: 2),
-                icon: const Icon(Icons.groups),
-                label: const Text('協力推理デモ（2人）'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => widget.app.startHostWithCoopScenario(playerCount: 3),
-                icon: const Icon(Icons.groups_3),
-                label: const Text('協力推理デモ（3人）'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '対立デモ人数: $_playerCount 人',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Slider(
-                        value: _playerCount.toDouble(),
-                        min: 2,
-                        max: 4,
-                        divisions: 2,
-                        label: '$_playerCount',
-                        onChanged: (v) => setState(() => _playerCount = v.round()),
-                      ),
-                    ],
+              const SizedBox(height: 24),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: Text('お試しデモ', style: Theme.of(context).textTheme.titleLarge),
+                subtitle: const Text('ネット不要・すぐ遊べる固定シナリオ'),
+                leading: Icon(Icons.science_outlined, color: Theme.of(context).colorScheme.secondary),
+                initiallyExpanded: _showDemo,
+                onExpansionChanged: (v) => setState(() => _showDemo = v),
+                children: [
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => widget.app.startHostWithFixedScenario(maxPlayers: _playerCount),
+                    icon: const Icon(Icons.castle_outlined),
+                    label: Text('洋館デモ（対立・$_playerCount人）'),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => widget.app.startHostWithCoopScenario(playerCount: 2),
+                    icon: const Icon(Icons.groups),
+                    label: const Text('協力推理デモ（2人）'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => widget.app.startHostWithCoopScenario(playerCount: 3),
+                    icon: const Icon(Icons.groups_3),
+                    label: const Text('協力推理デモ（3人）'),
+                  ),
+                  const SizedBox(height: 12),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('対立デモの人数', style: Theme.of(context).textTheme.titleSmall),
+                          Slider(
+                            value: _playerCount.toDouble(),
+                            min: 2,
+                            max: 4,
+                            divisions: 2,
+                            label: '$_playerCount人',
+                            onChanged: (v) => setState(() => _playerCount = v.round()),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
             ],
           ),
         ),

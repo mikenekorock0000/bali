@@ -12,16 +12,25 @@
   <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
+  <div id="status-bar">
+    <span id="status-phase">参加</span>
+    <span id="status-timer" class="hidden"></span>
+  </div>
+
   <div id="app">
     <!-- Join -->
     <div id="screen-join" class="screen active">
       <div class="header">
-        <h1>🔍 マダミス</h1>
+        <h1>マダミス</h1>
         <p class="subtitle">事件に参加する</p>
       </div>
+      <div class="hint-box">
+        <strong>やること</strong>
+        ニックネームを入力して「参加する」を押してください
+      </div>
       <div class="card">
-        <label>ニックネーム</label>
-        <input type="text" id="nickname" placeholder="あなたの名前" maxlength="20">
+        <label>ニックネーム（他の人に表示されます）</label>
+        <input type="text" id="nickname" placeholder="例: 探偵タロウ" maxlength="20">
         <button id="btn-join" class="btn primary">参加する</button>
       </div>
     </div>
@@ -29,6 +38,10 @@
     <!-- Waiting -->
     <div id="screen-waiting" class="screen">
       <div class="header"><h2>待機中</h2></div>
+      <div class="hint-box">
+        <strong>いま</strong>
+        他のプレイヤーの参加、またはゲーム開始を待っています
+      </div>
       <div class="card">
         <p id="waiting-msg">他のプレイヤーを待っています...</p>
         <ul id="player-list" class="player-list"></ul>
@@ -38,12 +51,20 @@
     <!-- Character Select -->
     <div id="screen-character" class="screen">
       <div class="header"><h2>配役を選ぶ</h2></div>
+      <div class="hint-box">
+        <strong>やること</strong>
+        演じたいキャラクターを1人タップして選んでください
+      </div>
       <div id="character-list" class="character-grid"></div>
     </div>
 
     <!-- Synopsis -->
     <div id="screen-synopsis" class="screen">
-      <div class="header"><h2>📜 あらすじ</h2></div>
+      <div class="header"><h2>あらすじ</h2></div>
+      <div class="hint-box">
+        <strong>やること</strong>
+        事件の概要を読み、下のボタンで確認完了を伝えてください
+      </div>
       <div class="card scrollable">
         <pre id="synopsis-text"></pre>
       </div>
@@ -52,7 +73,11 @@
 
     <!-- Private Script -->
     <div id="screen-script" class="screen">
-      <div class="header"><h2>📋 あなたの台本</h2></div>
+      <div class="header"><h2>あなたの台本</h2></div>
+      <div class="hint-box">
+        <strong>秘密</strong>
+        この内容は他の人に見せないでください。読み終わったら「読了」を押してください
+      </div>
       <div class="card scrollable" id="script-content"></div>
       <button id="btn-script-ready" class="btn primary">読了しました</button>
     </div>
@@ -60,21 +85,29 @@
     <!-- Investigation -->
     <div id="screen-investigation" class="screen">
       <div class="header">
-        <h2>🔎 調査</h2>
+        <h2>調査</h2>
         <span id="tokens-display" class="badge"></span>
       </div>
+      <div class="hint-box">
+        <strong>できること</strong>
+        手がかりを引く（1トークン）・全員に公開・他の人に譲渡・密談
+      </div>
       <div class="card">
-        <button id="btn-draw" class="btn primary">手がかりを引く（1トークン）</button>
+        <button id="btn-draw" class="btn primary">
+          手がかりを引く
+          <span class="btn-desc">山札から1枚取得（トークン1消費）</span>
+        </button>
       </div>
       <div class="section-title">あなたの手がかり</div>
       <div id="hand-clues" class="clue-list"></div>
-      <div class="section-title">全員公開の手がかり</div>
+      <div class="section-title">全員に公開された手がかり</div>
       <div id="public-clues" class="clue-list"></div>
       <div class="card">
-        <div class="section-title" style="margin-top:0">🤫 密談</div>
+        <div class="section-title" style="margin-top:0">密談（1対1）</div>
+        <p class="hint" style="margin-bottom:12px">選んだ相手だけが読めます</p>
         <label>相手</label>
         <select id="whisper-target"></select>
-        <label>手がかり（任意）</label>
+        <label>共有する手がかり（任意）</label>
         <select id="whisper-clue">
           <option value="">なし</option>
         </select>
@@ -88,12 +121,12 @@
     <!-- Discussion -->
     <div id="screen-discussion" class="screen">
       <div class="header">
-        <h2>💬 議論</h2>
+        <h2>議論</h2>
         <span id="discussion-timer" class="badge timer-badge hidden"></span>
       </div>
-      <div class="card">
-        <p>他のプレイヤーと話し合い、手がかりを整理してください。</p>
-        <p class="hint">口頭で議論し、推理を練りましょう。</p>
+      <div class="hint-box">
+        <strong>やること</strong>
+        口頭で話し合い、手がかりを整理して推理を練りましょう
       </div>
       <div class="section-title">全員公開の手がかり</div>
       <div id="discussion-clues" class="clue-list"></div>
@@ -101,30 +134,37 @@
 
     <!-- Accusation -->
     <div id="screen-accusation" class="screen">
-      <div class="header"><h2>🗣 推理発表</h2></div>
+      <div class="header"><h2>推理発表</h2></div>
+      <div class="hint-box">
+        <strong>任意</strong>
+        犯人だと思う人物と、その理由を書いて発表できます
+      </div>
       <div class="card">
         <label>あなたの推理</label>
-        <textarea id="accusation-text" rows="4" placeholder="犯人とその理由を述べてください"></textarea>
+        <textarea id="accusation-text" rows="4" placeholder="例: ○○が犯人だと思う。理由は..."></textarea>
         <button id="btn-accuse" class="btn primary">発表する</button>
       </div>
     </div>
 
     <!-- Voting -->
     <div id="screen-voting" class="screen">
-      <div class="header"><h2>🗳 投票</h2></div>
-      <p class="subtitle">犯人だと思う人物を選んでください</p>
+      <div class="header"><h2>投票</h2></div>
+      <div class="hint-box">
+        <strong>やること</strong>
+        犯人だと思う人物を1人タップして選んでください
+      </div>
       <div id="vote-list" class="character-grid"></div>
     </div>
 
     <!-- Truth -->
     <div id="screen-truth" class="screen">
-      <div class="header"><h2>⚡ 真相</h2></div>
+      <div class="header"><h2>真相</h2></div>
       <div class="card scrollable" id="truth-content"></div>
     </div>
 
     <!-- Results -->
     <div id="screen-results" class="screen">
-      <div class="header"><h2>🏆 結果</h2></div>
+      <div class="header"><h2>結果</h2></div>
       <div id="results-content" class="card"></div>
     </div>
   </div>

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/saved_scenario_summary.dart';
 import '../services/app_state.dart';
+import '../theme/app_theme.dart';
 
 class SavedScenarioSection extends StatefulWidget {
   const SavedScenarioSection({super.key});
@@ -35,29 +36,8 @@ class _SavedScenarioSectionState extends State<SavedScenarioSection> {
 
     if (app.savedScenarios.isEmpty) return const SizedBox.shrink();
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.library_books_outlined, size: 20),
-                const SizedBox(width: 8),
-                Text('保存シナリオ', style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'AI生成済みのシナリオをそのままプレイできます',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
-            ),
-            const SizedBox(height: 12),
-            ...app.savedScenarios.map((s) => _ScenarioTile(summary: s)),
-          ],
-        ),
-      ),
+    return Column(
+      children: app.savedScenarios.map((s) => _ScenarioTile(summary: s)).toList(),
     );
   }
 }
@@ -70,32 +50,55 @@ class _ScenarioTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.read<AppState>();
-    final theme = Theme.of(context);
+    final palette = GenrePalette.forGenre(summary.genre);
+    final disabled = app.isRunning;
 
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(
-        backgroundColor: summary.isCooperative
-            ? theme.colorScheme.tertiaryContainer
-            : theme.colorScheme.primaryContainer,
-        child: Text(
-          '${summary.playerCount}',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: summary.isCooperative
-                ? theme.colorScheme.onTertiaryContainer
-                : theme.colorScheme.onPrimaryContainer,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: disabled ? null : () => app.startHostWithSavedScenario(summary.assetPath),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: palette.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(palette.icon, color: palette.primary),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      summary.title,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${summary.modeLabel} · ${summary.playerCount}人 · 手がかり${summary.clueCount}枚',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.play_circle_fill,
+                color: disabled ? Colors.grey : palette.primary,
+                size: 32,
+              ),
+            ],
           ),
         ),
       ),
-      title: Text(summary.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        '${summary.modeLabel} · ${summary.clueCount}枚 · ${summary.genre}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: const Icon(Icons.play_circle_outline),
-      onTap: app.isRunning ? null : () => app.startHostWithSavedScenario(summary.assetPath),
     );
   }
 }

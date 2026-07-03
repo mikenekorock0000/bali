@@ -18,6 +18,40 @@ const phaseScreens = {
   results: 'results',
 };
 
+const phaseLabels = {
+  lobby: '待機',
+  synopsis: 'あらすじ',
+  private_reading: '個人台本',
+  investigation: '調査',
+  discussion: '議論',
+  accusation: '推理発表',
+  voting: '投票',
+  truth_reveal: '真相',
+  epilogue: '後日談',
+  results: '結果',
+  join: '参加',
+  character: '配役選択',
+  waiting: '待機',
+};
+
+const importanceLabels = {
+  critical: '最重要',
+  important: '重要',
+  supplementary: '補足',
+};
+
+function updateStatusBar(phase, timeoutAt) {
+  const phaseEl = document.getElementById('status-phase');
+  const timerEl = document.getElementById('status-timer');
+  if (phaseEl) phaseEl.textContent = phaseLabels[phase] || phase;
+
+  if (timeoutAt && timerEl) {
+    startPhaseTimer(timeoutAt, 'status-timer');
+  } else if (timerEl) {
+    timerEl.classList.add('hidden');
+  }
+}
+
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById(`screen-${id}`);
@@ -150,10 +184,12 @@ function renderState() {
   if (!session.isStarted) {
     if (player.characterId) {
       showScreen('waiting');
+      updateStatusBar('waiting');
       renderPlayerList(players);
       document.getElementById('waiting-msg').textContent = 'ゲーム開始を待っています...';
     } else {
       showScreen('character');
+      updateStatusBar('character');
       renderCharacters(availableCharacters);
     }
     return;
@@ -161,6 +197,7 @@ function renderState() {
 
   const screenId = phaseScreens[phase] || 'waiting';
   showScreen(screenId);
+  updateStatusBar(phase, session.phaseTimeoutAt);
 
   if (phase === 'synopsis') {
     document.getElementById('synopsis-text').textContent = session.synopsis;
@@ -188,10 +225,12 @@ function renderState() {
 function renderPlayerList(players) {
   const ul = document.getElementById('player-list');
   ul.innerHTML = (players || []).map(p => {
-    const status = p.connectionStatus === 'disconnected' ? ' 🔴' : '';
-    const charStatus = p.characterId ? '✓ 配役済' : '選択中...';
-    return `<li><span>${p.nickname}${status}</span><span>${charStatus}</span></li>`;
-  }).join('');
+    const disconnected = p.connectionStatus === 'disconnected';
+    const charStatus = p.characterId
+      ? '<span class="status-ok">配役済 ✓</span>'
+      : '<span class="status-wait">選択中...</span>';
+    return `<li><span>${p.nickname}${disconnected ? ' 🔴' : ''}</span>${charStatus}</li>`;
+  }).join('') || '<li class="empty-state">まだ参加者がいません</li>';
 }
 
 function renderCharacters(chars) {
@@ -226,24 +265,29 @@ function renderScript(char) {
 function renderClues(containerId, clues, showActions, otherPlayers) {
   const el = document.getElementById(containerId);
   el.innerHTML = (clues || []).map(c => {
+    const impLabel = importanceLabels[c.importance] || '';
+    const impBadge = impLabel
+      ? `<span class="importance-badge ${c.importance}">${impLabel}</span>`
+      : '';
     const transferBtns = showActions && otherPlayers && otherPlayers.length
       ? otherPlayers.map(p =>
-          `<button class="btn secondary btn-sm" onclick="transferClue('${c.id}','${p.id}')">${p.nickname}に譲渡</button>`
+          `<button class="btn secondary btn-sm" onclick="transferClue('${c.id}','${p.id}')">${p.nickname}へ</button>`
         ).join('')
       : '';
     return `
       <div class="clue-card ${c.importance}">
+        ${impBadge}
         <h4>${c.title}</h4>
         <p>${c.content}</p>
         ${showActions ? `
           <div class="clue-actions">
-            <button class="btn secondary btn-sm" onclick="revealClue('${c.id}')">全員公開</button>
+            <button class="btn secondary btn-sm" onclick="revealClue('${c.id}')">全員に公開</button>
             ${transferBtns}
           </div>
         ` : ''}
       </div>
     `;
-  }).join('') || '<p class="hint">手がかりなし</p>';
+  }).join('') || '<p class="empty-state">手がかりはまだありません</p>';
 }
 
 function renderWhisperForm(otherPlayers, handClues) {

@@ -3,134 +3,187 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../services/app_state.dart';
+import '../theme/app_theme.dart';
 import '../widgets/hotspot_info_card.dart';
 import '../widgets/player_list.dart';
+import '../widgets/ui_helpers.dart';
 
 class LobbyScreen extends StatelessWidget {
   const LobbyScreen({super.key});
 
+  int _lobbyStep(AppState app) {
+    if (app.canStart) return 2;
+    if (app.playerCount >= 1) return 1;
+    return 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final scenario = app.engine.session?.scenario;
     final joinUrl = app.joinUrl ?? '';
+    final genre = scenario?.genre ?? '洋館';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('ロビー'),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('ゲームを終了'),
-                  content: const Text('サーバーを停止しますか？'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('キャンセル')),
-                    FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('停止')),
+    return Theme(
+      data: AppTheme.forGenre(genre),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('ロビー — 参加待ち'),
+          actions: [
+            TextButton.icon(
+              onPressed: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('ゲームを終了'),
+                    content: const Text('サーバーを停止してホームに戻りますか？'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('キャンセル')),
+                      FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('終了する')),
+                    ],
+                  ),
+                );
+                if (ok == true && context.mounted) app.stopHost();
+              },
+              icon: const Icon(Icons.stop_circle_outlined, size: 18),
+              label: const Text('終了'),
+            ),
+          ],
+        ),
+        body: Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (scenario != null)
+                      ScenarioHeaderCard(
+                        title: scenario.title,
+                        genre: scenario.genre,
+                        playerCount: scenario.playerCount,
+                        isCooperative: scenario.gameMode == 'cooperative',
+                        subtitle: 'ルーム番号 ${app.roomId}',
+                      ),
+                    const SizedBox(height: 16),
+                    ActionStepsCard(
+                      currentStep: _lobbyStep(app),
+                      steps: const [
+                        'プレイヤーにQRコードを見せて参加してもらう',
+                        '全員がキャラクター（配役）を選ぶ',
+                        '「ゲーム開始」を押す',
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const HotspotInfoBanner(),
+                    const Spacer(),
+                    if (joinUrl.isNotEmpty) ...[
+                      Text(
+                        '参加用QRコード',
+                        style: Theme.of(context).textTheme.titleMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'スマホのカメラで読み取ってください',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                      ),
+                      const SizedBox(height: 12),
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                                blurRadius: 24,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: QrImageView(
+                            data: joinUrl,
+                            version: QrVersions.auto,
+                            size: 220,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SelectableText(
+                        joinUrl,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                    const Spacer(),
                   ],
                 ),
-              );
-              if (ok == true && context.mounted) app.stopHost();
-            },
-            child: const Text('終了'),
-          ),
-        ],
-      ),
-      body: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    app.engine.session?.scenario.title ?? 'ルーム ${app.roomId}',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  if (app.engine.session?.scenario.gameMode == 'cooperative')
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Chip(
-                        label: const Text('協力推理モード'),
-                        avatar: const Icon(Icons.groups, size: 16),
-                      ),
-                    ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'ルーム ${app.roomId}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'スマホでQRコードを読み取って参加',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 16),
-                  const HotspotInfoBanner(),
-                  if (joinUrl.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: QrImageView(
-                        data: joinUrl,
-                        version: QrVersions.auto,
-                        size: 240,
-                      ),
-                    ),
-                  const SizedBox(height: 16),
-                  SelectableText(
-                    joinUrl,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
               ),
             ),
-          ),
-          Expanded(
-            child: Container(
-              color: Theme.of(context).colorScheme.surface,
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    '参加者 (${app.playerCount}/${app.engine.session?.scenario.playerCount ?? 4})',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(child: PlayerList(players: app.engine.session?.players ?? [])),
-                  const SizedBox(height: 16),
-                  if (app.canStart)
-                    FilledButton.icon(
-                      onPressed: app.startGame,
-                      icon: const Icon(Icons.flag),
-                      label: const Text('ゲーム開始'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    )
-                  else
-                    OutlinedButton(
-                      onPressed: null,
-                      child: Text(
-                        app.playerCount < 2
-                            ? '2人以上必要'
-                            : '全員配役選択待ち',
-                      ),
+            VerticalDivider(width: 1, color: Colors.white.withValues(alpha: 0.1)),
+            Expanded(
+              flex: 2,
+              child: Container(
+                color: Theme.of(context).colorScheme.surface,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('参加者', style: Theme.of(context).textTheme.titleLarge),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${app.playerCount} / ${scenario?.playerCount ?? 4} 人',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                ],
+                    const SizedBox(height: 8),
+                    Text(
+                      '✓ 配役済み = キャラ選択完了',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(child: PlayerList(players: app.engine.session?.players ?? [])),
+                    const SizedBox(height: 16),
+                    if (app.canStart)
+                      FilledButton.icon(
+                        onPressed: app.startGame,
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('ゲーム開始'),
+                      )
+                    else
+                      OutlinedButton.icon(
+                        onPressed: null,
+                        icon: const Icon(Icons.hourglass_empty),
+                        label: Text(
+                          app.playerCount < 2
+                              ? 'あと${2 - app.playerCount}人必要'
+                              : '配役選択を待っています',
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
