@@ -45,6 +45,7 @@ class AudioService {
       'vote_cast' => 'se_vote.mp3',
       'truth_revealed' => 'se_truth.mp3',
       'results' => 'se_correct.mp3',
+      'all_voted' => 'se_vote.mp3',
       _ => null,
     };
 
