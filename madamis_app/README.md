@@ -77,6 +77,25 @@ dart run tool/generate_test.dart          # 4人（要 GEMINI_API_KEY）
 dart run tool/generate_test.dart --players=2
 ```
 
+## APKビルド（Android実機向け）
+
+```bash
+cd madamis_app
+flutter pub get
+bash tool/patch_wifi_iot.sh   # wifi_iot の Gradle 互換パッチ（初回・pub get後）
+flutter build apk --release
+```
+
+生成物: `build/app/outputs/flutter-apk/app-release.apk`
+
+タブレットへのインストール例:
+
+```bash
+adb install build/app/outputs/flutter-apk/app-release.apk
+```
+
+> release ビルドは現在 debug キーで署名されています（実機テスト用）。
+
 ## 音声アセット
 
 ```bash
