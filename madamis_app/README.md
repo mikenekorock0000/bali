@@ -52,7 +52,7 @@ flutter run
 ## 遊び方（MVP）
 
 1. タブレットでアプリを起動
-2. 「AIでシナリオ生成」または「固定シナリオで遊ぶ（デモ）」
+2. 「保存シナリオ」・「AIでシナリオを作る」・またはデモを選択
 3. ロビー画面のQRコードをプレイヤーがスマホで読み取り
 3. 各プレイヤーがニックネーム入力 → 配役選択
 4. 全員配役完了後、タブレットで「ゲーム開始」
@@ -66,12 +66,40 @@ flutter run
 | 2 | ✅ | Gemini連携・シナリオ自動生成 + 整合性検証 |
 | 3 | ✅ | 2-3人協力推理モード + 検証強化 |
 | 4 | ✅ | WiFiホットスポット + IP検出 |
-| 5 | ✅ | BGM/SE（システム音フォールバック）、中断再開（SQLite） |
+| 5 | ✅ | BGM/SE、中断再開（SQLite） |
+| + | ✅ | 保存シナリオ選択プレイ、UI改善、ジャンル別テーマ |
 
 ## テスト
 
 ```bash
 flutter test
+dart run tool/generate_test.dart          # 4人（要 GEMINI_API_KEY）
+dart run tool/generate_test.dart --players=2
+```
+
+## APKビルド（Android実機向け）
+
+```bash
+cd madamis_app
+flutter pub get
+bash tool/patch_wifi_iot.sh   # wifi_iot の Gradle 互換パッチ（初回・pub get後）
+flutter build apk --release
+```
+
+生成物: `build/app/outputs/flutter-apk/app-release.apk`
+
+タブレットへのインストール例:
+
+```bash
+adb install build/app/outputs/flutter-apk/app-release.apk
+```
+
+> release ビルドは現在 debug キーで署名されています（実機テスト用）。
+
+## 音声アセット
+
+```bash
+bash tool/generate_audio.sh   # BGM/SEプレースホルダー再生成
 ```
 
 ## 技術スタック

@@ -6,13 +6,15 @@
 ///   dart run tool/generate_test.dart
 ///   dart run tool/generate_test.dart --players=2
 ///   dart run tool/generate_test.dart --players=8 --save
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:madamis_app/config/api_key_source.dart';
-import 'package:madamis_app/models/scenario.dart';
+import 'package:madamis_app/models/generation_failure.dart';
+import 'package:madamis_app/models/generation_progress.dart';
 import 'package:madamis_app/models/scenario_config.dart';
+import 'package:madamis_app/services/generation_diagnostic_log.dart';
 import 'package:madamis_app/services/scenario_generator.dart';
+import 'package:madamis_app/services/scenario_save_service.dart';
 import 'package:madamis_app/services/scenario_validator.dart';
 
 Future<void> main(List<String> args) async {
@@ -48,6 +50,7 @@ Future<void> main(List<String> args) async {
 
   stdout.writeln('▶ 生成開始: ${config.playerCount}人 / ${config.theme}');
   final stopwatch = Stopwatch()..start();
+  final progress = GenerationProgress(maxAttempts: 2);
 
   try {
     final generator = ScenarioGenerator(maxAttempts: 2);
@@ -55,8 +58,19 @@ Future<void> main(List<String> args) async {
       config,
       apiKey: apiKey,
       onProgress: (p) {
+        progress
+          ..status = p.status
+          ..currentStep = p.currentStep
+          ..message = p.message
+          ..attempt = p.attempt
+          ..maxAttempts = p.maxAttempts
+          ..errors = p.errors
+          ..lastFailure = p.lastFailure
+          ..failureHistory = p.failureHistory;
         stdout.writeln('  [${p.currentStep}/8] ${p.message} (試行 ${p.attempt})');
-        if (p.errors.isNotEmpty) {
+        if (p.lastFailure != null) {
+          stdout.writeln('    ⚠ ${p.lastFailure!.locationLabel}: ${p.lastFailure!.code}');
+        } else if (p.errors.isNotEmpty) {
           stdout.writeln('    ⚠ ${p.errors.first}');
         }
       },
@@ -80,49 +94,30 @@ Future<void> main(List<String> args) async {
     }
 
     if (save) {
-      final path = saveScenario(scenario, config);
+      final path = saveScenarioToAssets(scenario, config);
       stdout.writeln('   保存: $path');
     }
   } on ScenarioGenerationException catch (e) {
     stopwatch.stop();
     stderr.writeln('');
-    stderr.writeln('❌ 生成失敗 (${stopwatch.elapsed.inSeconds}秒): $e');
+    stderr.writeln('❌ 生成失敗 (${stopwatch.elapsed.inSeconds}秒)');
+    stderr.writeln(formatGenerationFailureReport(progress));
+    if (e.failure != null) {
+      stderr.writeln('');
+      stderr.writeln(e.failure!.summary);
+    } else {
+      stderr.writeln(e.message);
+    }
+
+    final logPath = 'tool/output/generation_logs';
+    saveDiagnosticLogToFile(
+      directory: logPath,
+      config: config,
+      progress: progress,
+      exceptionMessage: e.message,
+    );
+    stderr.writeln('');
+    stderr.writeln('診断ログ: $logPath');
     exit(1);
   }
-}
-
-String saveScenario(Scenario scenario, ScenarioConfig config) {
-  final dir = Directory('assets/scenarios');
-  if (!dir.existsSync()) dir.createSync(recursive: true);
-
-  final slug = _slugify(scenario.title);
-  final fileName = 'generated_${config.playerCount}p_$slug.json';
-  final path = '${dir.path}/$fileName';
-
-  final payload = {
-    'savedAt': DateTime.now().toUtc().toIso8601String(),
-    'config': {
-      'genre': config.genre,
-      'difficulty': config.difficulty,
-      'estimatedMinutes': config.estimatedMinutes,
-      'playerCount': config.playerCount,
-      'theme': config.theme,
-    },
-    'scenario': scenario.toJson(),
-  };
-
-  File(path).writeAsStringSync(
-    const JsonEncoder.withIndent('  ').convert(payload),
-  );
-  return path;
-}
-
-String _slugify(String title) {
-  final normalized = title
-      .toLowerCase()
-      .replaceAll(RegExp(r'[^a-z0-9\u3040-\u9fff]+'), '_')
-      .replaceAll(RegExp(r'_+'), '_')
-      .replaceAll(RegExp(r'^_|_$'), '');
-  if (normalized.isEmpty) return 'untitled';
-  return normalized.length > 40 ? normalized.substring(0, 40) : normalized;
 }

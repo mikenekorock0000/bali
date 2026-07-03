@@ -2,19 +2,24 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../config/ai_pipeline_config.dart';
 import '../data/coop_scenario.dart';
 import '../models/game_phase.dart';
 import '../models/hotspot_info.dart';
+import '../models/generation_failure.dart';
+import '../models/generation_progress.dart';
 import '../models/saved_scenario_summary.dart';
 import '../models/scenario.dart';
 import '../models/scenario_config.dart';
 import '../services/asset_server.dart';
 import '../services/audio_service.dart';
 import '../services/game_engine.dart';
+import '../services/generation_diagnostic_log.dart';
 import '../services/network_service.dart';
 import '../services/save_service.dart';
-import '../services/scenario_asset_loader.dart';
+import '../services/saved_scenario_repository.dart';
 import '../services/scenario_generator.dart';
+import '../services/scenario_save_service.dart';
 import '../services/server_service.dart';
 import '../services/settings_service.dart';
 
@@ -43,6 +48,8 @@ class AppState extends ChangeNotifier {
   GenerationProgress _generationProgress = GenerationProgress();
   Scenario? _generatedScenario;
   String? _generationError;
+  String? _generationDiagnosticLogPath;
+  ScenarioConfig? _lastGenerationConfig;
   HotspotInfo? _hotspotInfo;
   List<SaveSummary> _saves = [];
   List<SavedScenarioSummary> _savedScenarios = [];
@@ -59,6 +66,7 @@ class AppState extends ChangeNotifier {
   GenerationProgress get generationProgress => _generationProgress;
   Scenario? get generatedScenario => _generatedScenario;
   String? get generationError => _generationError;
+  String? get generationDiagnosticLogPath => _generationDiagnosticLogPath;
   HotspotInfo? get hotspotInfo => _hotspotInfo;
   List<SaveSummary> get saves => _saves;
   List<SavedScenarioSummary> get savedScenarios => _savedScenarios;
@@ -77,7 +85,7 @@ class AppState extends ChangeNotifier {
     _savedScenarioError = null;
     notifyListeners();
     try {
-      _savedScenarios = await ScenarioAssetLoader.instance.listSummaries();
+      _savedScenarios = await SavedScenarioRepository.instance.listSummaries();
     } catch (e) {
       _savedScenarios = [];
       _savedScenarioError = e.toString();
@@ -112,11 +120,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> startHostWithSavedScenario(String assetPath) async {
+  Future<void> startHostWithSavedScenario(SavedScenarioSummary summary) async {
     _savedScenarioError = null;
     notifyListeners();
     try {
-      final scenario = await ScenarioAssetLoader.instance.loadScenario(assetPath);
+      final scenario = await SavedScenarioRepository.instance.loadScenario(summary);
       await _startServer(createRoom: () => _engine.createRoomWithScenario(scenario));
     } catch (e) {
       _savedScenarioError = 'シナリオの読み込みに失敗しました: $e';
@@ -135,8 +143,13 @@ class AppState extends ChangeNotifier {
 
   Future<void> generateAndStartHost(ScenarioConfig config) async {
     _generationError = null;
+    _generationDiagnosticLogPath = null;
     _generatedScenario = null;
-    _generationProgress = GenerationProgress(status: GenerationStatus.running);
+    _lastGenerationConfig = config;
+    _generationProgress = GenerationProgress(
+      status: GenerationStatus.running,
+      maxAttempts: AiPipelineConfig.maxAttempts,
+    );
     _screen = AppScreen.generating;
     notifyListeners();
 
@@ -150,16 +163,33 @@ class AppState extends ChangeNotifier {
         },
       );
       _generatedScenario = scenario;
+      try {
+        await ScenarioSaveService.instance.save(scenario, config);
+      } catch (_) {}
       await _startServer(createRoom: () => _engine.createRoomWithScenario(scenario));
     } on ScenarioGenerationException catch (e) {
-      _generationError = e.message;
+      _generationError = e.failure?.summary ?? e.message;
       _generationProgress.status = GenerationStatus.failed;
+      await _persistGenerationDiagnostics(e.message);
       notifyListeners();
     } catch (e) {
       _generationError = e.toString();
       _generationProgress.status = GenerationStatus.failed;
+      await _persistGenerationDiagnostics(e.toString());
       notifyListeners();
     }
+  }
+
+  Future<void> _persistGenerationDiagnostics(String? exceptionMessage) async {
+    final config = _lastGenerationConfig;
+    if (config == null) return;
+    try {
+      _generationDiagnosticLogPath = await GenerationDiagnosticLog.instance.save(
+        config: config,
+        progress: _generationProgress,
+        exceptionMessage: exceptionMessage,
+      );
+    } catch (_) {}
   }
 
   Future<void> resumeFromSave(String saveId) async {

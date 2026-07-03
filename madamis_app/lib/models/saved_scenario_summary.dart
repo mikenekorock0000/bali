@@ -1,6 +1,9 @@
+enum SavedScenarioSource { asset, local }
+
 class SavedScenarioSummary {
   const SavedScenarioSummary({
-    required this.assetPath,
+    required this.loadKey,
+    required this.source,
     required this.title,
     required this.playerCount,
     required this.gameMode,
@@ -10,7 +13,8 @@ class SavedScenarioSummary {
     required this.savedAt,
   });
 
-  final String assetPath;
+  final String loadKey;
+  final SavedScenarioSource source;
   final String title;
   final int playerCount;
   final String gameMode;
@@ -20,6 +24,7 @@ class SavedScenarioSummary {
   final DateTime? savedAt;
 
   bool get isCooperative => gameMode == 'cooperative';
+  bool get isLocal => source == SavedScenarioSource.local;
 
   String get modeLabel => isCooperative ? '協力推理' : '対立推理';
 }
