@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../data/coop_scenario.dart';
 import '../models/game_phase.dart';
 import '../models/hotspot_info.dart';
+import '../models/saved_scenario_summary.dart';
 import '../models/scenario.dart';
 import '../models/scenario_config.dart';
 import '../services/asset_server.dart';
@@ -12,6 +13,7 @@ import '../services/audio_service.dart';
 import '../services/game_engine.dart';
 import '../services/network_service.dart';
 import '../services/save_service.dart';
+import '../services/scenario_asset_loader.dart';
 import '../services/scenario_generator.dart';
 import '../services/server_service.dart';
 import '../services/settings_service.dart';
@@ -43,6 +45,9 @@ class AppState extends ChangeNotifier {
   String? _generationError;
   HotspotInfo? _hotspotInfo;
   List<SaveSummary> _saves = [];
+  List<SavedScenarioSummary> _savedScenarios = [];
+  bool _loadingSavedScenarios = false;
+  String? _savedScenarioError;
 
   AppScreen get screen => _screen;
   String? get joinUrl => _joinUrl;
@@ -56,6 +61,9 @@ class AppState extends ChangeNotifier {
   String? get generationError => _generationError;
   HotspotInfo? get hotspotInfo => _hotspotInfo;
   List<SaveSummary> get saves => _saves;
+  List<SavedScenarioSummary> get savedScenarios => _savedScenarios;
+  bool get loadingSavedScenarios => _loadingSavedScenarios;
+  String? get savedScenarioError => _savedScenarioError;
   bool get hasApiKey => SettingsService.instance.hasApiKey;
   bool get soundEnabled => SettingsService.instance.soundEnabled;
 
@@ -63,6 +71,20 @@ class AppState extends ChangeNotifier {
   int get playerCount => _engine.session?.players.length ?? 0;
   bool get canStart => _engine.session?.canStart ?? false;
   bool get isStarted => _engine.session?.isStarted ?? false;
+
+  Future<void> refreshSavedScenarios() async {
+    _loadingSavedScenarios = true;
+    _savedScenarioError = null;
+    notifyListeners();
+    try {
+      _savedScenarios = await ScenarioAssetLoader.instance.listSummaries();
+    } catch (e) {
+      _savedScenarios = [];
+      _savedScenarioError = e.toString();
+    }
+    _loadingSavedScenarios = false;
+    notifyListeners();
+  }
 
   Future<void> refreshSaves() async {
     try {
@@ -86,7 +108,20 @@ class AppState extends ChangeNotifier {
   void goToHome() {
     _screen = AppScreen.home;
     refreshSaves();
+    refreshSavedScenarios();
     notifyListeners();
+  }
+
+  Future<void> startHostWithSavedScenario(String assetPath) async {
+    _savedScenarioError = null;
+    notifyListeners();
+    try {
+      final scenario = await ScenarioAssetLoader.instance.loadScenario(assetPath);
+      await _startServer(createRoom: () => _engine.createRoomWithScenario(scenario));
+    } catch (e) {
+      _savedScenarioError = 'シナリオの読み込みに失敗しました: $e';
+      notifyListeners();
+    }
   }
 
   Future<void> startHostWithCoopScenario({int playerCount = 2}) async {

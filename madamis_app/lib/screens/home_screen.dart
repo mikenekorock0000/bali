@@ -8,6 +8,7 @@ import 'lobby_screen.dart';
 import 'scenario_config_screen.dart';
 import 'settings_screen.dart';
 import '../widgets/save_list_section.dart';
+import '../widgets/saved_scenario_section.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -80,6 +81,15 @@ class _HomeBodyState extends State<_HomeBody> {
               ),
                 const SizedBox(height: 24),
                 const SaveListSection(),
+                const SizedBox(height: 16),
+                const SavedScenarioSection(),
+                if (widget.app.savedScenarioError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.app.savedScenarioError!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 FilledButton.icon(
                 onPressed: widget.app.goToScenarioConfig,
