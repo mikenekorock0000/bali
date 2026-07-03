@@ -46,8 +46,14 @@ class LobbyScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'ルーム ${app.roomId}',
+                    app.engine.session?.scenario.title ?? 'ルーム ${app.roomId}',
                     style: Theme.of(context).textTheme.headlineMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'ルーム ${app.roomId}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -86,7 +92,7 @@ class LobbyScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    '参加者 (${app.playerCount}/4)',
+                    '参加者 (${app.playerCount}/${app.engine.session?.scenario.playerCount ?? 4})',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),

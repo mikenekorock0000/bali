@@ -23,16 +23,20 @@ class GameEngine {
 
   GameSession? get session => _session;
 
-  String createRoom({int playerCount = 4}) {
-    final scenario = createFixedScenario(playerCount: playerCount);
+  String createRoom({int playerCount = 4, Scenario? scenario}) {
+    final s = scenario ?? createFixedScenario(playerCount: playerCount);
     final roomId = (_random.nextInt(9000) + 1000).toString();
     _session = GameSession(
       id: _uuid.v4(),
       roomId: roomId,
-      scenario: scenario,
-      deckClues: scenario.clues.map((c) => c.id).toList()..shuffle(_random),
+      scenario: s,
+      deckClues: s.clues.map((c) => c.id).toList()..shuffle(_random),
     );
     return roomId;
+  }
+
+  String createRoomWithScenario(Scenario scenario) {
+    return createRoom(playerCount: scenario.playerCount, scenario: scenario);
   }
 
   Player? joinPlayer(String nickname) {

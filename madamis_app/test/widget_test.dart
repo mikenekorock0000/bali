@@ -5,6 +5,7 @@ void main() {
   testWidgets('App renders home screen', (tester) async {
     await tester.pumpWidget(const MadamisApp());
     expect(find.text('マダミス GM'), findsOneWidget);
-    expect(find.text('新しいゲームを始める'), findsOneWidget);
+    expect(find.text('AIでシナリオ生成'), findsOneWidget);
+    expect(find.text('固定シナリオで遊ぶ（デモ）'), findsOneWidget);
   });
 }
