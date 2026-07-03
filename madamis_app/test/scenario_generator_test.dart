@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:madamis_app/models/generation_failure.dart';
 import 'package:madamis_app/models/scenario_config.dart';
 import 'package:madamis_app/services/scenario_generator.dart';
 
@@ -16,7 +17,13 @@ void main() {
         ),
         apiKey: null,
       ),
-      throwsA(isA<ScenarioGenerationException>()),
+      throwsA(
+        isA<ScenarioGenerationException>().having(
+          (e) => e.failure?.code,
+          'failure code',
+          'api_key.missing',
+        ),
+      ),
     );
   });
 }

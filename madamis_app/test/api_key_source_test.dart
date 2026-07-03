@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:madamis_app/config/api_key_source.dart';
 
@@ -7,8 +9,14 @@ void main() {
   });
 
   test('resolve returns null when nothing set', () {
-    expect(ApiKeySource.resolve(null), isNull);
-    expect(ApiKeySource.resolve(''), isNull);
+    final envKey = Platform.environment['GEMINI_API_KEY'];
+    if (envKey != null && envKey.isNotEmpty) {
+      expect(ApiKeySource.resolve(null), envKey);
+      expect(ApiKeySource.resolve(''), envKey);
+    } else {
+      expect(ApiKeySource.resolve(null), isNull);
+      expect(ApiKeySource.resolve(''), isNull);
+    }
   });
 
   test('isFromEnvironment false when stored', () {

@@ -29,7 +29,7 @@ class _SavedScenarioSectionState extends State<SavedScenarioSection> {
       return const Card(
         child: Padding(
           padding: EdgeInsets.all(24),
-          child: Center(child: CircularProgressIndicator()),
+          child: Center(child: Text('シナリオ一覧を読み込み中...')),
         ),
       );
     }
@@ -56,7 +56,7 @@ class _ScenarioTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
-        onTap: disabled ? null : () => app.startHostWithSavedScenario(summary.assetPath),
+        onTap: disabled ? null : () => app.startHostWithSavedScenario(summary),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -84,7 +84,7 @@ class _ScenarioTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${summary.modeLabel} · ${summary.playerCount}人 · 手がかり${summary.clueCount}枚',
+                      '${summary.modeLabel} · ${summary.playerCount}人 · 手がかり${summary.clueCount}枚${summary.isLocal ? ' · アプリ生成' : ''}',
                       style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
                     ),
                   ],

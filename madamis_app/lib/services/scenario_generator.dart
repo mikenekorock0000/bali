@@ -4,6 +4,8 @@ import 'package:google_generative_ai/google_generative_ai.dart' as genai;
 import 'package:uuid/uuid.dart';
 
 import '../config/ai_pipeline_config.dart';
+import '../models/generation_failure.dart';
+import '../models/generation_progress.dart';
 import '../models/scenario.dart';
 import '../models/scenario_config.dart';
 import 'scenario_auditor.dart';
@@ -31,7 +33,13 @@ class ScenarioGenerator {
     ProgressCallback? onProgress,
   }) async {
     if (apiKey == null || apiKey.isEmpty) {
-      throw ScenarioGenerationException('Gemini APIキーが設定されていません');
+      final failure = GenerationFailure(
+        step: 0,
+        phase: GenerationPhase.apiKey,
+        code: 'api_key.missing',
+        message: 'Gemini APIキーが設定されていません',
+      );
+      throw ScenarioGenerationException(failure.summary, failure: failure);
     }
     _apiKey = apiKey;
 
@@ -83,10 +91,17 @@ class ScenarioGenerator {
 
           progress.errors = report.allErrors;
           if (repair == AiPipelineConfig.maxRepairPasses) {
-            lastError = ScenarioGenerationException(
-              '整合性チェック失敗 (試行 $attempt/$maxAttempts): ${report.allErrors.first}',
+            final failure = GenerationFailure.validation(
+              step: 5,
+              attempt: attempt,
+              errors: report.allErrors,
+              repairPass: repair,
+              exhaustedRepairs: true,
             );
+            progress.recordFailure(failure);
+            lastError = ScenarioGenerationException(failure.summary, failure: failure);
             previousErrors = report.allErrors;
+            onProgress?.call(progress);
             break;
           }
 
@@ -96,6 +111,7 @@ class ScenarioGenerator {
             scenario,
             config,
             report.allErrors,
+            attempt: attempt,
           );
           scenario = _parseScenario(repaired, config);
         }
@@ -119,18 +135,26 @@ class ScenarioGenerator {
               config,
               progress.errors,
               auditHint: audit.simulatedPlaythrough,
+              attempt: attempt,
+              phase: GenerationPhase.auditRepair,
             );
             scenario = _parseScenario(repaired, config);
 
             final reAudit = await auditor.audit(scenario, config);
             if (!reAudit.passed) {
-              lastError = ScenarioGenerationException(
-                'AI監査失敗 (試行 $attempt/$maxAttempts): ${reAudit.issues.firstOrNull ?? reAudit.failedCheckNames.first}',
+              final failure = GenerationFailure.audit(
+                attempt: attempt,
+                issues: reAudit.issues,
+                failedCheckNames: reAudit.failedCheckNames,
+                afterRepair: true,
               );
+              progress.recordFailure(failure);
+              lastError = ScenarioGenerationException(failure.summary, failure: failure);
               previousErrors = [
                 ...reAudit.issues,
                 ...reAudit.failedCheckNames.map((n) => 'AI監査: $n 不合格'),
               ];
+              onProgress?.call(progress);
               continue;
             }
           }
@@ -138,16 +162,23 @@ class ScenarioGenerator {
 
         // Step 7: Polish narrative
         _setStep(progress, 7, onProgress);
-        final polished = await _polishScenario(auditModel, scenario, config);
+        final polished = await _polishScenario(auditModel, scenario, config, attempt: attempt);
         scenario = _parseScenario(polished, config);
 
         final finalReport = validator.validate(scenario, config, strict: true);
         if (!finalReport.passed) {
-          progress.errors = finalReport.allErrors;
-          lastError = ScenarioGenerationException(
-            '仕上げ後の整合性チェック失敗: ${finalReport.allErrors.first}',
+          final failure = GenerationFailure(
+            step: 7,
+            phase: GenerationPhase.postPolishValidation,
+            code: 'validation.post_polish',
+            message: '仕上げ後の整合性チェックに失敗しました',
+            details: finalReport.allErrors,
+            attempt: attempt,
           );
+          progress.recordFailure(failure);
+          lastError = ScenarioGenerationException(failure.summary, failure: failure);
           previousErrors = finalReport.allErrors;
+          onProgress?.call(progress);
           continue;
         }
 
@@ -159,12 +190,24 @@ class ScenarioGenerator {
         return scenario;
       } on ScenarioGenerationException catch (e) {
         lastError = e;
-        progress.errors = [e.message];
-        previousErrors = [e.message];
+        if (e.failure != null) {
+          progress.recordFailure(e.failure!);
+        } else {
+          progress.errors = [e.message];
+        }
+        previousErrors = progress.errors;
         onProgress?.call(progress);
       } catch (e) {
-        lastError = ScenarioGenerationException('生成エラー: $e');
-        progress.errors = [e.toString()];
+        final failure = GenerationFailure(
+          step: progress.currentStep,
+          phase: GenerationPhase.unknown,
+          code: 'unknown.error',
+          message: '予期しない生成エラーが発生しました',
+          details: [e.toString()],
+          attempt: attempt,
+        );
+        progress.recordFailure(failure);
+        lastError = ScenarioGenerationException(failure.summary, failure: failure);
         previousErrors = [e.toString()];
         onProgress?.call(progress);
       }
@@ -172,8 +215,14 @@ class ScenarioGenerator {
 
     progress.status = GenerationStatus.failed;
     progress.message = '生成に失敗しました';
+    if (lastError?.failure != null) {
+      progress.lastFailure ??= lastError!.failure;
+    }
     onProgress?.call(progress);
-    throw lastError ?? ScenarioGenerationException('シナリオ生成に失敗しました');
+    throw lastError ?? ScenarioGenerationException(
+      'シナリオ生成に失敗しました',
+      failure: progress.lastFailure,
+    );
   }
 
   genai.GenerativeModel _createModel(String modelName, double temperature) {
@@ -199,24 +248,39 @@ class ScenarioGenerator {
         : '\n\n## 前回の失敗（必ず修正）\n${previousErrors.take(5).map((e) => '- $e').join('\n')}';
 
     _setStep(progress, 1, onProgress);
-    final foundation = await _callJson(model, _worldPrompt(config, errorHint));
+    final foundation = await _callJson(
+      model,
+      _worldPrompt(config, errorHint),
+      step: 1,
+      phase: GenerationPhase.creativeWorld,
+      attempt: progress.attempt,
+    );
 
     _setStep(progress, 2, onProgress);
     final charactersJson = await _callJson(
       model,
       _charactersPrompt(config, foundation, errorHint),
+      step: 2,
+      phase: GenerationPhase.creativeCharacters,
+      attempt: progress.attempt,
     );
 
     _setStep(progress, 3, onProgress);
     final scriptsJson = await _callJson(
       model,
       _scriptsPrompt(config, foundation, charactersJson, errorHint),
+      step: 3,
+      phase: GenerationPhase.creativeScripts,
+      attempt: progress.attempt,
     );
 
     _setStep(progress, 4, onProgress);
     final cluesJson = await _callJson(
       model,
       _cluesPrompt(config, foundation, charactersJson, scriptsJson, errorHint),
+      step: 4,
+      phase: GenerationPhase.creativeClues,
+      attempt: progress.attempt,
     );
 
     return _assembleScenario(foundation, charactersJson, scriptsJson, cluesJson);
@@ -451,19 +515,29 @@ $errorHint
     ScenarioConfig config,
     List<String> errors, {
     String auditHint = '',
+    required int attempt,
   }) async {
     final clueOnly = errors.every((e) => e.contains('clue_reachability'));
     if (clueOnly) {
-      return _repairCluesOnly(model, scenario, errors);
+      return _repairCluesOnly(model, scenario, errors, attempt: attempt);
     }
-    return _repairScenario(model, scenario, config, errors, auditHint: auditHint);
+    return _repairScenario(
+      model,
+      scenario,
+      config,
+      errors,
+      auditHint: auditHint,
+      attempt: attempt,
+      phase: GenerationPhase.repair,
+    );
   }
 
   Future<Map<String, dynamic>> _repairCluesOnly(
     genai.GenerativeModel model,
     Scenario scenario,
-    List<String> errors,
-  ) async {
+    List<String> errors, {
+    required int attempt,
+  }) async {
     final truth = scenario.truth;
     final critical = scenario.clues.where((c) => c.importance == 'critical').toList();
     final prompt = '''
@@ -491,7 +565,13 @@ ${jsonEncode(critical.map((c) => c.toJson()).toList())}
 { "clues": [ ...全手がかり... ] }
 ''';
 
-    final result = await _callJson(model, prompt);
+    final result = await _callJson(
+      model,
+      prompt,
+      step: 5,
+      phase: GenerationPhase.repair,
+      attempt: attempt,
+    );
     final json = scenario.toJson();
     json['clues'] = result['clues'];
     return json;
@@ -503,6 +583,8 @@ ${jsonEncode(critical.map((c) => c.toJson()).toList())}
     ScenarioConfig config,
     List<String> errors, {
     String auditHint = '',
+    required int attempt,
+    GenerationPhase phase = GenerationPhase.repair,
   }) async {
     final prompt = '''
 以下のマーダーミステリーシナリオJSONに問題があります。修正版を全文出力してください。
@@ -523,14 +605,21 @@ ${jsonEncode(scenario.toJson())}
 修正済みの完全なシナリオJSON（title, genre, synopsis, epilogue, truth, characters, clues を含む）
 ''';
 
-    return _callJson(model, prompt);
+    return _callJson(
+      model,
+      prompt,
+      step: phase == GenerationPhase.auditRepair ? 6 : 5,
+      phase: phase,
+      attempt: attempt,
+    );
   }
 
   Future<Map<String, dynamic>> _polishScenario(
     genai.GenerativeModel model,
     Scenario scenario,
-    ScenarioConfig config,
-  ) async {
+    ScenarioConfig config, {
+    required int attempt,
+  }) async {
     final prompt = '''
 以下のシナリオの文章品質を向上させてください。構造・ID・人数・手がかり数は変えないこと。
 
@@ -546,7 +635,13 @@ ${jsonEncode(scenario.toJson())}
 同じJSON構造の完成版
 ''';
 
-    return _callJson(model, prompt);
+    return _callJson(
+      model,
+      prompt,
+      step: 7,
+      phase: GenerationPhase.polish,
+      attempt: attempt,
+    );
   }
 
   String _repairHintsFor(List<String> errors) {
@@ -570,33 +665,72 @@ ${jsonEncode(scenario.toJson())}
     return hints.isEmpty ? '' : hints.join('\n');
   }
 
-  Future<Map<String, dynamic>> _callJson(genai.GenerativeModel model, String prompt) async {
-    final response = await model.generateContent([genai.Content.text(prompt)]);
-    final text = response.text;
-    if (text == null || text.isEmpty) {
-      throw ScenarioGenerationException('Geminiから空の応答');
+  Future<Map<String, dynamic>> _callJson(
+    genai.GenerativeModel model,
+    String prompt, {
+    required int step,
+    required GenerationPhase phase,
+    required int attempt,
+  }) async {
+    try {
+      final response = await model.generateContent([genai.Content.text(prompt)]);
+      final text = response.text;
+      if (text == null || text.isEmpty) {
+        final failure = GenerationFailure(
+          step: step,
+          phase: GenerationPhase.apiResponse,
+          code: 'api.empty_response',
+          message: 'Geminiから空の応答が返されました',
+          attempt: attempt,
+        );
+        throw ScenarioGenerationException(failure.summary, failure: failure);
+      }
+      return _extractJson(text, step: step, attempt: attempt);
+    } on ScenarioGenerationException {
+      rethrow;
+    } catch (e) {
+      final failure = GenerationFailure(
+        step: step,
+        phase: phase,
+        code: 'api.request_failed',
+        message: 'Gemini API呼び出しに失敗しました',
+        details: [e.toString()],
+        attempt: attempt,
+      );
+      throw ScenarioGenerationException(failure.summary, failure: failure);
     }
-    return _extractJson(text);
   }
 
-  Scenario _parseScenario(Map<String, dynamic> json, ScenarioConfig config) {
-    final id = _uuid.v4();
-    return Scenario(
-      id: id,
-      title: json['title'] as String? ?? '無題の事件',
-      genre: json['genre'] as String? ?? config.genre,
-      synopsis: json['synopsis'] as String? ?? '',
-      epilogue: json['epilogue'] as String? ?? '',
-      truth: ScenarioTruth.fromJson(json['truth'] as Map<String, dynamic>),
-      characters: (json['characters'] as List)
-          .map((e) => _parseCharacter(e as Map<String, dynamic>))
-          .toList(),
-      clues: (json['clues'] as List)
-          .map((e) => ScenarioClue.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      playerCount: config.playerCount,
-      gameMode: config.playerCount <= 3 ? 'cooperative' : 'competitive',
-    );
+  Scenario _parseScenario(Map<String, dynamic> json, ScenarioConfig config, {int attempt = 1, int step = 0}) {
+    try {
+      final id = _uuid.v4();
+      return Scenario(
+        id: id,
+        title: json['title'] as String? ?? '無題の事件',
+        genre: json['genre'] as String? ?? config.genre,
+        synopsis: json['synopsis'] as String? ?? '',
+        epilogue: json['epilogue'] as String? ?? '',
+        truth: ScenarioTruth.fromJson(json['truth'] as Map<String, dynamic>),
+        characters: (json['characters'] as List)
+            .map((e) => _parseCharacter(e as Map<String, dynamic>))
+            .toList(),
+        clues: (json['clues'] as List)
+            .map((e) => ScenarioClue.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        playerCount: config.playerCount,
+        gameMode: config.playerCount <= 3 ? 'cooperative' : 'competitive',
+      );
+    } catch (e) {
+      final failure = GenerationFailure(
+        step: step == 0 ? 0 : step,
+        phase: GenerationPhase.scenarioParse,
+        code: 'parse.scenario_invalid',
+        message: '生成結果をシナリオに変換できませんでした',
+        details: [e.toString()],
+        attempt: attempt,
+      );
+      throw ScenarioGenerationException(failure.summary, failure: failure);
+    }
   }
 
   ScenarioCharacter _parseCharacter(Map<String, dynamic> json) {
@@ -620,18 +754,39 @@ ${jsonEncode(scenario.toJson())}
     return defaultValue;
   }
 
-  Map<String, dynamic> _extractJson(String text) {
-    var cleaned = text.trim();
-    if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replaceFirst(RegExp(r'^```(?:json)?\n?'), '');
-      cleaned = cleaned.replaceFirst(RegExp(r'\n?```$'), '');
+  Map<String, dynamic> _extractJson(String text, {required int step, required int attempt}) {
+    try {
+      var cleaned = text.trim();
+      if (cleaned.startsWith('```')) {
+        cleaned = cleaned.replaceFirst(RegExp(r'^```(?:json)?\n?'), '');
+        cleaned = cleaned.replaceFirst(RegExp(r'\n?```$'), '');
+      }
+      final start = cleaned.indexOf('{');
+      final end = cleaned.lastIndexOf('}');
+      if (start == -1 || end == -1) {
+        final failure = GenerationFailure(
+          step: step,
+          phase: GenerationPhase.jsonParse,
+          code: 'parse.json_not_found',
+          message: 'AI応答からJSONを抽出できませんでした',
+          attempt: attempt,
+        );
+        throw ScenarioGenerationException(failure.summary, failure: failure);
+      }
+      return jsonDecode(cleaned.substring(start, end + 1)) as Map<String, dynamic>;
+    } on ScenarioGenerationException {
+      rethrow;
+    } catch (e) {
+      final failure = GenerationFailure(
+        step: step,
+        phase: GenerationPhase.jsonParse,
+        code: 'parse.json_invalid',
+        message: 'AI応答のJSONが不正です',
+        details: [e.toString()],
+        attempt: attempt,
+      );
+      throw ScenarioGenerationException(failure.summary, failure: failure);
     }
-    final start = cleaned.indexOf('{');
-    final end = cleaned.lastIndexOf('}');
-    if (start == -1 || end == -1) {
-      throw ScenarioGenerationException('JSONが見つかりません');
-    }
-    return jsonDecode(cleaned.substring(start, end + 1)) as Map<String, dynamic>;
   }
 
   void _setStep(
@@ -644,11 +799,4 @@ ${jsonEncode(scenario.toJson())}
     progress.message = message ?? GenerationStep.steps[step - 1].message;
     cb?.call(progress);
   }
-}
-
-class ScenarioGenerationException implements Exception {
-  ScenarioGenerationException(this.message);
-  final String message;
-  @override
-  String toString() => message;
 }
