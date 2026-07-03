@@ -18,19 +18,21 @@ class ServerService {
 
   final GameEngine engine;
   HttpServer? _server;
+  String? _hostIp;
   final _clients = <WebSocketChannel, String>{};
   final _broadcastController = StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get events => _broadcastController.stream;
 
   String? get joinUrl {
-    if (_server == null) return null;
+    if (_server == null || _hostIp == null) return null;
     final roomId = engine.session?.roomId;
     if (roomId == null) return null;
-    return 'http://${_server!.address.host}:${AppConstants.serverPort}/join?room=$roomId';
+    return 'http://$_hostIp:${AppConstants.serverPort}/join?room=$roomId';
   }
 
-  Future<void> start() async {
+  Future<void> start({required String hostIp}) async {
+    _hostIp = hostIp;
     engine.onEvent = _broadcast;
 
     final router = Router();

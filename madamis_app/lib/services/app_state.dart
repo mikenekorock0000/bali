@@ -4,10 +4,14 @@ import 'package:flutter/foundation.dart';
 
 import '../data/coop_scenario.dart';
 import '../models/game_phase.dart';
+import '../models/hotspot_info.dart';
 import '../models/scenario.dart';
 import '../models/scenario_config.dart';
 import '../services/asset_server.dart';
+import '../services/audio_service.dart';
 import '../services/game_engine.dart';
+import '../services/network_service.dart';
+import '../services/save_service.dart';
 import '../services/scenario_generator.dart';
 import '../services/server_service.dart';
 import '../services/settings_service.dart';
@@ -20,7 +24,7 @@ class AppState extends ChangeNotifier {
     SettingsService.instance.load();
   }
 
-  final GameEngine _engine = GameEngine();
+  GameEngine _engine = GameEngine();
   final ScenarioGenerator _generator = ScenarioGenerator();
   ServerService? _server;
 
@@ -29,11 +33,14 @@ class AppState extends ChangeNotifier {
   String? _roomId;
   String? _lastEvent;
   StreamSubscription<Map<String, dynamic>>? _eventSub;
+  Timer? _autoSaveTimer;
   bool _isRunning = false;
 
   GenerationProgress _generationProgress = GenerationProgress();
   Scenario? _generatedScenario;
   String? _generationError;
+  HotspotInfo? _hotspotInfo;
+  List<SaveSummary> _saves = [];
 
   AppScreen get screen => _screen;
   String? get joinUrl => _joinUrl;
@@ -44,12 +51,24 @@ class AppState extends ChangeNotifier {
   GenerationProgress get generationProgress => _generationProgress;
   Scenario? get generatedScenario => _generatedScenario;
   String? get generationError => _generationError;
+  HotspotInfo? get hotspotInfo => _hotspotInfo;
+  List<SaveSummary> get saves => _saves;
   bool get hasApiKey => SettingsService.instance.hasApiKey;
+  bool get soundEnabled => SettingsService.instance.soundEnabled;
 
   GamePhase? get currentPhase => _engine.session?.phase;
   int get playerCount => _engine.session?.players.length ?? 0;
   bool get canStart => _engine.session?.canStart ?? false;
   bool get isStarted => _engine.session?.isStarted ?? false;
+
+  Future<void> refreshSaves() async {
+    try {
+      _saves = await SaveService.instance.listSaves();
+    } catch (_) {
+      _saves = [];
+    }
+    notifyListeners();
+  }
 
   void goToScenarioConfig() {
     _screen = AppScreen.scenarioConfig;
@@ -63,6 +82,7 @@ class AppState extends ChangeNotifier {
 
   void goToHome() {
     _screen = AppScreen.home;
+    refreshSaves();
     notifyListeners();
   }
 
@@ -103,40 +123,100 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> _startServer({required String Function() createRoom}) async {
-    _roomId = createRoom();
+  Future<void> resumeFromSave(String saveId) async {
+    final session = await SaveService.instance.loadSession(saveId);
+    if (session == null) return;
+
+    _engine = GameEngine();
+    _engine.restoreSession(session);
+    await _startServer(
+      createRoom: () => session.roomId,
+      skipCreateRoom: true,
+    );
+
+    _screen = session.isStarted ? AppScreen.game : AppScreen.lobby;
+    notifyListeners();
+  }
+
+  Future<void> _startServer({
+    required String Function() createRoom,
+    bool skipCreateRoom = false,
+  }) async {
+    if (!skipCreateRoom) {
+      _roomId = createRoom();
+    } else {
+      _roomId = _engine.session?.roomId;
+    }
+
+    _hotspotInfo = await NetworkService.instance.startHotspot(_roomId!);
+    final hostIp = _hotspotInfo!.localIp ?? await NetworkService.instance.getLocalIp();
+
     _server = ServerService(engine: _engine);
-    await _server!.start();
+    await _server!.start(hostIp: hostIp);
 
     _joinUrl = _server!.joinUrl;
     _isRunning = true;
-    _screen = AppScreen.lobby;
+    if (_screen != AppScreen.game) {
+      _screen = AppScreen.lobby;
+    }
 
-    _eventSub = _server!.events.listen((event) {
-      _lastEvent = event['type'] as String?;
-      notifyListeners();
-    });
+    _eventSub?.cancel();
+    _eventSub = _server!.events.listen(_handleServerEvent);
+
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer.periodic(const Duration(seconds: 30), (_) => autoSave());
 
     notifyListeners();
+  }
+
+  void _handleServerEvent(Map<String, dynamic> event) {
+    _lastEvent = event['type'] as String?;
+    AudioService.instance.onEvent(_lastEvent ?? '');
+
+    if (_lastEvent == 'phase_changed') {
+      final phaseId = event['phase'] as String?;
+      if (phaseId != null) {
+        AudioService.instance.onPhaseChanged(GamePhase.fromId(phaseId));
+      }
+    }
+
+    autoSave();
+    notifyListeners();
+  }
+
+  Future<void> autoSave() async {
+    final session = _engine.session;
+    if (session == null || !session.isStarted) return;
+    try {
+      await SaveService.instance.saveSession(session);
+    } catch (_) {}
   }
 
   void startGame() {
     if (_engine.startGame()) {
       _screen = AppScreen.game;
+      autoSave();
       notifyListeners();
     }
   }
 
   Future<void> stopHost() async {
+    await autoSave();
     await _eventSub?.cancel();
     await _server?.stop();
+    await NetworkService.instance.stopHotspot();
+    await AudioService.instance.stopAll();
+    _autoSaveTimer?.cancel();
     _engine.dispose();
+    _engine = GameEngine();
     _isRunning = false;
     _screen = AppScreen.home;
     _joinUrl = null;
     _roomId = null;
+    _hotspotInfo = null;
     _generatedScenario = null;
     _generationError = null;
+    await refreshSaves();
     notifyListeners();
   }
 
@@ -145,10 +225,29 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setSoundEnabled(bool enabled) async {
+    await SettingsService.instance.setSoundEnabled(enabled);
+    if (!enabled) await AudioService.instance.stopAll();
+    notifyListeners();
+  }
+
+  Future<void> setVolume(double volume) async {
+    await SettingsService.instance.setVolume(volume);
+    notifyListeners();
+  }
+
+  Future<void> deleteSave(String id) async {
+    await SaveService.instance.deleteSave(id);
+    await refreshSaves();
+  }
+
   @override
   void dispose() {
     _eventSub?.cancel();
+    _autoSaveTimer?.cancel();
     _server?.stop();
+    NetworkService.instance.stopHotspot();
+    AudioService.instance.stopAll();
     _engine.dispose();
     super.dispose();
   }

@@ -7,6 +7,7 @@ import 'generating_screen.dart';
 import 'lobby_screen.dart';
 import 'scenario_config_screen.dart';
 import 'settings_screen.dart';
+import '../widgets/save_list_section.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -77,8 +78,10 @@ class _HomeBodyState extends State<_HomeBody> {
                       color: Colors.grey,
                     ),
               ),
-              const SizedBox(height: 32),
-              FilledButton.icon(
+                const SizedBox(height: 24),
+                const SaveListSection(),
+                const SizedBox(height: 16),
+                FilledButton.icon(
                 onPressed: widget.app.goToScenarioConfig,
                 icon: const Icon(Icons.auto_awesome),
                 label: const Text('AIでシナリオ生成'),

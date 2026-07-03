@@ -1,0 +1,2 @@
+# Placeholder for SE audio files (se_phase.mp3, se_clue.mp3, etc.)
+# Falls back to system sounds when files are not present.

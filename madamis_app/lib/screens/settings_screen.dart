@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../services/app_state.dart';
+import '../services/settings_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -81,6 +82,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }
             },
             child: const Text('保存'),
+          ),
+          const Divider(height: 48),
+          Text('サウンド', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            title: const Text('効果音・BGM'),
+            subtitle: const Text('フェーズ遷移やイベント時に再生'),
+            value: app.soundEnabled,
+            onChanged: app.setSoundEnabled,
+          ),
+          ListTile(
+            title: Text('音量: ${(SettingsService.instance.volume * 100).round()}%'),
+            subtitle: Slider(
+              value: SettingsService.instance.volume,
+              onChanged: app.soundEnabled ? app.setVolume : null,
+            ),
           ),
         ],
       ),

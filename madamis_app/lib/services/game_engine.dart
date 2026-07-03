@@ -44,6 +44,20 @@ class GameEngine {
     return createRoom(playerCount: scenario.playerCount, scenario: scenario);
   }
 
+  void restoreSession(GameSession session) {
+    _session = session;
+    _phaseTimer?.cancel();
+    if (session.phaseTimeoutAt != null) {
+      final remaining = session.phaseTimeoutAt!.difference(DateTime.now()).inSeconds;
+      if (remaining > 0 &&
+          session.phase != GamePhase.results &&
+          session.phase != GamePhase.end &&
+          session.phase != GamePhase.lobby) {
+        _startPhaseTimer(remaining);
+      }
+    }
+  }
+
   Player? joinPlayer(String nickname) {
     final session = _session;
     if (session == null) return null;

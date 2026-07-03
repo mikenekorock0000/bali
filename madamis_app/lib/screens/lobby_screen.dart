@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../services/app_state.dart';
+import '../widgets/hotspot_info_card.dart';
 import '../widgets/player_list.dart';
 
 class LobbyScreen extends StatelessWidget {
@@ -68,7 +69,8 @@ class LobbyScreen extends StatelessWidget {
                     'スマホでQRコードを読み取って参加',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 16),
+                  const HotspotInfoBanner(),
                   if (joinUrl.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.all(16),
