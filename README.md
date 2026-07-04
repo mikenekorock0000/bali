@@ -4,7 +4,11 @@
 
 ## 実機用 APK
 
-[madamis_app/dist/madamis-gm-release.apk](madamis_app/dist/madamis-gm-release.apk)（Android タブレット向け）
+**最新:** [madamis_app/dist/madamis-gm-v1.1.0+2.apk](madamis_app/dist/madamis-gm-v1.1.0%2B2.apk)（v1.1.0+2・シミュレーター同梱）
+
+互換用: [madamis_app/dist/madamis-gm-release.apk](madamis_app/dist/madamis-gm-release.apk)（常に最新版と同一）
+
+> `main` ブランチの `madamis_app/dist/` に常に置く。再ビルド時は `bash madamis_app/tool/build_release_apk.sh`
 
 ## プロジェクト
 
