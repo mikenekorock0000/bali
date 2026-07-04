@@ -8,11 +8,13 @@ class PlayerList extends StatelessWidget {
     required this.players,
     this.characterNames = const {},
     this.showDetails = false,
+    this.shrinkWrap = false,
   });
 
   final List<Player> players;
   final Map<String, String> characterNames;
   final bool showDetails;
+  final bool shrinkWrap;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +28,8 @@ class PlayerList extends StatelessWidget {
     }
 
     return ListView.builder(
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
       itemCount: players.length,
       itemBuilder: (context, i) {
         final p = players[i];
