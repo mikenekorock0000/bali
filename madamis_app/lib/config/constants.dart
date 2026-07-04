@@ -1,4 +1,5 @@
 class AppConstants {
+  static const String appVersion = '1.1.0+2';
   static const int serverPort = 8080;
   static const int maxPlayers = 8;
   static const int minPlayers = 2;

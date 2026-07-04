@@ -2,22 +2,28 @@
 
 | ファイル | 説明 |
 |---------|------|
-| `madamis-gm-release.apk` | Android タブレット向けリリースビルド（マダミス GM） |
+| **`madamis-gm-v1.1.0+2.apk`** | **最新** — シミュレーター・全ボタン自動テスト同梱（v1.1.0+2） |
+| `madamis-gm-release.apk` | 上記と同一内容（互換用の固定名） |
+
+## バージョン確認
+
+インストール後、アプリ **設定** 画面の先頭に `1.1.0+2` と表示され、
+**「プレイヤーシミュレーター / 全自動テスト」** 項目があれば最新版です。
 
 ## インストール
 
 ```bash
-adb install madamis-gm-release.apk
+adb install -r madamis-gm-v1.1.0+2.apk
 ```
 
 または APK をタブレットにコピーしてタップ（「提供元不明のアプリ」を許可）。
+古い版は上書きインストール（`-r`）を推奨。
 
 ## 再ビルド
 
 ```bash
 cd madamis_app
-flutter pub get
-bash tool/patch_wifi_iot.sh
-flutter build apk --release
-cp build/app/outputs/flutter-apk/app-release.apk dist/madamis-gm-release.apk
+bash tool/build_release_apk.sh
 ```
+
+`pubspec.yaml` の `version:` に合わせて `dist/madamis-gm-v<version>.apk` が生成されます。

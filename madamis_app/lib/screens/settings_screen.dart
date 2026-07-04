@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config/constants.dart';
 import '../services/app_state.dart';
 import '../services/settings_service.dart';
 import 'player_simulator_screen.dart';
@@ -43,6 +44,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          ListTile(
+            title: const Text('アプリバージョン'),
+            subtitle: Text(AppConstants.appVersion),
+            leading: const Icon(Icons.info_outline),
+          ),
+          const Divider(),
           Text('Gemini APIキー', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
