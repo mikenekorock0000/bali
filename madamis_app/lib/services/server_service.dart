@@ -28,10 +28,15 @@ class ServerService {
     if (_server == null || _hostIp == null) return null;
     final roomId = engine.session?.roomId;
     if (roomId == null) return null;
-    return 'http://$_hostIp:${AppConstants.serverPort}/join?room=$roomId';
+    return 'http://$_hostIp:${boundPort}/join?room=$roomId';
   }
 
-  Future<void> start({required String hostIp}) async {
+  int get boundPort => _server?.port ?? AppConstants.serverPort;
+
+  Future<void> start({
+    required String hostIp,
+    int port = AppConstants.serverPort,
+  }) async {
     _hostIp = hostIp;
     engine.onEvent = _broadcast;
 
@@ -71,7 +76,7 @@ class ServerService {
     _server = await shelf_io.serve(
       cascade.handler,
       InternetAddress.anyIPv4,
-      AppConstants.serverPort,
+      port,
     );
   }
 
