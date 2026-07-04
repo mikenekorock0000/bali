@@ -70,6 +70,7 @@ class GameEngine {
       token: _uuid.v4(),
     );
     session.players.add(player);
+    assignRandomCharacter(player.id);
     _emit('player_joined', {'player': player.toJson()});
     return player;
   }
@@ -133,6 +134,41 @@ class GameEngine {
     return true;
   }
 
+  bool assignRandomCharacter(String playerId) {
+    final session = _session;
+    if (session == null || session.isStarted) return false;
+
+    final player = session.players.firstWhere((p) => p.id == playerId);
+    if (player.characterId != null) return true;
+
+    final available = session.scenario.playerCharacters
+        .where((c) => !session.players.any((p) => p.characterId == c.id))
+        .map((c) => c.id)
+        .toList();
+    if (available.isEmpty) return false;
+
+    final characterId = available[_random.nextInt(available.length)];
+    return selectCharacter(playerId, characterId);
+  }
+
+  void assignAllCharactersRandomly() {
+    final session = _session;
+    if (session == null || session.isStarted) return;
+
+    final unassigned = session.players.where((p) => p.characterId == null).toList();
+    if (unassigned.isEmpty) return;
+
+    final available = session.scenario.playerCharacters
+        .where((c) => !session.players.any((p) => p.characterId == c.id))
+        .map((c) => c.id)
+        .toList()
+      ..shuffle(_random);
+
+    for (var i = 0; i < unassigned.length && i < available.length; i++) {
+      selectCharacter(unassigned[i].id, available[i]);
+    }
+  }
+
   bool selectCharacter(String playerId, String characterId) {
     final session = _session;
     if (session == null || session.isStarted) return false;
@@ -155,7 +191,10 @@ class GameEngine {
 
   bool startGame() {
     final session = _session;
-    if (session == null || !session.canStart) return false;
+    if (session == null) return false;
+
+    assignAllCharactersRandomly();
+    if (!session.canStart) return false;
 
     session.isStarted = true;
     session.startedAt = DateTime.now();
@@ -502,12 +541,21 @@ class GameEngine {
       'handClues': handClueDetails,
       'publicClues': publicClueDetails,
       'players': session.players
-          .map((p) => {
-                'id': p.id,
-                'nickname': p.nickname,
-                'characterId': p.characterId,
-                'connectionStatus': p.connectionStatus,
-              })
+          .map((p) {
+            final char = p.characterId != null
+                ? session.scenario.characters
+                    .where((c) => c.id == p.characterId)
+                    .map((c) => c.name)
+                    .firstOrNull
+                : null;
+            return {
+              'id': p.id,
+              'nickname': p.nickname,
+              'characterId': p.characterId,
+              'characterName': char,
+              'connectionStatus': p.connectionStatus,
+            };
+          })
           .toList(),
       'characters': _voteTargets(session)
           .map((c) => {

@@ -182,16 +182,13 @@ function renderState() {
   const phase = session.phase;
 
   if (!session.isStarted) {
-    if (player.characterId) {
-      showScreen('waiting');
-      updateStatusBar('waiting');
-      renderPlayerList(players);
-      document.getElementById('waiting-msg').textContent = 'ゲーム開始を待っています...';
-    } else {
-      showScreen('character');
-      updateStatusBar('character');
-      renderCharacters(availableCharacters);
-    }
+    showScreen('waiting');
+    updateStatusBar('waiting');
+    renderPlayerList(players);
+    const charName = character?.name;
+    document.getElementById('waiting-msg').textContent = charName
+      ? `あなたの配役: ${charName}。ゲーム開始を待っています...`
+      : '配役を割り当て中...';
     return;
   }
 
@@ -226,9 +223,9 @@ function renderPlayerList(players) {
   const ul = document.getElementById('player-list');
   ul.innerHTML = (players || []).map(p => {
     const disconnected = p.connectionStatus === 'disconnected';
-    const charStatus = p.characterId
-      ? '<span class="status-ok">配役済 ✓</span>'
-      : '<span class="status-wait">選択中...</span>';
+    const charStatus = p.characterName
+      ? `<span class="status-ok">配役: ${p.characterName}</span>`
+      : '<span class="status-wait">配役待ち...</span>';
     return `<li><span>${p.nickname}${disconnected ? ' 🔴' : ''}</span>${charStatus}</li>`;
   }).join('') || '<li class="empty-state">まだ参加者がいません</li>';
 }

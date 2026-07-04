@@ -6,10 +6,12 @@ class PlayerList extends StatelessWidget {
   const PlayerList({
     super.key,
     required this.players,
+    this.characterNames = const {},
     this.showDetails = false,
   });
 
   final List<Player> players;
+  final Map<String, String> characterNames;
   final bool showDetails;
 
   @override
@@ -27,6 +29,7 @@ class PlayerList extends StatelessWidget {
       itemCount: players.length,
       itemBuilder: (context, i) {
         final p = players[i];
+        final charName = p.characterId != null ? characterNames[p.characterId] : null;
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
@@ -44,9 +47,9 @@ class PlayerList extends StatelessWidget {
             subtitle: showDetails
                 ? Text('トークン ${p.tokensRemaining} · 手がかり ${p.handClues.length}枚')
                 : Text(
-                    p.characterId != null ? '配役済み ✓' : 'キャラ選択中...',
+                    charName != null ? '配役: $charName' : '配役待ち...',
                     style: TextStyle(
-                      color: p.characterId != null ? Colors.green : Colors.orange.shade300,
+                      color: charName != null ? Colors.green : Colors.orange.shade300,
                     ),
                   ),
             trailing: Tooltip(

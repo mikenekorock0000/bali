@@ -41,8 +41,6 @@ void main() {
 
     final p1 = engine.joinPlayer('Alice')!;
     engine.joinPlayer('Bob')!;
-    engine.selectCharacter(p1.id, 'char_detective_1');
-    engine.selectCharacter(engine.session!.players[1].id, 'char_detective_2');
     engine.startGame();
     engine.session!.phase = GamePhase.investigation;
 
@@ -58,8 +56,6 @@ void main() {
 
     final p1 = engine.joinPlayer('Alice')!;
     final p2 = engine.joinPlayer('Bob')!;
-    engine.selectCharacter(p1.id, 'char_detective_1');
-    engine.selectCharacter(p2.id, 'char_detective_2');
     engine.startGame();
     engine.session!.phase = GamePhase.voting;
 

@@ -72,7 +72,7 @@ class LobbyScreen extends StatelessWidget {
                       currentStep: _lobbyStep(app),
                       steps: const [
                         'プレイヤーにQRコードを見せて参加してもらう',
-                        '全員がキャラクター（配役）を選ぶ',
+                        '参加と同時に配役が自動で割り当てられる',
                         '「ゲーム開始」を押す',
                       ],
                     ),
@@ -156,11 +156,18 @@ class LobbyScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '✓ 配役済み = キャラ選択完了',
+                      '✓ 配役済み = キャラが自動割り当て済み',
                       style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                     ),
                     const SizedBox(height: 12),
-                    Expanded(child: PlayerList(players: app.engine.session?.players ?? [])),
+                    Expanded(
+                      child: PlayerList(
+                        players: app.engine.session?.players ?? [],
+                        characterNames: {
+                          for (final c in scenario?.characters ?? []) c.id: c.name,
+                        },
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     if (app.canStart)
                       FilledButton.icon(
@@ -175,7 +182,7 @@ class LobbyScreen extends StatelessWidget {
                         label: Text(
                           app.playerCount < 2
                               ? 'あと${2 - app.playerCount}人必要'
-                              : '配役選択を待っています',
+                              : '全員の参加を待っています',
                         ),
                       ),
                   ],

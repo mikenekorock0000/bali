@@ -15,15 +15,24 @@ void main() {
     expect(engine.session!.players.length, 2);
   });
 
-  test('game starts after all characters selected', () {
+  test('assigns unique characters automatically on join', () {
     final engine = GameEngine();
     engine.createRoom(playerCount: 4);
 
-    final p1 = engine.joinPlayer('Alice')!;
-    final p2 = engine.joinPlayer('Bob')!;
+    engine.joinPlayer('Alice');
+    engine.joinPlayer('Bob');
 
-    engine.selectCharacter(p1.id, 'char_doctor');
-    engine.selectCharacter(p2.id, 'char_niece');
+    final assigned = engine.session!.players.map((p) => p.characterId).toList();
+    expect(assigned.every((id) => id != null), isTrue);
+    expect(assigned.toSet().length, 2);
+  });
+
+  test('game starts after players join with auto assignment', () {
+    final engine = GameEngine();
+    engine.createRoom(playerCount: 4);
+
+    engine.joinPlayer('Alice');
+    engine.joinPlayer('Bob');
 
     expect(engine.session!.canStart, isTrue);
 
@@ -37,10 +46,7 @@ void main() {
     engine.createRoom(playerCount: 4);
 
     final p1 = engine.joinPlayer('Alice')!;
-    final p2 = engine.joinPlayer('Bob')!;
-
-    engine.selectCharacter(p1.id, 'char_doctor');
-    engine.selectCharacter(p2.id, 'char_niece');
+    engine.joinPlayer('Bob');
 
     engine.startGame();
     engine.session!.phase = GamePhase.investigation;
@@ -56,9 +62,6 @@ void main() {
 
     final p1 = engine.joinPlayer('Alice')!;
     final p2 = engine.joinPlayer('Bob')!;
-
-    engine.selectCharacter(p1.id, 'char_doctor');
-    engine.selectCharacter(p2.id, 'char_niece');
     engine.startGame();
     engine.session!.phase = GamePhase.investigation;
 
@@ -75,9 +78,6 @@ void main() {
 
     final p1 = engine.joinPlayer('Alice')!;
     final p2 = engine.joinPlayer('Bob')!;
-
-    engine.selectCharacter(p1.id, 'char_doctor');
-    engine.selectCharacter(p2.id, 'char_niece');
     engine.startGame();
     engine.session!.phase = GamePhase.investigation;
 
