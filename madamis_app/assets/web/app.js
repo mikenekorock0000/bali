@@ -571,6 +571,74 @@ window.__madamisTest = {
       playerId: playerId || null,
     };
   },
+  getStateJson() {
+    return JSON.stringify(this.getState());
+  },
+  prepareSession(nextToken, nextPlayerId) {
+    token = nextToken;
+    playerId = nextPlayerId;
+    localStorage.setItem('madamis_token', token);
+    localStorage.setItem('madamis_playerId', playerId);
+    connectWs();
+    refreshState();
+    return 'ok';
+  },
+  pumpRefresh() {
+    refreshState();
+    return this.getActiveScreen();
+  },
+  kickJoin(nickname) {
+    this.setNickname(nickname || 'SimPlayer');
+    join();
+    return 'started';
+  },
+  kickSynopsisReady() {
+    markReady('synopsis');
+    return 'started';
+  },
+  kickScriptReady() {
+    markReady('private_reading');
+    return 'started';
+  },
+  kickDraw() {
+    drawClue();
+    return 'started';
+  },
+  kickRevealFirstClue() {
+    const clueId = state?.handClues?.[0]?.id;
+    if (!clueId) throw new Error('no hand clue to reveal');
+    revealClue(clueId);
+    return 'started';
+  },
+  kickTransferFirstClue() {
+    const clueId = state?.handClues?.[0]?.id;
+    const toPlayerId = state?.otherPlayers?.[0]?.id;
+    if (!clueId || !toPlayerId) throw new Error('no clue or transfer target');
+    transferClue(clueId, toPlayerId);
+    return 'started';
+  },
+  kickWhisper(message) {
+    const el = document.getElementById('whisper-message');
+    if (el && message) {
+      el.value = message;
+    } else if (el && !el.value.trim()) {
+      el.value = 'テスト密談';
+    }
+    sendWhisper();
+    return 'started';
+  },
+  kickAccuse(text) {
+    const el = document.getElementById('accusation-text');
+    if (el) el.value = text || 'テスト推理';
+    accuse();
+    return 'started';
+  },
+  kickVoteFirst() {
+    const targetId = state?.characters?.[0]?.id;
+    if (!targetId) throw new Error('no vote target');
+    vote(targetId);
+    return 'started';
+  },
   async injectSession(nextToken, nextPlayerId) {
     token = nextToken;
     playerId = nextPlayerId;

@@ -61,16 +61,17 @@ void main() {
 
     test('webview test helpers are exposed', () {
       expect(appJs, contains('window.__madamisTest'));
-      expect(appJs, contains('async clickSynopsisReady'));
-      expect(appJs, contains('async clickScriptReady'));
-      expect(appJs, contains('async clickDraw'));
-      expect(appJs, contains('async clickAccuse'));
-      expect(appJs, contains('async clickWhisper'));
-      expect(appJs, contains('async clickRevealFirstClue'));
-      expect(appJs, contains('async clickTransferFirstClue'));
-      expect(appJs, contains('async clickVoteFirst'));
-      expect(appJs, contains('handClueCount'));
-      expect(appJs, contains('publicClueCount'));
+      expect(appJs, contains('prepareSession'));
+      expect(appJs, contains('pumpRefresh'));
+      expect(appJs, contains('kickJoin'));
+      expect(appJs, contains('kickSynopsisReady'));
+      expect(appJs, contains('kickDraw'));
+      expect(appJs, contains('kickRevealFirstClue'));
+      expect(appJs, contains('kickTransferFirstClue'));
+      expect(appJs, contains('kickWhisper'));
+      expect(appJs, contains('kickAccuse'));
+      expect(appJs, contains('kickVoteFirst'));
+      expect(appJs, contains('async clickJoin'));
     });
 
     test('clue reveal and transfer await refreshState', () {

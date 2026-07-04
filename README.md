@@ -4,7 +4,7 @@
 
 ## 実機用 APK
 
-**最新:** [madamis_app/dist/madamis-gm-v1.1.0+4.apk](madamis_app/dist/madamis-gm-v1.1.0%2B4.apk)（v1.1.0+4・WebView 全ボタン修正同梱）
+**最新:** [madamis_app/dist/madamis-gm-v1.1.0+5.apk](madamis_app/dist/madamis-gm-v1.1.0%2B5.apk)（v1.1.0+5・Android WebView 修正同梱）
 
 互換用: [madamis_app/dist/madamis-gm-release.apk](madamis_app/dist/madamis-gm-release.apk)（常に最新版と同一）
 

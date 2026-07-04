@@ -79,15 +79,15 @@ dart run tool/generate_test.dart --players=2
 
 ## 実機用 APK（ダウンロード）
 
-**`dist/madamis-gm-v1.1.0+4.apk`** — main ブランチの最新 Android 向けビルド（v1.1.0+4）
+**`dist/madamis-gm-v1.1.0+5.apk`** — main ブランチの最新 Android 向けビルド（v1.1.0+5）
 
 `dist/madamis-gm-release.apk` は同じ内容の固定名です。
 
 ```bash
-adb install -r dist/madamis-gm-v1.1.0+4.apk
+adb install -r dist/madamis-gm-v1.1.0+5.apk
 ```
 
-設定画面でバージョン `1.1.0+4` と「プレイヤーシミュレーター」項目を確認してください。
+設定画面でバージョン `1.1.0+5` と「プレイヤーシミュレーター」項目を確認してください。
 
 ## APKビルド（Android実機向け）
 
