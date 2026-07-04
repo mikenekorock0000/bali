@@ -44,6 +44,17 @@ void _disconnectJoinTestPlayer(GameEngine engine) {
   }
 }
 
+Future<void> _expectStep(
+  String baseUrl,
+  String config,
+  String step,
+  String label,
+) async {
+  final result = await _runNodeCheck(baseUrl, config, step);
+  expect(result.$1, 0, reason: result.$3);
+  expect(result.$2, contains('OK $label'));
+}
+
 void main() {
   test('headless browser covers webview screen transitions', () async {
     final nodeModules = File('tool/node_modules/puppeteer-core/package.json');
@@ -63,9 +74,7 @@ void main() {
     final baseUrl = 'http://127.0.0.1:${server.boundPort}';
 
     try {
-      final join = await _runNodeCheck(baseUrl, '{}', 'join');
-      expect(join.$1, 0, reason: join.$3);
-      expect(join.$2, contains('OK WebView: 参加する'));
+      await _expectStep(baseUrl, '{}', 'join', 'WebView: 参加する');
       _disconnectJoinTestPlayer(engine);
 
       final p1 = PlayerApiClient(baseUrl);
@@ -82,9 +91,7 @@ void main() {
         },
       });
 
-      final synopsis = await _runNodeCheck(baseUrl, config, 'synopsis');
-      expect(synopsis.$1, 0, reason: synopsis.$3);
-      expect(synopsis.$2, contains('OK WebView: 確認しました'));
+      await _expectStep(baseUrl, config, 'synopsis', 'WebView: 確認しました');
       for (var i = 0; i < 20; i++) {
         final state = await p1.me();
         if (state['player']['readyFlags']?['synopsis'] == true) break;
@@ -94,28 +101,23 @@ void main() {
       await p2.markReady('synopsis');
       expect((await p1.me())['session']['phase'], 'private_reading');
 
-      final script = await _runNodeCheck(baseUrl, config, 'script');
-      expect(script.$1, 0, reason: script.$3);
-      expect(script.$2, contains('OK WebView: 読了しました'));
+      await _expectStep(baseUrl, config, 'script', 'WebView: 読了しました');
       await p1.markReady('private_reading');
       await p2.markReady('private_reading');
       expect((await p1.me())['session']['phase'], 'investigation');
 
-      final investigation = await _runNodeCheck(baseUrl, config, 'investigation');
-      expect(investigation.$1, 0, reason: investigation.$3);
-      expect(investigation.$2, contains('OK WebView: 調査ボタン群'));
+      await _expectStep(baseUrl, config, 'draw', 'WebView: 手がかりを引く');
+      await _expectStep(baseUrl, config, 'reveal', 'WebView: 全員に公開');
+      await _expectStep(baseUrl, config, 'transfer', 'WebView: 手がかり譲渡');
+      await _expectStep(baseUrl, config, 'whisper', 'WebView: 密談を送る');
 
       engine.session!.phase = GamePhase.accusation;
-      final accuse = await _runNodeCheck(baseUrl, config, 'accuse');
-      expect(accuse.$1, 0, reason: accuse.$3);
-      expect(accuse.$2, contains('OK WebView: 推理発表'));
+      await _expectStep(baseUrl, config, 'accuse', 'WebView: 推理発表');
       await p1.accuse('wv');
       await p2.accuse('wv');
 
       engine.session!.phase = GamePhase.voting;
-      final vote = await _runNodeCheck(baseUrl, config, 'vote');
-      expect(vote.$1, 0, reason: vote.$3);
-      expect(vote.$2, contains('OK WebView: 投票'));
+      await _expectStep(baseUrl, config, 'vote', 'WebView: 投票');
     } finally {
       await server.stop();
       engine.dispose();

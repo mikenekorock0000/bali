@@ -1,7 +1,7 @@
 name: madamis_app
 description: TOTEM型対面マーダーミステリー自動進行アプリ
 publish_to: 'none'
-version: 1.1.0+3
+version: 1.1.0+4
 
 environment:
   sdk: ^3.12.2

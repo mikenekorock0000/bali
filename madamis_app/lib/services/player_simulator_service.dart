@@ -63,9 +63,21 @@ class PlayerSimulatorService {
       await p1.markReady('private_reading');
       await p2.markReady('private_reading');
 
-      emit(await wv.verifyInvestigationButtons(
+      emit(await wv.verifyDrawClue(
         client: p1,
-        deviceId: 'wv-inv-1',
+        deviceId: 'wv-draw-1',
+      ));
+      emit(await wv.verifyRevealClue(
+        client: p1,
+        deviceId: 'wv-reveal-1',
+      ));
+      emit(await wv.verifyTransferClue(
+        client: p1,
+        deviceId: 'wv-transfer-1',
+      ));
+      emit(await wv.verifyWhisperButton(
+        client: p1,
+        deviceId: 'wv-whisper-1',
       ));
 
       engine.session!.phase = GamePhase.accusation;

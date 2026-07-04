@@ -2,7 +2,7 @@ import puppeteer from 'puppeteer-core';
 
 const baseUrl = process.argv[2];
 if (!baseUrl) {
-  console.error('Usage: node webview_headless_check.mjs <baseUrl> <json-config> [step|mode]');
+  console.error('Usage: node webview_headless_check.mjs <baseUrl> <json-config> [step]');
   process.exit(1);
 }
 
@@ -17,6 +17,24 @@ async function waitForScreen(page, screenId, label) {
   }
   const active = await page.evaluate(() => window.__madamisTest.getActiveScreen());
   throw new Error(`${label}: expected ${screenId}, got ${active}`);
+}
+
+async function waitForHandClueCount(page, expected) {
+  for (let i = 0; i < 40; i++) {
+    const count = await page.evaluate(() => window.__madamisTest.handClueCount());
+    if (count === expected) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(`expected ${expected} hand clues`);
+}
+
+async function waitForPublicClueCount(page, expected) {
+  for (let i = 0; i < 40; i++) {
+    const count = await page.evaluate(() => window.__madamisTest.publicClueCount());
+    if (count === expected) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(`expected ${expected} public clues`);
 }
 
 async function runStep(label, fn) {
@@ -76,13 +94,61 @@ const steps = {
       });
     });
   },
-  async investigation(page) {
-    await runStep('WebView: 調査ボタン群', async () => {
-      await loadTestPage(page, 'wv-inv-1');
+  async draw(page) {
+    await runStep('WebView: 手がかりを引く', async () => {
+      await loadTestPage(page, 'wv-draw-1');
       await injectP1(page);
-      await waitForScreen(page, 'screen-investigation', 'WebView: 調査ボタン群');
+      await waitForScreen(page, 'screen-investigation', 'WebView: 手がかりを引く');
+      const before = await page.evaluate(() => window.__madamisTest.handClueCount());
       await page.evaluate(async () => {
         await window.__madamisTest.clickDraw();
+      });
+      await waitForHandClueCount(page, before + 1);
+    });
+  },
+  async reveal(page) {
+    await runStep('WebView: 全員に公開', async () => {
+      await loadTestPage(page, 'wv-reveal-1');
+      await injectP1(page);
+      await waitForScreen(page, 'screen-investigation', 'WebView: 全員に公開');
+      if (await page.evaluate(() => window.__madamisTest.handClueCount()) === 0) {
+        await page.evaluate(async () => {
+          await window.__madamisTest.clickDraw();
+        });
+        await waitForHandClueCount(page, 1);
+      }
+      const publicBefore = await page.evaluate(() => window.__madamisTest.publicClueCount());
+      await page.evaluate(async () => {
+        await window.__madamisTest.clickRevealFirstClue();
+      });
+      await waitForPublicClueCount(page, publicBefore + 1);
+    });
+  },
+  async transfer(page) {
+    await runStep('WebView: 手がかり譲渡', async () => {
+      await loadTestPage(page, 'wv-transfer-1');
+      await injectP1(page);
+      await waitForScreen(page, 'screen-investigation', 'WebView: 手がかり譲渡');
+      if (await page.evaluate(() => window.__madamisTest.handClueCount()) === 0) {
+        await page.evaluate(async () => {
+          await window.__madamisTest.clickDraw();
+        });
+        await waitForHandClueCount(page, 1);
+      }
+      const before = await page.evaluate(() => window.__madamisTest.handClueCount());
+      await page.evaluate(async () => {
+        await window.__madamisTest.clickTransferFirstClue();
+      });
+      await waitForHandClueCount(page, before - 1);
+    });
+  },
+  async whisper(page) {
+    await runStep('WebView: 密談を送る', async () => {
+      await loadTestPage(page, 'wv-whisper-1');
+      await injectP1(page);
+      await waitForScreen(page, 'screen-investigation', 'WebView: 密談を送る');
+      await page.evaluate(async () => {
+        await window.__madamisTest.clickWhisper('WebView密談テスト');
       });
     });
   },
@@ -116,8 +182,9 @@ const browser = await puppeteer.launch({
 
 try {
   const page = await browser.newPage();
+  const allSteps = ['join', 'synopsis', 'script', 'draw', 'reveal', 'transfer', 'whisper', 'accuse', 'vote'];
   if (stepArg === 'all') {
-    for (const step of ['join', 'synopsis', 'script', 'investigation', 'accuse', 'vote']) {
+    for (const step of allSteps) {
       await steps[step](page);
     }
   } else if (steps[stepArg]) {

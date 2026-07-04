@@ -272,8 +272,9 @@ function renderCharacters(chars) {
 }
 
 async function selectCharacter(id) {
-  await api('POST', '/api/players/character', { characterId: id });
-  refreshState();
+  const res = await api('POST', '/api/players/character', { characterId: id });
+  if (res.error) return showToast(res.error);
+  await refreshState();
 }
 
 function renderScript(char) {
@@ -445,14 +446,15 @@ async function drawClue() {
 }
 
 async function revealClue(clueId) {
-  await api('POST', '/api/game/clue/reveal', { clueId });
-  refreshState();
+  const res = await api('POST', '/api/game/clue/reveal', { clueId });
+  if (res.error) showToast(res.error);
+  else await refreshState();
 }
 
 async function transferClue(clueId, toPlayerId) {
   const res = await api('POST', '/api/game/clue/transfer', { clueId, toPlayerId });
   if (res.error) showToast(res.error);
-  else refreshState();
+  else await refreshState();
 }
 
 async function sendWhisper() {
@@ -473,7 +475,10 @@ async function sendWhisper() {
 async function vote(targetCharacterId) {
   const res = await api('POST', '/api/game/vote', { targetCharacterId });
   if (res.error) showToast(res.error);
-  else showToast('投票しました');
+  else {
+    showToast('投票しました');
+    await refreshState();
+  }
 }
 
 async function accuse() {
@@ -519,20 +524,38 @@ window.__madamisTest = {
   },
   async clickWhisper(message) {
     const el = document.getElementById('whisper-message');
-    if (el) el.value = message || 'テスト密談';
+    if (el && message) {
+      el.value = message;
+    } else if (el && !el.value.trim()) {
+      el.value = 'テスト密談';
+    }
     await sendWhisper();
     return this.getState();
   },
-  clickRevealFirstClue() {
-    const btn = document.querySelector('#hand-clues .clue-actions button');
-    btn?.click();
+  async clickRevealFirstClue() {
+    const clueId = state?.handClues?.[0]?.id;
+    if (!clueId) throw new Error('no hand clue to reveal');
+    await revealClue(clueId);
+    return this.getState();
   },
-  clickTransferFirstClue() {
-    const btns = document.querySelectorAll('#hand-clues .clue-actions button');
-    btns[1]?.click();
+  async clickTransferFirstClue() {
+    const clueId = state?.handClues?.[0]?.id;
+    const toPlayerId = state?.otherPlayers?.[0]?.id;
+    if (!clueId || !toPlayerId) throw new Error('no clue or transfer target');
+    await transferClue(clueId, toPlayerId);
+    return this.getState();
   },
-  clickVoteFirst() {
-    document.querySelector('#vote-list .character-card')?.click();
+  async clickVoteFirst() {
+    const targetId = state?.characters?.[0]?.id;
+    if (!targetId) throw new Error('no vote target');
+    await vote(targetId);
+    return this.getState();
+  },
+  handClueCount() {
+    return state?.handClues?.length ?? 0;
+  },
+  publicClueCount() {
+    return state?.publicClues?.length ?? 0;
   },
   getActiveScreen() {
     return document.querySelector('.screen.active')?.id || null;

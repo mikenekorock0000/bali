@@ -56,6 +56,66 @@ class PlayerWebViewTester {
     });
   }
 
+  Future<SimTestStep> verifyDrawClue({
+    required PlayerApiClient client,
+    required String deviceId,
+  }) async {
+    return _run('webview_draw', 'WebView: 手がかりを引く', () async {
+      await _injectSession(client, deviceId);
+      await _waitForScreen('screen-investigation');
+      final before = await _handClueCount();
+      await _js('await window.__madamisTest.clickDraw()');
+      await _waitForHandClueCount(before + 1);
+    });
+  }
+
+  Future<SimTestStep> verifyRevealClue({
+    required PlayerApiClient client,
+    required String deviceId,
+  }) async {
+    return _run('webview_reveal', 'WebView: 全員に公開', () async {
+      await _injectSession(client, deviceId);
+      await _waitForScreen('screen-investigation');
+      if (await _handClueCount() == 0) {
+        await _js('await window.__madamisTest.clickDraw()');
+        await _waitForHandClueCount(1);
+      }
+      final publicBefore = await _publicClueCount();
+      await _js('await window.__madamisTest.clickRevealFirstClue()');
+      await _waitForPublicClueCount(publicBefore + 1);
+    });
+  }
+
+  Future<SimTestStep> verifyTransferClue({
+    required PlayerApiClient client,
+    required String deviceId,
+  }) async {
+    return _run('webview_transfer', 'WebView: 手がかり譲渡', () async {
+      await _injectSession(client, deviceId);
+      await _waitForScreen('screen-investigation');
+      if (await _handClueCount() == 0) {
+        await _js('await window.__madamisTest.clickDraw()');
+        await _waitForHandClueCount(1);
+      }
+      final before = await _handClueCount();
+      await _js('await window.__madamisTest.clickTransferFirstClue()');
+      await _waitForHandClueCount(before - 1);
+    });
+  }
+
+  Future<SimTestStep> verifyWhisperButton({
+    required PlayerApiClient client,
+    required String deviceId,
+  }) async {
+    return _run('webview_whisper', 'WebView: 密談を送る', () async {
+      await _injectSession(client, deviceId);
+      await _waitForScreen('screen-investigation');
+      await _js(
+        'await window.__madamisTest.clickWhisper(${jsonEncode('WebView密談テスト')})',
+      );
+    });
+  }
+
   Future<SimTestStep> verifyInvestigationButtons({
     required PlayerApiClient client,
     required String deviceId,
@@ -64,11 +124,17 @@ class PlayerWebViewTester {
       await _injectSession(client, deviceId);
       await _waitForScreen('screen-investigation');
       await _js('await window.__madamisTest.clickDraw()');
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      final drawExists = await _elementExists('btn-draw');
-      if (!drawExists) throw StateError('draw button missing');
-      await _setWhisperMessage('WebView密談テスト');
-      await _js('await window.__madamisTest.clickWhisper()');
+      await _waitForHandClueCount(1);
+      final publicBefore = await _publicClueCount();
+      await _js('await window.__madamisTest.clickRevealFirstClue()');
+      await _waitForPublicClueCount(publicBefore + 1);
+      await _js('await window.__madamisTest.clickDraw()');
+      await _waitForHandClueCount(1);
+      await _js('await window.__madamisTest.clickTransferFirstClue()');
+      await _waitForHandClueCount(0);
+      await _js(
+        'await window.__madamisTest.clickWhisper(${jsonEncode('WebView密談テスト')})',
+      );
     });
   }
 
@@ -130,27 +196,34 @@ class PlayerWebViewTester {
     throw StateError('screen $screenId not active, got ${await _js('window.__madamisTest.getActiveScreen()')}');
   }
 
-  Future<void> _setNickname(String value) async {
-    await _js("window.__madamisTest.setNickname(${jsonEncode(value)})");
+  Future<int> _handClueCount() async {
+    final v = await _js('window.__madamisTest.handClueCount()');
+    return int.tryParse(v ?? '') ?? 0;
   }
 
-  Future<void> _setWhisperMessage(String value) async {
-    await _js(
-      "document.getElementById('whisper-message').value = ${jsonEncode(value)}",
-    );
+  Future<int> _publicClueCount() async {
+    final v = await _js('window.__madamisTest.publicClueCount()');
+    return int.tryParse(v ?? '') ?? 0;
   }
 
-  Future<void> _click(String elementId) async {
-    await _js("document.getElementById('$elementId')?.click()");
+  Future<void> _waitForHandClueCount(int expected) async {
+    for (var i = 0; i < 40; i++) {
+      if (await _handClueCount() == expected) return;
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    throw StateError('expected $expected hand clues, got ${await _handClueCount()}');
+  }
+
+  Future<void> _waitForPublicClueCount(int expected) async {
+    for (var i = 0; i < 40; i++) {
+      if (await _publicClueCount() == expected) return;
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    throw StateError('expected $expected public clues, got ${await _publicClueCount()}');
   }
 
   Future<bool> _isDisabled(String elementId) async {
     final v = await _js('window.__madamisTest.isButtonDisabled("$elementId")');
-    return v == 'true';
-  }
-
-  Future<bool> _elementExists(String elementId) async {
-    final v = await _js("!!document.getElementById('$elementId')");
     return v == 'true';
   }
 
