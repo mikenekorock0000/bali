@@ -19,8 +19,9 @@ class PlayerWebViewTester {
   }) async {
     return _run('webview_join', 'WebView: 参加する', () async {
       await _loadFresh(deviceId);
-      await _setNickname(nickname);
-      await _click('btn-join');
+      await _js(
+        'await window.__madamisTest.clickJoin(${jsonEncode(nickname)})',
+      );
       await _waitForScreen('screen-waiting');
     });
   }
@@ -34,7 +35,7 @@ class PlayerWebViewTester {
       await _waitForScreen('screen-synopsis');
       final disabledBefore = await _isDisabled('btn-synopsis-ready');
       if (disabledBefore) throw StateError('button already disabled');
-      await _js('window.__madamisTest.clickSynopsisReady()');
+      await _js('await window.__madamisTest.clickSynopsisReady()');
       await Future<void>.delayed(const Duration(milliseconds: 500));
       final disabledAfter = await _isDisabled('btn-synopsis-ready');
       if (!disabledAfter) throw StateError('button should be disabled after click');
@@ -48,7 +49,7 @@ class PlayerWebViewTester {
     return _run('webview_script', 'WebView: 読了しました', () async {
       await _injectSession(client, deviceId);
       await _waitForScreen('screen-script');
-      await _js('window.__madamisTest.clickScriptReady()');
+      await _js('await window.__madamisTest.clickScriptReady()');
       await Future<void>.delayed(const Duration(milliseconds: 500));
       final disabled = await _isDisabled('btn-script-ready');
       if (!disabled) throw StateError('script ready button should disable');
@@ -62,12 +63,12 @@ class PlayerWebViewTester {
     return _run('webview_investigation', 'WebView: 調査ボタン群', () async {
       await _injectSession(client, deviceId);
       await _waitForScreen('screen-investigation');
-      await _js('window.__madamisTest.clickDraw()');
+      await _js('await window.__madamisTest.clickDraw()');
       await Future<void>.delayed(const Duration(milliseconds: 500));
       final drawExists = await _elementExists('btn-draw');
       if (!drawExists) throw StateError('draw button missing');
       await _setWhisperMessage('WebView密談テスト');
-      await _js('window.__madamisTest.clickWhisper()');
+      await _js('await window.__madamisTest.clickWhisper()');
     });
   }
 
@@ -78,7 +79,9 @@ class PlayerWebViewTester {
     return _run('webview_accuse', 'WebView: 推理発表', () async {
       await _injectSession(client, deviceId);
       await _waitForScreen('screen-accusation');
-      await _js("window.__madamisTest.clickAccuse('WebView推理')");
+      await _js(
+        "await window.__madamisTest.clickAccuse(${jsonEncode('WebView推理')})",
+      );
     });
   }
 
@@ -89,7 +92,7 @@ class PlayerWebViewTester {
     return _run('webview_vote', 'WebView: 投票', () async {
       await _injectSession(client, deviceId);
       await _waitForScreen('screen-voting');
-      await _js('window.__madamisTest.clickVoteFirst()');
+      await _js('await window.__madamisTest.clickVoteFirst()');
     });
   }
 
@@ -105,9 +108,8 @@ class PlayerWebViewTester {
     final me = await client.me();
     final playerId = me['player']['id'] as String;
     await _js(
-      "window.__madamisTest.injectSession('${client.token}', '$playerId')",
+      'await window.__madamisTest.injectSession(${jsonEncode(client.token)}, ${jsonEncode(playerId)})',
     );
-    await Future<void>.delayed(const Duration(milliseconds: 600));
   }
 
   Future<void> _waitForTestApi() async {

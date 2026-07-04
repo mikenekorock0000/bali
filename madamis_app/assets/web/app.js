@@ -428,7 +428,7 @@ async function join() {
   localStorage.setItem('madamis_playerId', playerId);
   if (res.reconnected) showToast('この端末は既に参加済みです。再接続しました');
   connectWs();
-  refreshState();
+  await refreshState();
 }
 
 async function markReady(phase) {
@@ -441,7 +441,7 @@ async function markReady(phase) {
 async function drawClue() {
   const res = await api('POST', '/api/game/clue/draw');
   if (res.error) showToast(res.error);
-  else refreshState();
+  else await refreshState();
 }
 
 async function revealClue(clueId) {
@@ -466,7 +466,7 @@ async function sendWhisper() {
   else {
     document.getElementById('whisper-message').value = '';
     showToast('密談を送りました');
-    refreshState();
+    await refreshState();
   }
 }
 
@@ -499,24 +499,29 @@ window.__madamisTest = {
     await join();
     return this.getState();
   },
-  clickSynopsisReady() {
-    document.getElementById('btn-synopsis-ready')?.click();
+  async clickSynopsisReady() {
+    await markReady('synopsis');
+    return this.getState();
   },
-  clickScriptReady() {
-    document.getElementById('btn-script-ready')?.click();
+  async clickScriptReady() {
+    await markReady('private_reading');
+    return this.getState();
   },
-  clickDraw() {
-    document.getElementById('btn-draw')?.click();
+  async clickDraw() {
+    await drawClue();
+    return this.getState();
   },
-  clickAccuse(text) {
+  async clickAccuse(text) {
     const el = document.getElementById('accusation-text');
     if (el) el.value = text || 'テスト推理';
-    document.getElementById('btn-accuse')?.click();
+    await accuse();
+    return this.getState();
   },
-  clickWhisper(message) {
+  async clickWhisper(message) {
     const el = document.getElementById('whisper-message');
     if (el) el.value = message || 'テスト密談';
-    document.getElementById('btn-whisper')?.click();
+    await sendWhisper();
+    return this.getState();
   },
   clickRevealFirstClue() {
     const btn = document.querySelector('#hand-clues .clue-actions button');
