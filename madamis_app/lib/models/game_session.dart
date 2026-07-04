@@ -6,6 +6,7 @@ class Player {
     required this.id,
     required this.nickname,
     required this.token,
+    this.deviceId,
     this.characterId,
     this.connectionStatus = 'connected',
     this.tokensRemaining = 3,
@@ -19,6 +20,7 @@ class Player {
   final String id;
   String nickname;
   final String token;
+  String? deviceId;
   String? characterId;
   String connectionStatus;
   int tokensRemaining;
@@ -42,6 +44,7 @@ class Player {
       id: json['id'] as String,
       nickname: json['nickname'] as String,
       token: json['token'] as String? ?? '',
+      deviceId: json['deviceId'] as String?,
       characterId: json['characterId'] as String?,
       connectionStatus: json['connectionStatus'] as String? ?? 'connected',
       tokensRemaining: json['tokensRemaining'] as int? ?? 3,

@@ -5,6 +5,17 @@ let ws = null;
 let state = {};
 let timerInterval = null;
 
+function getDeviceId() {
+  let id = localStorage.getItem('madamis_deviceId');
+  if (!id) {
+    id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem('madamis_deviceId', id);
+  }
+  return id;
+}
+
 const phaseScreens = {
   lobby: 'waiting',
   synopsis: 'synopsis',
@@ -130,6 +141,11 @@ function handleWsEvent(data) {
     refreshState();
   } else if (data.type === 'character_selected' || data.type === 'player_joined') {
     refreshState();
+  } else if (data.type === 'player_ready') {
+    if (data.readyCount < data.totalCount) {
+      showToast(`準備完了 ${data.readyCount}/${data.totalCount}`);
+    }
+    refreshState();
   } else if (data.type === 'truth_revealed') {
     renderTruth(data.truth, data.epilogue);
     showScreen('truth');
@@ -198,8 +214,10 @@ function renderState() {
 
   if (phase === 'synopsis') {
     document.getElementById('synopsis-text').textContent = session.synopsis;
+    updateReadyButton('synopsis', player.readyFlags?.synopsis);
   } else if (phase === 'private_reading' && character) {
     renderScript(character);
+    updateReadyButton('private_reading', player.readyFlags?.private_reading);
   } else if (phase === 'investigation') {
     const isCoop = session.gameMode === 'cooperative';
     const tokens = isCoop ? session.sharedTokensRemaining : player.tokensRemaining;
@@ -371,22 +389,41 @@ function renderResults(scores, culpritId, gameMode) {
   `;
 }
 
+function updateReadyButton(phase, isReady) {
+  const btnId = phase === 'synopsis' ? 'btn-synopsis-ready' : 'btn-script-ready';
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  if (isReady) {
+    btn.disabled = true;
+    btn.textContent = '確認済み（他の参加者を待っています）';
+  } else {
+    btn.disabled = false;
+    btn.textContent = phase === 'synopsis' ? '確認しました' : '読了しました';
+  }
+}
+
 async function join() {
   const nickname = document.getElementById('nickname').value.trim();
   if (!nickname) return showToast('ニックネームを入力してください');
-  const res = await api('POST', '/api/players/join', { nickname });
+  const res = await api('POST', '/api/players/join', {
+    nickname,
+    deviceId: getDeviceId(),
+  });
   if (res.error) return showToast(res.error);
   token = res.token;
   playerId = res.playerId;
   localStorage.setItem('madamis_token', token);
   localStorage.setItem('madamis_playerId', playerId);
+  if (res.reconnected) showToast('この端末は既に参加済みです。再接続しました');
   connectWs();
   refreshState();
 }
 
 async function markReady(phase) {
-  await api('POST', '/api/game/ready', { phase });
+  const res = await api('POST', '/api/game/ready', { phase });
+  if (res.error) return showToast(res.error);
   showToast('準備完了！');
+  await refreshState();
 }
 
 async function drawClue() {

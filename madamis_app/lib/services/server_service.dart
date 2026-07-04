@@ -220,7 +220,10 @@ class ServerService {
   Future<Response> _handleJoin(Request request) async {
     final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
     final nickname = body['nickname'] as String? ?? 'Player';
-    final player = engine.joinPlayer(nickname);
+    final deviceId = body['deviceId'] as String?;
+    final wasExisting = deviceId != null &&
+        engine.getPlayerByDeviceId(deviceId) != null;
+    final player = engine.joinPlayer(nickname, deviceId: deviceId);
     if (player == null) {
       return _jsonResponse({'error': 'Cannot join'}, statusCode: 400);
     }
@@ -228,6 +231,7 @@ class ServerService {
       'playerId': player.id,
       'token': player.token,
       'roomId': engine.session?.roomId,
+      'reconnected': wasExisting,
     });
   }
 
@@ -260,7 +264,10 @@ class ServerService {
 
     final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
     final phase = GamePhase.fromId(body['phase'] as String);
-    engine.markReady(player.id, phase);
+    final ok = engine.markReady(player.id, phase);
+    if (!ok) {
+      return _jsonResponse({'error': 'Cannot mark ready'}, statusCode: 400);
+    }
     return _jsonResponse({'ok': true});
   }
 

@@ -58,9 +58,20 @@ class GameEngine {
     }
   }
 
-  Player? joinPlayer(String nickname) {
+  Player? joinPlayer(String nickname, {String? deviceId}) {
     final session = _session;
     if (session == null) return null;
+
+    if (deviceId != null && deviceId.isNotEmpty) {
+      final existing = _findPlayerByDeviceId(deviceId);
+      if (existing != null) {
+        existing.nickname = nickname;
+        existing.connectionStatus = 'connected';
+        _emit('player_reconnected', {'player': existing.toJson()});
+        return existing;
+      }
+    }
+
     if (session.isStarted) return null;
     if (session.players.length >= session.scenario.playerCount) return null;
 
@@ -68,11 +79,24 @@ class GameEngine {
       id: _uuid.v4(),
       nickname: nickname,
       token: _uuid.v4(),
+      deviceId: deviceId,
     );
     session.players.add(player);
     assignRandomCharacter(player.id);
     _emit('player_joined', {'player': player.toJson()});
     return player;
+  }
+
+  Player? getPlayerByDeviceId(String deviceId) =>
+      _findPlayerByDeviceId(deviceId);
+
+  Player? _findPlayerByDeviceId(String deviceId) {
+    final session = _session;
+    if (session == null) return null;
+    for (final p in session.players) {
+      if (p.deviceId == deviceId) return p;
+    }
+    return null;
   }
 
   Player? getPlayerByToken(String token) {
@@ -205,13 +229,30 @@ class GameEngine {
   bool markReady(String playerId, GamePhase phase) {
     final session = _session;
     if (session == null) return false;
+    if (session.phase != phase) return false;
 
     final player = session.players.firstWhere((p) => p.id == playerId);
+    if (player.readyFlags[phase.id] == true) {
+      return true;
+    }
     player.readyFlags[phase.id] = true;
 
-    final allReady = session.players.every(
-      (p) => p.readyFlags[phase.id] == true,
-    );
+    final connected =
+        session.players.where((p) => p.connectionStatus == 'connected').toList();
+    if (connected.isEmpty) return false;
+
+    final readyCount =
+        connected.where((p) => p.readyFlags[phase.id] == true).length;
+
+    _emit('player_ready', {
+      'playerId': playerId,
+      'phase': phase.id,
+      'readyCount': readyCount,
+      'totalCount': connected.length,
+    });
+
+    final allReady =
+        connected.every((p) => p.readyFlags[phase.id] == true);
 
     if (allReady) {
       _advanceFromCurrentPhase();
