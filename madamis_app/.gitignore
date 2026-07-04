@@ -1,4 +1,4 @@
-# Miscellaneous
+node_modules/
 *.class
 *.log
 *.pyc

@@ -1,6 +1,7 @@
-import 'dart:async';
-
 import 'package:flutter/services.dart';
+
+import 'asset_server_disk_stub.dart'
+    if (dart.library.io) 'asset_server_disk_io.dart';
 
 class AssetServer {
   AssetServer._();
@@ -11,7 +12,15 @@ class AssetServer {
   Future<String> load(String path) async {
     if (_cache.containsKey(path)) return _cache[path]!;
     final assetPath = path.startsWith('assets/') ? path : 'assets/web/$path';
-    final content = await rootBundle.loadString(assetPath);
+    String? content;
+    try {
+      content = await rootBundle.loadString(assetPath);
+    } catch (_) {
+      content = await readAssetFromDisk(path);
+    }
+    if (content == null) {
+      throw StateError('Asset not found: $path');
+    }
     _cache[path] = content;
     return content;
   }
