@@ -79,27 +79,24 @@ dart run tool/generate_test.dart --players=2
 
 ## 実機用 APK（ダウンロード）
 
-**`dist/madamis-gm-release.apk`** — main ブランチに同梱の Android 向けビルド
+**`dist/madamis-gm-v1.1.0+2.apk`** — main ブランチの最新 Android 向けビルド（v1.1.0+2）
+
+`dist/madamis-gm-release.apk` は同じ内容の固定名です。
 
 ```bash
-adb install dist/madamis-gm-release.apk
+adb install -r dist/madamis-gm-v1.1.0+2.apk
 ```
+
+設定画面でバージョン `1.1.0+2` と「プレイヤーシミュレーター」項目を確認してください。
 
 ## APKビルド（Android実機向け）
 
 ```bash
 cd madamis_app
-flutter pub get
-bash tool/patch_wifi_iot.sh   # wifi_iot の Gradle 互換パッチ（初回・pub get後）
-flutter build apk --release
-cp build/app/outputs/flutter-apk/app-release.apk dist/madamis-gm-release.apk
+bash tool/build_release_apk.sh
 ```
 
-タブレットへのインストール例:
-
-```bash
-adb install dist/madamis-gm-release.apk
-```
+`pubspec.yaml` の `version` に合わせて `dist/madamis-gm-v<version>.apk` を生成し、`dist/madamis-gm-release.apk` も更新します。**main にコミットして常に最新を置く。**
 
 > release ビルドは現在 debug キーで署名されています（実機テスト用）。
 
