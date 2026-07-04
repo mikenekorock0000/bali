@@ -58,5 +58,15 @@ void main() {
       expect(appJs, contains("data.type === 'player_ready'"));
       expect(appJs, contains('refreshState();'));
     });
+
+    test('webview test helpers are exposed', () {
+      expect(appJs, contains('window.__madamisTest'));
+      expect(appJs, contains('clickSynopsisReady'));
+      expect(appJs, contains('clickScriptReady'));
+      expect(appJs, contains('clickDraw'));
+      expect(appJs, contains('clickAccuse'));
+      expect(appJs, contains('clickWhisper'));
+      expect(appJs, contains('clickVoteFirst'));
+    });
   });
 }

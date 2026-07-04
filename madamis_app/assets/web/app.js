@@ -1,4 +1,16 @@
 const API = '';
+(function applySimQueryParams() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('fresh') === '1') {
+    localStorage.removeItem('madamis_token');
+    localStorage.removeItem('madamis_playerId');
+  }
+  const simDevice = params.get('deviceId');
+  if (simDevice) {
+    localStorage.setItem('madamis_deviceId', simDevice);
+  }
+})();
+
 let token = localStorage.getItem('madamis_token') || '';
 let playerId = localStorage.getItem('madamis_playerId') || '';
 let ws = null;
@@ -476,6 +488,71 @@ document.getElementById('btn-script-ready').addEventListener('click', () => mark
 document.getElementById('btn-draw').addEventListener('click', drawClue);
 document.getElementById('btn-accuse').addEventListener('click', accuse);
 document.getElementById('btn-whisper').addEventListener('click', sendWhisper);
+
+window.__madamisTest = {
+  setNickname(value) {
+    const el = document.getElementById('nickname');
+    if (el) el.value = value;
+  },
+  async clickJoin(nickname) {
+    this.setNickname(nickname || 'SimPlayer');
+    await join();
+    return this.getState();
+  },
+  clickSynopsisReady() {
+    document.getElementById('btn-synopsis-ready')?.click();
+  },
+  clickScriptReady() {
+    document.getElementById('btn-script-ready')?.click();
+  },
+  clickDraw() {
+    document.getElementById('btn-draw')?.click();
+  },
+  clickAccuse(text) {
+    const el = document.getElementById('accusation-text');
+    if (el) el.value = text || 'テスト推理';
+    document.getElementById('btn-accuse')?.click();
+  },
+  clickWhisper(message) {
+    const el = document.getElementById('whisper-message');
+    if (el) el.value = message || 'テスト密談';
+    document.getElementById('btn-whisper')?.click();
+  },
+  clickRevealFirstClue() {
+    const btn = document.querySelector('#hand-clues .clue-actions button');
+    btn?.click();
+  },
+  clickTransferFirstClue() {
+    const btns = document.querySelectorAll('#hand-clues .clue-actions button');
+    btns[1]?.click();
+  },
+  clickVoteFirst() {
+    document.querySelector('#vote-list .character-card')?.click();
+  },
+  getActiveScreen() {
+    return document.querySelector('.screen.active')?.id || null;
+  },
+  isButtonDisabled(id) {
+    return !!document.getElementById(id)?.disabled;
+  },
+  getState() {
+    return {
+      activeScreen: this.getActiveScreen(),
+      phase: state?.session?.phase || null,
+      token: token || null,
+      playerId: playerId || null,
+    };
+  },
+  async injectSession(nextToken, nextPlayerId) {
+    token = nextToken;
+    playerId = nextPlayerId;
+    localStorage.setItem('madamis_token', token);
+    localStorage.setItem('madamis_playerId', playerId);
+    connectWs();
+    await refreshState();
+    return this.getState();
+  },
+};
 
 if (token) {
   connectWs();

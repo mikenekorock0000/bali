@@ -396,7 +396,7 @@ class GameEngine {
           totalClues * GameRules.teamScoreClueBonus();
 
       scores = session.players
-          .map((p) => {
+          .map<Map<String, dynamic>>((p) => {
                 'playerId': p.id,
                 'nickname': p.nickname,
                 'voteCorrect': teamCorrect,
@@ -413,7 +413,7 @@ class GameEngine {
         'totalScore': teamScore,
       };
     } else {
-      scores = session.players.map((p) {
+      scores = session.players.map<Map<String, dynamic>>((p) {
         final playerVote = session.votes.firstWhere((v) => v.playerId == p.id);
         final correct = playerVote.targetCharacterId == culpritId;
         final cluesFound = p.handClues.length + p.publicClues.length;
@@ -429,7 +429,8 @@ class GameEngine {
       }).toList();
 
       winner = scores.reduce(
-        (a, b) => (a['totalScore'] as int) > (b['totalScore'] as int) ? a : b,
+        (Map<String, dynamic> a, Map<String, dynamic> b) =>
+            (a['totalScore'] as int) > (b['totalScore'] as int) ? a : b,
       );
     }
 

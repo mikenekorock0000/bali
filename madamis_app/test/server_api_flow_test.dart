@@ -138,7 +138,9 @@ Future<Map<String, dynamic>> postJson(
     if (token != null) {
       request.headers.set('Authorization', 'Bearer $token');
     }
-    request.write(jsonEncode(body));
+      final payload = utf8.encode(jsonEncode(body));
+      request.headers.set('Content-Length', '${payload.length}');
+      request.add(payload);
     final response = await request.close();
     final text = await response.transform(utf8.decoder).join();
     return jsonDecode(text) as Map<String, dynamic>;

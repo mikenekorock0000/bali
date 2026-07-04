@@ -7,6 +7,7 @@ echo "==> Running pre-device checks (API flow + web asset wiring)..."
 flutter test \
   test/server_api_flow_test.dart \
   test/web_player_assets_test.dart \
+  test/player_automated_test.dart \
   test/game_engine_test.dart
 
 echo ""

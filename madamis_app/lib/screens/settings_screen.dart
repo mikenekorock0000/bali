@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../services/app_state.dart';
 import '../services/settings_service.dart';
+import 'player_simulator_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -108,6 +109,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: SettingsService.instance.volume,
               onChanged: app.soundEnabled ? app.setVolume : null,
             ),
+          ),
+          const Divider(height: 48),
+          Text('開発・テスト', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            'タブレット内に仮想スマホを表示し、参加〜投票まで全ボタンを自動検証します。',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PlayerSimulatorScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.phone_android),
+            label: const Text('プレイヤーシミュレーター / 全自動テスト'),
           ),
         ],
       ),

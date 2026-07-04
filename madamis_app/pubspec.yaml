@@ -25,6 +25,7 @@ dependencies:
   path_provider: ^2.1.5
   audioplayers: ^6.4.0
   wifi_iot: ^0.3.19+2
+  webview_flutter: ^4.13.0
 
 dev_dependencies:
   flutter_test:
