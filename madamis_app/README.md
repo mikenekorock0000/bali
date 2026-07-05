@@ -77,17 +77,25 @@ dart run tool/generate_test.dart          # 4人（要 GEMINI_API_KEY）
 dart run tool/generate_test.dart --players=2
 ```
 
+### WebView シミュレーター（プレイヤー Web）
+
+- **実機 Android WebView**: `assets/web/app.js` の `kick*` で非同期処理を開始し、Dart 側が `pumpRefresh` + ポーリングで完了を待つ
+- **ヘッドレス Chrome（CI/PC）**: 同ファイルの `click*`（async）を Puppeteer が `await` する
+- 設定画面 → **プレイヤーシミュレーター** で Phase 1（API）+ Phase 2（WebView）を一括実行
+
+GitHub Actions（`.github/workflows/flutter-test.yml`）で `flutter test` を PR/push 時に自動実行します。
+
 ## 実機用 APK（ダウンロード）
 
-**`dist/madamis-gm-v1.1.0+5.apk`** — main ブランチの最新 Android 向けビルド（v1.1.0+5）
+**`dist/madamis-gm-v1.1.0+6.apk`** — main ブランチの最新 Android 向けビルド（v1.1.0+6）
 
 `dist/madamis-gm-release.apk` は同じ内容の固定名です。
 
 ```bash
-adb install -r dist/madamis-gm-v1.1.0+5.apk
+adb install -r dist/madamis-gm-v1.1.0+6.apk
 ```
 
-設定画面でバージョン `1.1.0+5` と「プレイヤーシミュレーター」項目を確認してください。
+設定画面でバージョン `1.1.0+6` と「プレイヤーシミュレーター」項目を確認してください。
 
 ## APKビルド（Android実機向け）
 

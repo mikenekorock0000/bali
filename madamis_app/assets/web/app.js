@@ -14,6 +14,9 @@ const API = '';
 let token = localStorage.getItem('madamis_token') || '';
 let playerId = localStorage.getItem('madamis_playerId') || '';
 let ws = null;
+let wsPingInterval = null;
+let wsReconnectTimer = null;
+let refreshPromise = null;
 let state = {};
 let timerInterval = null;
 
@@ -106,13 +109,31 @@ async function api(method, path, body) {
   return res.json();
 }
 
+function disconnectWs() {
+  if (wsPingInterval) {
+    clearInterval(wsPingInterval);
+    wsPingInterval = null;
+  }
+  if (wsReconnectTimer) {
+    clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = null;
+  }
+  if (ws) {
+    ws.onclose = null;
+    ws.close();
+    ws = null;
+  }
+}
+
 function connectWs() {
+  if (!token) return;
+  disconnectWs();
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/ws`);
   ws.onopen = () => {
     ws.send(JSON.stringify({ type: 'auth', token }));
-    setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
+    wsPingInterval = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'ping' }));
       }
     }, 30000);
@@ -121,43 +142,54 @@ function connectWs() {
     const data = JSON.parse(e.data);
     handleWsEvent(data);
   };
-  ws.onclose = () => setTimeout(connectWs, 3000);
+  ws.onclose = () => {
+    wsReconnectTimer = setTimeout(connectWs, 3000);
+  };
+}
+
+function scheduleRefresh() {
+  if (!refreshPromise) {
+    refreshPromise = refreshState().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
 }
 
 function handleWsEvent(data) {
   if (data.type === 'phase_changed') {
     showPhaseBanner(data.phaseLabel || data.phase);
-    refreshState();
+    scheduleRefresh();
   } else if (data.type === 'clue_drawn' && data.playerId === playerId) {
     showToast(`手がかりを取得: ${data.clue.title}`);
-    refreshState();
+    scheduleRefresh();
   } else if (data.type === 'clue_revealed') {
     showToast(`手がかりが公開されました: ${data.clue.title}`);
-    refreshState();
+    scheduleRefresh();
   } else if (data.type === 'clue_transferred') {
     if (data.to === playerId) {
       showToast('手がかりを受け取りました');
     } else if (data.from === playerId) {
       showToast('手がかりを譲渡しました');
     }
-    refreshState();
+    scheduleRefresh();
   } else if (data.type === 'whisper_received') {
     const cluePart = data.clue ? ` [${data.clue.title}]` : '';
     showToast(`密談: ${data.fromNickname}${cluePart}`);
-    refreshState();
+    scheduleRefresh();
   } else if (data.type === 'player_left') {
     showToast(`${data.player.nickname} が切断しました`);
-    refreshState();
+    scheduleRefresh();
   } else if (data.type === 'player_reconnected') {
     showToast(`${data.player.nickname} が再接続しました`);
-    refreshState();
+    scheduleRefresh();
   } else if (data.type === 'character_selected' || data.type === 'player_joined') {
-    refreshState();
+    scheduleRefresh();
   } else if (data.type === 'player_ready') {
     if (data.readyCount < data.totalCount) {
       showToast(`準備完了 ${data.readyCount}/${data.totalCount}`);
     }
-    refreshState();
+    scheduleRefresh();
   } else if (data.type === 'truth_revealed') {
     renderTruth(data.truth, data.epilogue);
     showScreen('truth');
@@ -483,8 +515,10 @@ async function vote(targetCharacterId) {
 
 async function accuse() {
   const content = document.getElementById('accusation-text').value.trim();
-  await api('POST', '/api/game/accuse', { content });
+  const res = await api('POST', '/api/game/accuse', { content });
+  if (res.error) return showToast(res.error);
   showToast('推理を発表しました');
+  await refreshState();
 }
 
 document.getElementById('btn-join').addEventListener('click', join);
@@ -494,6 +528,9 @@ document.getElementById('btn-draw').addEventListener('click', drawClue);
 document.getElementById('btn-accuse').addEventListener('click', accuse);
 document.getElementById('btn-whisper').addEventListener('click', sendWhisper);
 
+// WebView テスト API:
+// - click* … Puppeteer/Chrome 向け（Promise を await できる）
+// - kick* … Android WebView 向け（非同期開始のみ。Dart 側で pumpRefresh + ポーリング）
 window.__madamisTest = {
   setNickname(value) {
     const el = document.getElementById('nickname');
@@ -557,6 +594,15 @@ window.__madamisTest = {
   publicClueCount() {
     return state?.publicClues?.length ?? 0;
   },
+  sentWhisperCount() {
+    return state?.player?.sentWhispersCount ?? 0;
+  },
+  hasAccused() {
+    return !!state?.player?.hasAccused;
+  },
+  hasVoted() {
+    return !!state?.player?.hasVoted;
+  },
   getActiveScreen() {
     return document.querySelector('.screen.active')?.id || null;
   },
@@ -580,11 +626,11 @@ window.__madamisTest = {
     localStorage.setItem('madamis_token', token);
     localStorage.setItem('madamis_playerId', playerId);
     connectWs();
-    refreshState();
+    scheduleRefresh();
     return 'ok';
   },
   pumpRefresh() {
-    refreshState();
+    scheduleRefresh();
     return this.getActiveScreen();
   },
   kickJoin(nickname) {
