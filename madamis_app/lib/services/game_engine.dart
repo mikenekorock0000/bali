@@ -566,7 +566,13 @@ class GameEngine {
             ? session.scenario.truth.toJson()
             : null,
       },
-      'player': player.toJson(),
+      'player': {
+        ...player.toJson(),
+        'hasAccused': session.accusations.any((a) => a.playerId == playerId),
+        'hasVoted': session.votes.any((v) => v.playerId == playerId),
+        'sentWhispersCount':
+            session.whispers.where((w) => w.fromPlayerId == playerId).length,
+      },
       'character': character?.toJson(),
       'availableCharacters': session.isStarted
           ? []

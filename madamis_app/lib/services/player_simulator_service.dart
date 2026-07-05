@@ -44,6 +44,7 @@ class PlayerSimulatorService {
         deviceId: 'wv-sim-1',
         nickname: 'WebViewPlayer1',
       ));
+      _disconnectJoinTestPlayer(engine);
 
       await p1.join(nickname: 'API_P1', deviceId: 'wv-api-1');
       await p2.join(nickname: 'API_P2', deviceId: 'wv-api-2');
@@ -103,5 +104,14 @@ class PlayerSimulatorService {
       startedAt: startedAt,
       finishedAt: DateTime.now(),
     );
+  }
+}
+
+void _disconnectJoinTestPlayer(GameEngine engine) {
+  for (final player in engine.session!.players) {
+    if (player.nickname == 'WebViewPlayer1') {
+      engine.setPlayerConnection(player.id, connected: false);
+      return;
+    }
   }
 }

@@ -71,7 +71,21 @@ void main() {
       expect(appJs, contains('kickWhisper'));
       expect(appJs, contains('kickAccuse'));
       expect(appJs, contains('kickVoteFirst'));
+      expect(appJs, contains('sentWhisperCount'));
+      expect(appJs, contains('hasAccused'));
+      expect(appJs, contains('hasVoted'));
       expect(appJs, contains('async clickJoin'));
+    });
+
+    test('connectWs clears previous ping interval on reconnect', () {
+      expect(appJs, contains('function disconnectWs()'));
+      expect(appJs, contains('wsPingInterval'));
+      expect(appJs, contains('clearInterval(wsPingInterval)'));
+    });
+
+    test('websocket handlers schedule serialized refresh', () {
+      expect(appJs, contains('function scheduleRefresh()'));
+      expect(appJs, contains('scheduleRefresh();'));
     });
 
     test('clue reveal and transfer await refreshState', () {

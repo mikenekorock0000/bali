@@ -11,13 +11,18 @@ import 'player_api_client.dart';
 /// Android WebView の [runJavaScriptReturningResult] は Promise を待てないため、
 /// JS 側は kick* で非同期処理を開始し、Dart 側で pumpRefresh + ポーリングする。
 class PlayerWebViewTester {
-  PlayerWebViewTester({required this.controller, required this.baseUrl}) {
+  PlayerWebViewTester({
+    required this.controller,
+    required this.baseUrl,
+    void Function(String url)? onPageFinished,
+  }) {
     controller.setNavigationDelegate(
       NavigationDelegate(
-        onPageFinished: (_) {
+        onPageFinished: (url) {
           if (_pageLoadCompleter != null && !_pageLoadCompleter!.isCompleted) {
             _pageLoadCompleter!.complete();
           }
+          onPageFinished?.call(url);
         },
       ),
     );
@@ -120,33 +125,11 @@ class PlayerWebViewTester {
     return _run('webview_whisper', 'WebView: 密談を送る', () async {
       await _injectSession(client, deviceId);
       await _waitForScreen('screen-investigation');
+      final before = await _sentWhisperCount();
       await _kick(
         'window.__madamisTest.kickWhisper(${jsonEncode('WebView密談テスト')})',
       );
-      await _pumpAndDelay();
-    });
-  }
-
-  Future<SimTestStep> verifyInvestigationButtons({
-    required PlayerApiClient client,
-    required String deviceId,
-  }) async {
-    return _run('webview_investigation', 'WebView: 調査ボタン群', () async {
-      await _injectSession(client, deviceId);
-      await _waitForScreen('screen-investigation');
-      await _kick('window.__madamisTest.kickDraw()');
-      await _waitForHandClueCount(1);
-      final publicBefore = await _publicClueCount();
-      await _kick('window.__madamisTest.kickRevealFirstClue()');
-      await _waitForPublicClueCount(publicBefore + 1);
-      await _kick('window.__madamisTest.kickDraw()');
-      await _waitForHandClueCount(1);
-      await _kick('window.__madamisTest.kickTransferFirstClue()');
-      await _waitForHandClueCount(0);
-      await _kick(
-        'window.__madamisTest.kickWhisper(${jsonEncode('WebView密談テスト')})',
-      );
-      await _pumpAndDelay();
+      await _waitForSentWhisperCount(before + 1, client: client);
     });
   }
 
@@ -160,7 +143,7 @@ class PlayerWebViewTester {
       await _kick(
         "window.__madamisTest.kickAccuse(${jsonEncode('WebView推理')})",
       );
-      await _pumpAndDelay();
+      await _waitForPlayerFlag(client, hasAccused: true);
     });
   }
 
@@ -172,7 +155,7 @@ class PlayerWebViewTester {
       await _injectSession(client, deviceId);
       await _waitForScreen('screen-voting');
       await _kick('window.__madamisTest.kickVoteFirst()');
-      await _pumpAndDelay();
+      await _waitForPlayerFlag(client, hasVoted: true);
     });
   }
 
@@ -238,6 +221,11 @@ class PlayerWebViewTester {
     return int.tryParse(v ?? '') ?? 0;
   }
 
+  Future<int> _sentWhisperCount() async {
+    final v = await _js('String(window.__madamisTest.sentWhisperCount())');
+    return int.tryParse(v ?? '') ?? 0;
+  }
+
   Future<void> _waitForHandClueCount(int expected) async {
     for (var i = 0; i < 60; i++) {
       await _pumpAndDelay();
@@ -258,6 +246,48 @@ class PlayerWebViewTester {
     );
   }
 
+  Future<void> _waitForSentWhisperCount(
+    int expected, {
+    required PlayerApiClient client,
+  }) async {
+    for (var i = 0; i < 40; i++) {
+      await _pumpAndDelay();
+      if (await _sentWhisperCount() >= expected) return;
+      final me = await client.me();
+      final count = me['player']['sentWhispersCount'] as int? ?? 0;
+      if (count >= expected) return;
+    }
+    throw StateError(
+      'expected >= $expected sent whispers, got ${await _sentWhisperCount()}',
+    );
+  }
+
+  Future<void> _waitForPlayerFlag(
+    PlayerApiClient client, {
+    bool? hasAccused,
+    bool? hasVoted,
+  }) async {
+    for (var i = 0; i < 40; i++) {
+      await _pumpAndDelay();
+      if (hasAccused == true && await _jsBool('window.__madamisTest.hasAccused()')) {
+        return;
+      }
+      if (hasVoted == true && await _jsBool('window.__madamisTest.hasVoted()')) {
+        return;
+      }
+      final me = await client.me();
+      final player = me['player'] as Map<String, dynamic>;
+      if (hasAccused == true && player['hasAccused'] == true) return;
+      if (hasVoted == true && player['hasVoted'] == true) return;
+    }
+    if (hasAccused == true) {
+      throw StateError('expected player.hasAccused');
+    }
+    if (hasVoted == true) {
+      throw StateError('expected player.hasVoted');
+    }
+  }
+
   Future<void> _kick(String code) async {
     await _js(code);
     await _pumpAndDelay();
@@ -270,6 +300,11 @@ class PlayerWebViewTester {
 
   Future<bool> _isDisabled(String elementId) async {
     final v = await _js('window.__madamisTest.isButtonDisabled("$elementId")');
+    return v == 'true';
+  }
+
+  Future<bool> _jsBool(String code) async {
+    final v = await _js(code);
     return v == 'true';
   }
 

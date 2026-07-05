@@ -37,6 +37,26 @@ async function waitForPublicClueCount(page, expected) {
   throw new Error(`expected ${expected} public clues`);
 }
 
+async function waitForSentWhisperCount(page, min) {
+  for (let i = 0; i < 40; i++) {
+    await page.evaluate(() => window.__madamisTest.pumpRefresh());
+    const count = await page.evaluate(() => window.__madamisTest.sentWhisperCount());
+    if (count >= min) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(`expected >= ${min} sent whispers`);
+}
+
+async function waitForPlayerFlag(page, flag) {
+  for (let i = 0; i < 40; i++) {
+    await page.evaluate(() => window.__madamisTest.pumpRefresh());
+    const value = await page.evaluate((name) => window.__madamisTest[name](), flag);
+    if (value) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(`expected player.${flag}`);
+}
+
 async function runStep(label, fn) {
   const started = Date.now();
   try {
@@ -150,6 +170,7 @@ const steps = {
       await page.evaluate(async () => {
         await window.__madamisTest.clickWhisper('WebView密談テスト');
       });
+      await waitForSentWhisperCount(page, 1);
     });
   },
   async accuse(page) {
@@ -160,6 +181,7 @@ const steps = {
       await page.evaluate(async () => {
         await window.__madamisTest.clickAccuse('WebView推理');
       });
+      await waitForPlayerFlag(page, 'hasAccused');
     });
   },
   async vote(page) {
@@ -170,6 +192,7 @@ const steps = {
       await page.evaluate(async () => {
         await window.__madamisTest.clickVoteFirst();
       });
+      await waitForPlayerFlag(page, 'hasVoted');
     });
   },
 };
