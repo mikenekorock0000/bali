@@ -8,7 +8,7 @@ rm -rf gerber && mkdir gerber
 kicad-cli pcb export gerbers -o gerber/ \
   -l F.Cu,B.Cu,F.SilkS,B.SilkS,F.Mask,B.Mask,Edge.Cuts \
   --subtract-soldermask hijet_starter.kicad_pcb
-kicad-cli pcb export drill -o gerber/ --excellon-separate-th --generate-map --map-format gerberx2 \
+kicad-cli pcb export drill -o gerber/ --excellon-separate-th \
   hijet_starter.kicad_pcb
 rm -f hijet_starter_gerber.zip
 (cd gerber && zip -q ../hijet_starter_gerber.zip *)
