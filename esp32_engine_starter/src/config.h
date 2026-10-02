@@ -38,6 +38,14 @@ constexpr uint32_t VBAT_LOW_HOLD_MS = 60000;
 // 始動後、この時間で稼働判定できなければ「始動未確認」としてログに残す
 constexpr uint32_t START_VERIFY_MS = 45000;
 
+// ---- 予備入力（基板 J3、PC817 で絶縁。信号ありで LOW） ----
+constexpr int PIN_AUX_IN1 = 33;
+constexpr int PIN_AUX_IN2 = 35;  // 内部プルアップなし（基板の 10k でプルアップ）
+
+// ---- I2C（基板 J4） ----
+constexpr int PIN_I2C_SDA = 21;
+constexpr int PIN_I2C_SCL = 22;
+
 // ---- 時刻 ----
 #define TZ_JAPAN "JST-9"
 #define NTP_SERVER1 "ntp.nict.jp"
