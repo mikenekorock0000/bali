@@ -9,7 +9,7 @@ import pcbnew
 # 値 → 購入時の説明
 DESC = {
     "12V IN": "端子台 5.08mm 3P（Phoenix MKDS 1,5/3-5,08 互換）",
-    "REMOTE OUT": "端子台 3.5mm 8P（Phoenix PT 1,5/8-3,5-H 互換）",
+    "OUT": "端子台 3.5mm 8P（Phoenix PT 1,5/8-3,5-H 互換）",
     "AUX IN": "端子台 3.5mm 4P（Phoenix PT 1,5/4-3,5-H 互換）",
     "Mini blade 1A": "ミニ平型ヒューズホルダー Keystone 3568 ＋ ミニ平型ヒューズ 1A",
     "1N5819": "ショットキーダイオード 40V 1A（DO-41）逆接保護",

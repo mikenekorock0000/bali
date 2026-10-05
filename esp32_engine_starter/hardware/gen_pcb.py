@@ -81,9 +81,9 @@ part("J5", "Connector_PinSocket_2.54mm", "PinSocket_1x19_P2.54mm_Vertical", ESP_
 part("J6", "Connector_PinSocket_2.54mm", "PinSocket_1x19_P2.54mm_Vertical", ESP_X + ESP_ROW, ESP_Y, 0,
      {str(k): v for k, v in ESP_R.items()}, "ESP32 J3")
 
-# リモコン操作出力 4ch：GPIO → 470Ω → PC817 LED、トランジスタ側を端子へ
-OUT_GPIO = ["G25", "G26", "G27", "G32"]  # 始動 / 停止 / 施錠 / 解錠
-OUT_NAME = ["START", "STOP", "LOCK", "UNLK"]
+# 絶縁出力 4ch（1ch は車両の施錠信号用）：GPIO → 470Ω → PC817 LED、トランジスタ側を端子へ
+OUT_GPIO = ["G25", "G26", "G27", "G32"]  # 施錠信号 / 汎用 / 汎用 / 汎用
+OUT_NAME = ["LOCK", "OUT2", "OUT3", "OUT4"]
 j2nets = {}
 for k in range(4):
     ye = 29.5 + 7 * k
@@ -94,7 +94,7 @@ for k in range(4):
     j2nets[str(2 * k + 1)] = f"O{k + 1}E"
     j2nets[str(2 * k + 2)] = f"O{k + 1}C"
 part("J2", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-8-3.5-H_1x08_P3.50mm_Horizontal",
-     5.5, 29.0, 270, j2nets, "REMOTE OUT")
+     5.5, 29.0, 270, j2nets, "OUT")
 
 # 予備入力 2ch（絶縁）：IN+ → 2.2k → PC817 LED → IN-、逆電圧保護に 1N4148
 IN_GPIO = ["G33", "G35"]

@@ -8,7 +8,7 @@
 2,D4 D5,1N4148,小信号ダイオード 1N4148（DO-35）入力の逆電圧保護
 1,F1,Mini blade 1A,ミニ平型ヒューズホルダー Keystone 3568 ＋ ミニ平型ヒューズ 1A
 1,J1,12V IN,"端子台 5.08mm 3P（Phoenix MKDS 1,5/3-5,08 互換）"
-1,J2,REMOTE OUT,"端子台 3.5mm 8P（Phoenix PT 1,5/8-3,5-H 互換）"
+1,J2,OUT,"端子台 3.5mm 8P（Phoenix PT 1,5/8-3,5-H 互換）"
 1,J3,AUX IN,"端子台 3.5mm 4P（Phoenix PT 1,5/4-3,5-H 互換）"
 1,J4,I2C,ピンヘッダー 1×4 2.54mm
 1,J5,ESP32 J1,ピンソケット 1×19 2.54mm（ESP32-DevKitC 用）
