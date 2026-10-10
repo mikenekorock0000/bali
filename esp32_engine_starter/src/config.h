@@ -46,9 +46,10 @@ constexpr int PIN_ACC_IN = 36;   // ACC 検知。内部プルアップなし（�
 // ---- OBD-II（CAN、基板 U9 MCP2562） ----
 constexpr int PIN_CAN_TX = 18;
 constexpr int PIN_CAN_RX = 19;
+constexpr int PIN_CAN_STBY = 4;  // LOW で動作、HIGH（基板の 10k で既定）で待機＝バスに関与しない
 
 // ---- ブザー（基板 BZ1、HIGH で鳴る） ----
-constexpr int PIN_BUZZER = 23;
+constexpr int PIN_BUZZER = 13;  // 基板の 10k で起動時は OFF
 
 // ---- GPS（UART2、基板 J8） ----
 constexpr int PIN_GPS_TX = 17;  // ESP32 → GPS の RX

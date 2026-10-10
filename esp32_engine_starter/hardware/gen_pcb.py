@@ -19,7 +19,7 @@ OUT = os.path.join(HERE, "hijet_starter.kicad_pcb")
 FPLIB = "/usr/share/kicad/footprints"
 
 # ---------------------------------------------------------------- 基板寸法
-BOARD_W, BOARD_H = 100.0, 92.0
+BOARD_W, BOARD_H = 92.0, 70.0
 GRID = 0.25            # ルーティング格子 [mm]
 CLEAR = 0.30           # 銅箔間クリアランス [mm]
 EDGE_CLEAR = 0.60      # 基板端からの距離 [mm]
@@ -30,12 +30,12 @@ POWER_NETS = {"BATT", "12V_F", "12V_P", "+5V", "GND"}
 
 # ESP32 DevKit V1 互換（30 ピン、HW-394）：列間 25.4mm、15 ピン×2。
 # 1 番ピンをアンテナ側（基板の上）にした並び。
-ESP_X, ESP_Y = 62.0, 10.0
+ESP_X, ESP_Y = 59.0, 14.0
 ESP_ROW = 25.4
 ESP_L = {2: "G36", 4: "VSENSE", 5: "G35", 6: "G32", 7: "G33", 8: "G25", 9: "G26", 10: "G27",
-         14: "GND", 15: "+5V"}     # EN VP VN D34 D35 D32 D33 D25 D26 D27 D14 D12 D13 GND VIN
-ESP_R = {1: "G23", 2: "SCL", 5: "SDA", 6: "G19", 7: "G18", 9: "G17", 10: "G16",
-         14: "GND", 15: "+3V3"}  # D23 D22 TX0 RX0 D21 ... D15 GND 3V3
+         13: "G13", 14: "GND", 15: "+5V"}  # EN VP VN D34 D35 D32 D33 D25 D26 D27 D14 D12 D13 GND VIN
+ESP_R = {2: "SCL", 5: "SDA", 6: "G19", 7: "G18", 9: "G17", 10: "G16", 11: "STBY",
+         14: "GND", 15: "+3V3"}  # D23 D22 TX0 RX0 D21 D19 D18 D5 D17 D16 D4 D2 D15 GND 3V3
 
 # アンテナ下（ピン列の間、上端側）は銅箔禁止
 ANTENNA_KEEPOUT = (ESP_X + 1.6, 0.0, ESP_X + ESP_ROW - 1.6, ESP_Y + 4.0)
@@ -49,119 +49,111 @@ def part(ref, lib, fp, x, y, rot, nets, value):
     PARTS.append((ref, lib, fp, x, y, rot, nets, value))
 
 
-# 電源入力：端子 → ヒューズ → 逆接保護ダイオード → TVS/コンデンサ → DC-DC
+# 足の間隔 5.08mm で立てて実装する抵抗・ダイオード（はんだ付けしやすく、場所を取らない）
+RV = ("Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical")
+D35V = ("Diode_THT", "D_DO-35_SOD27_P5.08mm_Vertical_KathodeUp")
+CDISC = ("Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P2.50mm")
+DIP4 = ("Package_DIP", "DIP-4_W7.62mm")
+
+# ---- 中央列：電源（端子 → ポリスイッチ → 逆接保護 → TVS/コンデンサ → DC-DC）と電圧測定・ブザー
 part("J1", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal",
-     6.5, 11.0, 270, {"1": "BATT", "2": "GND", "3": "12V_F"}, "12V IN")
-part("F1", "Fuse", "Fuseholder_Blade_Mini_Keystone_3568", 17.0, 6.0, 0,
-     {"1": "BATT", "2": "12V_F"}, "Mini blade 1A")
-part("D1", "Diode_THT", "D_DO-41_SOD81_P10.16mm_Horizontal", 38.0, 15.5, 180,
+     53.0, 5.8, 180, {"1": "BATT", "2": "GND", "3": "12V_F"}, "12V IN")
+part("F1", "Capacitor_THT", "C_Disc_D7.5mm_W5.0mm_P5.00mm", 41.0, 17.0, 0,
+     {"1": "BATT", "2": "12V_F"}, "PTC 0.5A")
+part("D1", "Diode_THT", "D_DO-41_SOD81_P5.08mm_Vertical_KathodeUp", 49.5, 15.5, 0,
      {"1": "12V_P", "2": "12V_F"}, "1N5819")
-part("D2", "Diode_THT", "D_DO-15_P12.70mm_Horizontal", 41.0, 21.5, 0,
+part("D2", "Diode_THT", "D_DO-15_P5.08mm_Vertical_KathodeUp", 49.5, 21.5, 0,
      {"1": "12V_P", "2": "GND"}, "P6KE22A")
-part("C1", "Capacitor_THT", "CP_Radial_D8.0mm_P3.50mm", 34.0, 7.5, 0,
+part("C1", "Capacitor_THT", "CP_Radial_D8.0mm_P3.50mm", 40.5, 25.5, 0,
      {"1": "12V_P", "2": "GND"}, "100uF 50V")
-part("U1", "Converter_DCDC", "Converter_DCDC_Murata_OKI-78SR_Vertical", 44.5, 9.0, 0,
-     {"1": "12V_P", "2": "GND", "3": "+5V"}, "OKI-78SR-5/1.5-W36-C")
-part("C2", "Capacitor_THT", "CP_Radial_D6.3mm_P2.50mm", 55.0, 15.0, 0,
+part("C2", "Capacitor_THT", "CP_Radial_D6.3mm_P2.50mm", 51.0, 27.0, 0,
      {"1": "+5V", "2": "GND"}, "100uF 16V")
-part("C3", "Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P2.50mm", 57.0, 47.0, 90,
-     {"1": "+5V", "2": "GND"}, "0.1uF")
+part("U1", "Converter_DCDC", "Converter_DCDC_Murata_OKI-78SR_Vertical", 40.5, 37.0, 0,
+     {"1": "12V_P", "2": "GND", "3": "+5V"}, "OKI-78SR-5/1.5-W36-C")
+part("R1", *RV, 50.5, 34.0, 0, {"1": "12V_F", "2": "VSENSE"}, "100k")
+part("R2", *RV, 50.5, 38.0, 0, {"1": "GND", "2": "VSENSE"}, "22k")
+part("C4", *CDISC, 51.0, 42.0, 0, {"1": "VSENSE", "2": "GND"}, "0.1uF")
+part("D3", *D35V, 50.5, 46.0, 0, {"1": "+3V3", "2": "VSENSE"}, "BAT85")
+part("C3", *CDISC, 55.5, 55.0, 90, {"1": "+5V", "2": "GND"}, "0.1uF")
 
-# バッテリー電圧測定：100k/22k 分圧 + 0.1uF + 3V3 へのクランプ
-part("R1", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", 27.0, 24.5, 0,
-     {"1": "12V_F", "2": "VSENSE"}, "100k")
-part("R2", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", 44.0, 37.0, 90,
-     {"1": "GND", "2": "VSENSE"}, "22k")
-part("C4", "Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P2.50mm", 49.5, 31.0, 90,
-     {"1": "VSENSE", "2": "GND"}, "0.1uF")
-part("D3", "Diode_THT", "D_DO-35_SOD27_P7.62mm_Horizontal", 54.5, 36.0, 90,
-     {"1": "+3V3", "2": "VSENSE"}, "BAT85")
+# ブザー（5V 自励式）：GPIO13 → 1k → 2SC1815（E-C-B）。10k で起動時に OFF、1N4148 で逆起電力吸収
+part("BZ1", "Buzzer_Beeper", "Buzzer_12x9.5RM7.6", 40.5, 54.0, 0, {"1": "+5V", "2": "BZN"}, "Buzzer 5V 12mm")
+part("D7", *D35V, 40.0, 63.0, 0, {"1": "+5V", "2": "BZN"}, "1N4148")
+part("Q1", "Package_TO_SOT_THT", "TO-92_Inline_Wide", 40.0, 67.5, 0,
+     {"1": "GND", "2": "BZN", "3": "QB"}, "2SC1815")
+part("R13", *RV, 48.0, 63.0, 0, {"1": "QB", "2": "G13"}, "1k")
+part("R14", *RV, 48.0, 67.5, 0, {"1": "QB", "2": "GND"}, "10k")
 
-# ESP32-DevKitC 用ソケット
+# ---- ESP32 DevKit V1（30 ピン）用ソケット。下の空間に背の低い部品を置く
 part("J5", "Connector_PinSocket_2.54mm", "PinSocket_1x15_P2.54mm_Vertical", ESP_X, ESP_Y, 0,
      {str(k): v for k, v in ESP_L.items()}, "ESP32 VIN row")
 part("J6", "Connector_PinSocket_2.54mm", "PinSocket_1x15_P2.54mm_Vertical", ESP_X + ESP_ROW, ESP_Y, 0,
      {str(k): v for k, v in ESP_R.items()}, "ESP32 3V3 row")
 
-# 絶縁出力 4ch（1ch は車両の施錠信号用）：GPIO → 470Ω → PC817 LED、トランジスタ側を端子へ
-OUT_GPIO = ["G25", "G26", "G27", "G32"]  # 施錠信号 / 汎用 / 汎用 / 汎用
+# OBD-II（CAN）：MCP2562（VDD=5V、VIO=3.3V）。STBY は 10k で待機側に固定し、GPIO4 で LOW にしたときだけ動作
+part("U9", "Package_DIP", "DIP-8_W7.62mm", 65.0, 33.0, 0,
+     {"1": "G18", "2": "GND", "3": "+5V", "4": "G19", "5": "+3V3", "6": "CANL", "7": "CANH",
+      "8": "STBY"}, "MCP2562-E/P")
+part("C5", *CDISC, 65.0, 45.5, 0, {"1": "+5V", "2": "GND"}, "0.1uF")
+part("C6", *CDISC, 76.0, 45.0, 90, {"1": "+3V3", "2": "GND"}, "0.1uF")
+part("R15", *RV, 76.0, 30.0, 0, {"1": "STBY", "2": "+3V3"}, "10k")
+part("J7", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-3-3.5-H_1x03_P3.50mm_Horizontal",
+     72.0, 64.0, 0, {"1": "CANH", "2": "CANL", "3": "GND"}, "OBD-II CAN")
+
+# ---- 右端：I2C と GPS（UART2）のピンヘッダー。1 番（四角）が GND
+part("J4", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", 89.5, 18.0, 0,
+     {"1": "GND", "2": "+3V3", "3": "SCL", "4": "SDA"}, "I2C")
+part("J8", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", 89.5, 31.0, 0,
+     {"1": "GND", "2": "+3V3", "3": "G17", "4": "G16"}, "GPS")
+
+# ---- 左列：絶縁出力 4ch（1ch は車両の施錠信号用）
+OUT_GPIO = ["G25", "G26", "G27", "G32"]
 OUT_NAME = ["LOCK", "OUT2", "OUT3", "OUT4"]
 j2nets = {}
 for k in range(4):
-    ye = 29.5 + 7 * k
-    part(f"U{2 + k}", "Package_DIP", "DIP-4_W7.62mm", 24.62, ye + 2.54, 180,
+    ye = 10.5 + 7 * k
+    part(f"U{2 + k}", *DIP4, 22.12, ye + 2.54, 180,
          {"1": f"LED{k + 1}", "2": "GND", "3": f"O{k + 1}E", "4": f"O{k + 1}C"}, "PC817C")
-    part(f"R{3 + k}", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal",
-         28.0, ye + 2.54, 0, {"1": f"LED{k + 1}", "2": OUT_GPIO[k]}, "470")
+    part(f"R{3 + k}", *RV, 25.5, ye + 2.54, 0, {"1": f"LED{k + 1}", "2": OUT_GPIO[k]}, "470")
     j2nets[str(2 * k + 1)] = f"O{k + 1}E"
     j2nets[str(2 * k + 2)] = f"O{k + 1}C"
 part("J2", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-8-3.5-H_1x08_P3.50mm_Horizontal",
-     5.5, 29.0, 270, j2nets, "OUT")
+     5.5, 10.0, 270, j2nets, "OUT")
 
-# 絶縁入力 3ch：IN+ → 2.2k → PC817 LED → IN-、逆電圧保護に 1N4148。3ch 目は ACC 検知
+# ---- 左列：絶縁入力 3ch（IN+ → 2.2k → PC817 LED → IN-、1N4148 で逆電圧保護）。3ch 目は ACC 検知
 IN_GPIO = ["G33", "G35", "G36"]
 for k in range(3):
-    y = 61.0 + 7 * k
-    part(f"U{6 + k}", "Package_DIP", "DIP-4_W7.62mm", 28.0, y, 0,
+    y = 39.0 + 7 * k
+    part(f"R{7 + k}", *RV, 12.0, y, 0, {"1": f"IN{k + 1}P", "2": f"IN{k + 1}A"}, "2.2k")
+    part(f"D{4 + k}", *D35V, 17.08, y + 3.5, 180, {"1": f"IN{k + 1}A", "2": f"IN{k + 1}N"}, "1N4148")
+    part(f"U{6 + k}", *DIP4, 20.5, y, 0,
          {"1": f"IN{k + 1}A", "2": f"IN{k + 1}N", "3": "GND", "4": IN_GPIO[k]}, "PC817C")
-    part(f"R{7 + k}", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal",
-         14.0, y, 0, {"1": f"IN{k + 1}P", "2": f"IN{k + 1}A"}, "2.2k")
-    part(f"D{4 + k}", "Diode_THT", "D_DO-35_SOD27_P7.62mm_Horizontal", 23.0, y + 3.5, 180,
-         {"1": f"IN{k + 1}A", "2": f"IN{k + 1}N"}, "1N4148")
-    part(f"R{10 + k}", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal",
-         42.0 + 4 * k, y + 2.0, 90, {"1": IN_GPIO[k], "2": "+3V3"}, "10k")
+    part(f"R{10 + k}", *RV, 31.0, y, 0, {"1": IN_GPIO[k], "2": "+3V3"}, "10k")
 part("J3", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-6-3.5-H_1x06_P3.50mm_Horizontal",
-     5.5, 61.0, 270, {"1": "IN1P", "2": "IN1N", "3": "IN2P", "4": "IN2N", "5": "IN3P", "6": "IN3N"},
+     5.5, 39.0, 270, {"1": "IN1P", "2": "IN1N", "3": "IN2P", "4": "IN2N", "5": "IN3P", "6": "IN3N"},
      "IN")
 
-# OBD-II（CAN）：MCP2562（5V 電源、VIO=3.3V で ESP32 と直結）。STBY は GND で常時動作
-part("U9", "Package_DIP", "DIP-8_W7.62mm", 66.0, 76.0, 0,
-     {"1": "G18", "2": "GND", "3": "+5V", "4": "G19", "5": "+3V3", "6": "CANL", "7": "CANH",
-      "8": "GND"}, "MCP2562-E/P")
-part("C5", "Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P2.50mm", 61.5, 82.0, 90,
-     {"1": "+5V", "2": "GND"}, "0.1uF")
-part("C6", "Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P2.50mm", 78.0, 87.5, 0,
-     {"1": "+3V3", "2": "GND"}, "0.1uF")
-part("J7", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-3-3.5-H_1x03_P3.50mm_Horizontal",
-     94.5, 82.0, 90, {"1": "CANH", "2": "CANL", "3": "GND"}, "OBD-II CAN")
-
-# ブザー（5V 自励式）：GPIO23 → 1k → 2SC1815（E-C-B 並び）、逆起電力吸収に 1N4148
-part("BZ1", "Buzzer_Beeper", "Buzzer_12x9.5RM7.6", 68.0, 64.0, 0,
-     {"1": "+5V", "2": "BZN"}, "Buzzer 5V 12mm")
-part("Q1", "Package_TO_SOT_THT", "TO-92_Inline_Wide", 82.0, 64.0, 0,
-     {"1": "GND", "2": "BZN", "3": "QB"}, "2SC1815")
-part("R13", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", 91.0, 70.0, 90,
-     {"1": "QB", "2": "G23"}, "1k")
-part("D7", "Diode_THT", "D_DO-35_SOD27_P7.62mm_Horizontal", 67.0, 72.5, 0,
-     {"1": "+5V", "2": "BZN"}, "1N4148")
-
-# GPS（UART2）：ESP32 TX=GPIO17 → GPS の RX、GPS の TX → ESP32 RX=GPIO16
-part("J8", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", 95.0, 36.0, 0,
-     {"1": "GND", "2": "+3V3", "3": "G17", "4": "G16"}, "GPS")
-
-# I2C 拡張（SSD1306 OLED モジュールと同じ並び）
-part("J4", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", 95.0, 20.0, 0,
-     {"1": "GND", "2": "+3V3", "3": "SCL", "4": "SDA"}, "I2C")
-
-for i, (x, y) in enumerate([(3.5, 3.5), (96.5, 3.5), (3.5, 88.5), (96.5, 88.5)]):
+for i, (x, y) in enumerate([(3.5, 3.5), (88.5, 3.5), (3.5, 66.5), (88.5, 66.5)]):
     part(f"H{i + 1}", "MountingHole", "MountingHole_3.2mm_M3", x, y, 0, {}, "M3")
 
 L, R, C = "L", "R", "C"
 SILK = [
     # (文字, x, y, 角度, 大きさ, 揃え)
-    ("+12V", 14.4, 12.9, 0, 0.8, L), ("GND", 14.4, 16.08, 0, 0.8, L), ("12V OUT", 14.4, 21.16, 0, 0.8, L),
-    ("- IN1 +", 11.2, 62.75, 90, 0.8, C), ("- IN2 +", 11.2, 69.75, 90, 0.8, C),
-    ("- ACC +", 11.2, 76.75, 90, 0.8, C),
-    ("CAN H", 90.4, 82.0, 0, 0.8, R), ("CAN L", 90.4, 78.5, 0, 0.8, R), ("GND", 90.4, 75.0, 0, 0.8, R),
-    ("GND", 93.6, 36.0, 0, 0.8, R), ("3V3", 93.6, 38.54, 0, 0.8, R),
-    ("GPS RX", 93.6, 41.08, 0, 0.8, R), ("GPS TX", 93.6, 43.62, 0, 0.8, R),
-    ("GND", 93.6, 20.0, 0, 0.8, R), ("3V3", 93.6, 22.54, 0, 0.8, R),
-    ("SCL", 93.6, 25.08, 0, 0.8, R), ("SDA", 93.6, 27.62, 0, 0.8, R),
-    ("HIJET MONITOR v2", 40.0, 88.0, 0, 1.5, C),
-    ("ESP32 DevKit V1 (30pin)  USB side", 74.7, 57.0, 0, 0.8, C),
+    ("+12V", 53.0, 12.6, 0, 0.8, C), ("GND", 47.92, 12.6, 0, 0.8, C), ("OUT", 42.84, 12.6, 0, 0.8, C),
+    ("CAN", 68.5, 64.0, 0, 0.8, R),
+    ("H", 72.0, 59.3, 0, 0.8, C), ("L", 75.5, 59.3, 0, 0.8, C), ("G", 79.0, 59.3, 0, 0.8, C),
+    ("I2C", 89.5, 15.5, 0, 0.8, C), ("GPS", 89.5, 28.5, 0, 0.8, C),
+    ("HIJET MONITOR v3", 71.7, 52.5, 0, 1.0, C),
+    ("USB side", 71.7, 56.5, 0, 0.8, C),
 ]
 for k in range(4):
-    SILK.append((f"+ {OUT_NAME[k]} -", 11.2, 30.75 + 7 * k, 90, 0.8, C))
+    SILK.append((f"+ {OUT_NAME[k]} -", 11.2, 11.75 + 7 * k, 90, 0.8, C))
+for k, name in enumerate(["IN1", "IN2", "ACC"]):
+    SILK.append((f"- {name} +", 9.9, 40.75 + 7 * k, 90, 0.8, C))
+
+# 部品番号の位置の上書き：立てる部品は既定で本体の上（-2mm）。("rel", dx, dy) はパッド中点から、
+# ("abs", x, y) は絶対位置
+REF_POS = {"D1": ("rel", 0, 2.6), "Q1": ("abs", 37.0, 67.5), "D3": ("rel", 0, 2.0), "C2": ("abs", 56.6, 27.0)}
 
 # ---------------------------------------------------------------- ボード生成
 
@@ -224,9 +216,20 @@ def build_board():
         ref = fp.Reference()
         ref.SetTextSize(pcbnew.VECTOR2I(mm(0.8), mm(0.8)))
         ref.SetTextThickness(mm(0.12))
-        if ref.GetText().startswith("H") or ref.GetText() == "J7":
+        if ref.GetText().startswith("H") or ref.GetText() in ("J1", "J2", "J3", "J4", "J7", "J8"):
             ref.SetVisible(False)  # 取付穴と端子台はシルクの文字で用途を示す
-        if (ref.GetText()[0] in "RDU" and ref.GetText() != "U1") or ref.GetText() == "BZ1":
+        name = ref.GetText()
+        if name in REF_POS or "Vertical" in fpn and name[0] in "RD":
+            xs = [p.GetPosition().x for p in fp.Pads()]
+            ys = [p.GetPosition().y for p in fp.Pads()]
+            kind, dx, dy = REF_POS.get(name, ("rel", 0, -2.0))
+            if kind == "abs":
+                ref.SetPosition(pcbnew.VECTOR2I(mm(dx), mm(dy)))
+            else:
+                ref.SetPosition(pcbnew.VECTOR2I((min(xs) + max(xs)) // 2 + mm(dx),
+                                                (min(ys) + max(ys)) // 2 + mm(dy)))
+            ref.SetTextAngleDegrees(0)
+        elif (name[0] in "RDU" and name != "U1") or name in ("BZ1", "F1"):
             # 抵抗・ダイオード・フォトカプラは本体の中央に番号を置く
             xs = [p.GetPosition().x for p in fp.Pads()]
             ys = [p.GetPosition().y for p in fp.Pads()]
@@ -235,7 +238,7 @@ def build_board():
         for p in fp.Pads():
             # ESP32 ソケットの GND はベタに直結（細いピンなので熱逃がし不要）
             if padnets.get(p.GetNumber()) == "GND" and (
-                    ref.GetText() in ("J5", "J6", "C5", "U9", "J8")):
+                    ref.GetText() in ("J5", "J6", "C2", "C3", "C5", "C6", "U9", "J4", "J8")):
                 p.SetZoneConnection(pcbnew.ZONE_CONNECTION_FULL)
 
     for text, x, y, rot, size, just in SILK:
@@ -517,7 +520,7 @@ class Router:
                     self.mark_segment(name, layer, (ax, ay), (bx, by), width)
 
 
-GND_LINKS = [(("J8", "1"), ("J6", "14"))]
+GND_LINKS = []
 
 
 def find_pad(board, ref, num):
