@@ -19,7 +19,7 @@ OUT = os.path.join(HERE, "hijet_starter.kicad_pcb")
 FPLIB = "/usr/share/kicad/footprints"
 
 # ---------------------------------------------------------------- 基板寸法
-BOARD_W, BOARD_H = 100.0, 82.0
+BOARD_W, BOARD_H = 100.0, 92.0
 GRID = 0.25            # ルーティング格子 [mm]
 CLEAR = 0.30           # 銅箔間クリアランス [mm]
 EDGE_CLEAR = 0.60      # 基板端からの距離 [mm]
@@ -32,9 +32,10 @@ POWER_NETS = {"BATT", "12V_F", "12V_P", "+5V", "GND"}
 # 1 番ピンをアンテナ側（基板の上）にした並び。
 ESP_X, ESP_Y = 62.0, 10.0
 ESP_ROW = 25.4
-ESP_L = {4: "VSENSE", 5: "G35", 6: "G32", 7: "G33", 8: "G25", 9: "G26", 10: "G27",
+ESP_L = {2: "G36", 4: "VSENSE", 5: "G35", 6: "G32", 7: "G33", 8: "G25", 9: "G26", 10: "G27",
          14: "GND", 15: "+5V"}     # EN VP VN D34 D35 D32 D33 D25 D26 D27 D14 D12 D13 GND VIN
-ESP_R = {2: "SCL", 5: "SDA", 14: "GND", 15: "+3V3"}  # D23 D22 TX0 RX0 D21 ... D15 GND 3V3
+ESP_R = {1: "G23", 2: "SCL", 5: "SDA", 6: "G19", 7: "G18", 9: "G17", 10: "G16",
+         14: "GND", 15: "+3V3"}  # D23 D22 TX0 RX0 D21 ... D15 GND 3V3
 
 # アンテナ下（ピン列の間、上端側）は銅箔禁止
 ANTENNA_KEEPOUT = (ESP_X + 1.6, 0.0, ESP_X + ESP_ROW - 1.6, ESP_Y + 4.0)
@@ -97,9 +98,9 @@ for k in range(4):
 part("J2", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-8-3.5-H_1x08_P3.50mm_Horizontal",
      5.5, 29.0, 270, j2nets, "OUT")
 
-# 予備入力 2ch（絶縁）：IN+ → 2.2k → PC817 LED → IN-、逆電圧保護に 1N4148
-IN_GPIO = ["G33", "G35"]
-for k in range(2):
+# 絶縁入力 3ch：IN+ → 2.2k → PC817 LED → IN-、逆電圧保護に 1N4148。3ch 目は ACC 検知
+IN_GPIO = ["G33", "G35", "G36"]
+for k in range(3):
     y = 61.0 + 7 * k
     part(f"U{6 + k}", "Package_DIP", "DIP-4_W7.62mm", 28.0, y, 0,
          {"1": f"IN{k + 1}A", "2": f"IN{k + 1}N", "3": "GND", "4": IN_GPIO[k]}, "PC817C")
@@ -107,16 +108,42 @@ for k in range(2):
          14.0, y, 0, {"1": f"IN{k + 1}P", "2": f"IN{k + 1}A"}, "2.2k")
     part(f"D{4 + k}", "Diode_THT", "D_DO-35_SOD27_P7.62mm_Horizontal", 23.0, y + 3.5, 180,
          {"1": f"IN{k + 1}A", "2": f"IN{k + 1}N"}, "1N4148")
-    part(f"R{9 + k}", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal",
+    part(f"R{10 + k}", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal",
          42.0 + 4 * k, y + 2.0, 90, {"1": IN_GPIO[k], "2": "+3V3"}, "10k")
-part("J3", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-4-3.5-H_1x04_P3.50mm_Horizontal",
-     5.5, 61.0, 270, {"1": "IN1P", "2": "IN1N", "3": "IN2P", "4": "IN2N"}, "AUX IN")
+part("J3", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-6-3.5-H_1x06_P3.50mm_Horizontal",
+     5.5, 61.0, 270, {"1": "IN1P", "2": "IN1N", "3": "IN2P", "4": "IN2N", "5": "IN3P", "6": "IN3N"},
+     "IN")
+
+# OBD-II（CAN）：MCP2562（5V 電源、VIO=3.3V で ESP32 と直結）。STBY は GND で常時動作
+part("U9", "Package_DIP", "DIP-8_W7.62mm", 66.0, 76.0, 0,
+     {"1": "G18", "2": "GND", "3": "+5V", "4": "G19", "5": "+3V3", "6": "CANL", "7": "CANH",
+      "8": "GND"}, "MCP2562-E/P")
+part("C5", "Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P2.50mm", 61.5, 82.0, 90,
+     {"1": "+5V", "2": "GND"}, "0.1uF")
+part("C6", "Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P2.50mm", 78.0, 87.5, 0,
+     {"1": "+3V3", "2": "GND"}, "0.1uF")
+part("J7", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-3-3.5-H_1x03_P3.50mm_Horizontal",
+     94.5, 82.0, 90, {"1": "CANH", "2": "CANL", "3": "GND"}, "OBD-II CAN")
+
+# ブザー（5V 自励式）：GPIO23 → 1k → 2SC1815（E-C-B 並び）、逆起電力吸収に 1N4148
+part("BZ1", "Buzzer_Beeper", "Buzzer_12x9.5RM7.6", 68.0, 64.0, 0,
+     {"1": "+5V", "2": "BZN"}, "Buzzer 5V 12mm")
+part("Q1", "Package_TO_SOT_THT", "TO-92_Inline_Wide", 82.0, 64.0, 0,
+     {"1": "GND", "2": "BZN", "3": "QB"}, "2SC1815")
+part("R13", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", 91.0, 70.0, 90,
+     {"1": "QB", "2": "G23"}, "1k")
+part("D7", "Diode_THT", "D_DO-35_SOD27_P7.62mm_Horizontal", 67.0, 72.5, 0,
+     {"1": "+5V", "2": "BZN"}, "1N4148")
+
+# GPS（UART2）：ESP32 TX=GPIO17 → GPS の RX、GPS の TX → ESP32 RX=GPIO16
+part("J8", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", 95.0, 36.0, 0,
+     {"1": "GND", "2": "+3V3", "3": "G17", "4": "G16"}, "GPS")
 
 # I2C 拡張（SSD1306 OLED モジュールと同じ並び）
 part("J4", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", 95.0, 20.0, 0,
      {"1": "GND", "2": "+3V3", "3": "SCL", "4": "SDA"}, "I2C")
 
-for i, (x, y) in enumerate([(3.5, 3.5), (96.5, 3.5), (3.5, 78.5), (96.5, 78.5)]):
+for i, (x, y) in enumerate([(3.5, 3.5), (96.5, 3.5), (3.5, 88.5), (96.5, 88.5)]):
     part(f"H{i + 1}", "MountingHole", "MountingHole_3.2mm_M3", x, y, 0, {}, "M3")
 
 L, R, C = "L", "R", "C"
@@ -124,10 +151,14 @@ SILK = [
     # (文字, x, y, 角度, 大きさ, 揃え)
     ("+12V", 14.4, 12.9, 0, 0.8, L), ("GND", 14.4, 16.08, 0, 0.8, L), ("12V OUT", 14.4, 21.16, 0, 0.8, L),
     ("- IN1 +", 11.2, 62.75, 90, 0.8, C), ("- IN2 +", 11.2, 69.75, 90, 0.8, C),
+    ("- ACC +", 11.2, 76.75, 90, 0.8, C),
+    ("CAN H", 90.4, 82.0, 0, 0.8, R), ("CAN L", 90.4, 78.5, 0, 0.8, R), ("GND", 90.4, 75.0, 0, 0.8, R),
+    ("GND", 93.6, 36.0, 0, 0.8, R), ("3V3", 93.6, 38.54, 0, 0.8, R),
+    ("GPS RX", 93.6, 41.08, 0, 0.8, R), ("GPS TX", 93.6, 43.62, 0, 0.8, R),
     ("GND", 93.6, 20.0, 0, 0.8, R), ("3V3", 93.6, 22.54, 0, 0.8, R),
     ("SCL", 93.6, 25.08, 0, 0.8, R), ("SDA", 93.6, 27.62, 0, 0.8, R),
-    ("HIJET MONITOR v2", 74.7, 68.0, 0, 1.5, C),
-    ("ESP32 DevKit V1 (30pin)  USB side", 74.7, 62.0, 0, 1.0, C),
+    ("HIJET MONITOR v2", 40.0, 88.0, 0, 1.5, C),
+    ("ESP32 DevKit V1 (30pin)  USB side", 74.7, 57.0, 0, 0.8, C),
 ]
 for k in range(4):
     SILK.append((f"+ {OUT_NAME[k]} -", 11.2, 30.75 + 7 * k, 90, 0.8, C))
@@ -193,7 +224,9 @@ def build_board():
         ref = fp.Reference()
         ref.SetTextSize(pcbnew.VECTOR2I(mm(0.8), mm(0.8)))
         ref.SetTextThickness(mm(0.12))
-        if ref.GetText()[0] in "RDU" and ref.GetText() != "U1":
+        if ref.GetText().startswith("H") or ref.GetText() == "J7":
+            ref.SetVisible(False)  # 取付穴と端子台はシルクの文字で用途を示す
+        if (ref.GetText()[0] in "RDU" and ref.GetText() != "U1") or ref.GetText() == "BZ1":
             # 抵抗・ダイオード・フォトカプラは本体の中央に番号を置く
             xs = [p.GetPosition().x for p in fp.Pads()]
             ys = [p.GetPosition().y for p in fp.Pads()]
@@ -201,7 +234,8 @@ def build_board():
             ref.SetTextAngleDegrees(90 if rot in (90, 270) and ref.GetText()[0] != "U" else 0)
         for p in fp.Pads():
             # ESP32 ソケットの GND はベタに直結（細いピンなので熱逃がし不要）
-            if ref.GetText() in ("J5", "J6") and padnets.get(p.GetNumber()) == "GND":
+            if padnets.get(p.GetNumber()) == "GND" and (
+                    ref.GetText() in ("J5", "J6", "C5", "U9", "J8")):
                 p.SetZoneConnection(pcbnew.ZONE_CONNECTION_FULL)
 
     for text, x, y, rot, size, just in SILK:
@@ -332,6 +366,14 @@ class Router:
 
     def cell(self, x, y):
         return int(round(y / GRID)), int(round(x / GRID))
+
+    def route_pads(self, name, pads):
+        saved = self.pads.get(name)
+        self.pads[name] = pads
+        try:
+            return self.route_net(name)
+        finally:
+            self.pads[name] = saved
 
     def route_net(self, name):
         pads = self.pads.get(name, [])
@@ -475,6 +517,13 @@ class Router:
                     self.mark_segment(name, layer, (ax, ay), (bx, by), width)
 
 
+GND_LINKS = [(("J8", "1"), ("J6", "14"))]
+
+
+def find_pad(board, ref, num):
+    return [p for p in board.FindFootprintByReference(ref).Pads() if p.GetNumber() == num][0]
+
+
 def add_zones(board, nets):
     for layer in (pcbnew.F_Cu, pcbnew.B_Cu):
         z = pcbnew.ZONE(board)
@@ -524,6 +573,13 @@ def main():
         if not ok:
             failed.append(name)
         print(f"route {name:8s} {'ok' if ok else 'FAILED'}")
+    # ベタだけでは届かない GND パッドを、近くの GND パッドへ直接配線する
+    for a, b in GND_LINKS:
+        ok, paths = router.route_pads("GND", [find_pad(board, *a), find_pad(board, *b)])
+        router.commit("GND", paths)
+        print(f"route GND {a}-{b} {'ok' if ok else 'FAILED'}")
+        if not ok:
+            failed.append(f"GND {a}-{b}")
     add_zones(board, nets)
     board.Save(OUT)
     # 新規 BOARD のままだと ZONE_FILLER が落ちるため、読み直してから塗りつぶす

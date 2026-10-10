@@ -38,9 +38,21 @@ constexpr uint32_t VBAT_LOW_HOLD_MS = 60000;
 // 始動後、この時間で稼働判定できなければ「始動未確認」としてログに残す
 constexpr uint32_t START_VERIFY_MS = 45000;
 
-// ---- 予備入力（基板 J3、PC817 で絶縁。信号ありで LOW） ----
+// ---- 絶縁入力（基板 J3、PC817 で絶縁。信号ありで LOW） ----
 constexpr int PIN_AUX_IN1 = 33;
 constexpr int PIN_AUX_IN2 = 35;  // 内部プルアップなし（基板の 10k でプルアップ）
+constexpr int PIN_ACC_IN = 36;   // ACC 検知。内部プルアップなし（基板の 10k でプルアップ）
+
+// ---- OBD-II（CAN、基板 U9 MCP2562） ----
+constexpr int PIN_CAN_TX = 18;
+constexpr int PIN_CAN_RX = 19;
+
+// ---- ブザー（基板 BZ1、HIGH で鳴る） ----
+constexpr int PIN_BUZZER = 23;
+
+// ---- GPS（UART2、基板 J8） ----
+constexpr int PIN_GPS_TX = 17;  // ESP32 → GPS の RX
+constexpr int PIN_GPS_RX = 16;  // GPS の TX → ESP32
 
 // ---- I2C（基板 J4） ----
 constexpr int PIN_I2C_SDA = 21;
