@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 namespace starter {
@@ -78,6 +79,31 @@ inline bool beaconMatches(const BeaconRule& r, const uint8_t mac[6], const IBeac
   if (!ib || memcmp(r.uuid, ib->uuid, 16) != 0) return false;
   if (r.major >= 0 && r.major != ib->major) return false;
   if (r.minor >= 0 && r.minor != ib->minor) return false;
+  return true;
+}
+
+// 設定文字列からルールを作る："aa:bb:cc:dd:ee:ff"（MAC）または
+// "uuid:<UUID>[:major[:minor]]"（iBeacon。省略した major/minor はワイルドカード）
+inline bool parseBeaconRule(const char* s, BeaconRule& r) {
+  r = BeaconRule();
+  if (strncmp(s, "uuid:", 5) != 0) {
+    r.type = BeaconRule::Mac;
+    return parseMac(s, r.mac);
+  }
+  r.type = BeaconRule::IBeaconId;
+  const char* u = s + 5;
+  const char* c = strchr(u, ':');
+  char buf[40];
+  size_t n = c ? static_cast<size_t>(c - u) : strlen(u);
+  if (n >= sizeof(buf)) return false;
+  memcpy(buf, u, n);
+  buf[n] = '\0';
+  if (!parseUuid(buf, r.uuid)) return false;
+  if (c) {
+    r.major = atoi(c + 1);
+    const char* c2 = strchr(c + 1, ':');
+    if (c2) r.minor = atoi(c2 + 1);
+  }
   return true;
 }
 

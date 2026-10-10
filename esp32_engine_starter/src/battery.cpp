@@ -7,13 +7,17 @@ void Battery::begin() {
   pinMode(PIN_VBAT, INPUT);
 }
 
-void Battery::loop(uint32_t nowMs, float cal) {
+float Battery::sampleNow() const {
+  uint32_t mv = 0;
+  for (int i = 0; i < 4; ++i) mv += analogReadMilliVolts(PIN_VBAT);
+  return (mv / 4.0f) / 1000.0f * VBAT_DIVIDER * VBAT_CAL;
+}
+
+void Battery::loop(uint32_t nowMs) {
   if (nowMs - lastSampleMs_ < 200) return;
   lastSampleMs_ = nowMs;
 
-  uint32_t mv = 0;
-  for (int i = 0; i < 8; ++i) mv += analogReadMilliVolts(PIN_VBAT);
-  float v = (mv / 8.0f) / 1000.0f * VBAT_DIVIDER * cal;
+  float v = (sampleNow() + sampleNow()) / 2.0f;
   volts_ = valid_ ? volts_ * 0.8f + v * 0.2f : v;  // スターター作動時の瞬間的な落ち込みをならす
   valid_ = true;
 

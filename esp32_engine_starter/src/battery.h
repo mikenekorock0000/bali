@@ -5,10 +5,12 @@
 class Battery {
  public:
   void begin();
-  void loop(uint32_t nowMs, float cal);
+  void loop(uint32_t nowMs);
+  // 平均をとらない即時値（始動時の電圧の落ち込みを捉えるため）
+  float sampleNow() const;
   float volts() const { return volts_; }
   bool valid() const { return valid_; }
-  bool engineRunning() const { return running_; }
+  bool chargingVoltage() const { return running_; }  // 発電中の電圧か（OBD が無いときの稼働判定）
   bool lowVoltage() const { return low_; }
 
  private:
