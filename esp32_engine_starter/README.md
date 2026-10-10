@@ -9,7 +9,7 @@
 - 未実装 : `main.cpp`（全体の結線）と操作画面
 
 ## 基板
-`hardware/` に ESP32-DevKitC キャリア基板（ガーバー一式・部品表・組み立て手順）があります。
+`hardware/` に ESP32 DevKit V1（30ピン）キャリア基板（ガーバー一式・部品表・組み立て手順）があります。
 詳しくは [hardware/README.md](hardware/README.md)。
 
 ## テスト

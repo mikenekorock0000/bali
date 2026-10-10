@@ -11,8 +11,8 @@
 1,J2,OUT,"端子台 3.5mm 8P（Phoenix PT 1,5/8-3,5-H 互換）"
 1,J3,AUX IN,"端子台 3.5mm 4P（Phoenix PT 1,5/4-3,5-H 互換）"
 1,J4,I2C,ピンヘッダー 1×4 2.54mm
-1,J5,ESP32 J1,ピンソケット 1×19 2.54mm（ESP32-DevKitC 用）
-1,J6,ESP32 J3,ピンソケット 1×19 2.54mm（ESP32-DevKitC 用）
+1,J5,ESP32 VIN row,ピンソケット 1×15 2.54mm（ESP32 DevKit V1 30ピン用）
+1,J6,ESP32 3V3 row,ピンソケット 1×15 2.54mm（ESP32 DevKit V1 30ピン用）
 1,R1,100k,抵抗 100kΩ 1/4W
 2,R10 R9,10k,抵抗 10kΩ 1/4W
 1,R2,22k,抵抗 22kΩ 1/4W

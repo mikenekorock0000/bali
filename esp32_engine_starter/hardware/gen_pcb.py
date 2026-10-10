@@ -28,15 +28,16 @@ VIA_D, VIA_DRILL = 0.80, 0.40
 
 POWER_NETS = {"BATT", "12V_F", "12V_P", "+5V", "GND"}
 
-# ESP32-DevKitC V4（秋月 ESP32-DevKitC-32E）ピン：列間 25.4mm、19 ピン×2
-ESP_X, ESP_Y = 62.0, 8.0
+# ESP32 DevKit V1 互換（30 ピン、HW-394）：列間 25.4mm、15 ピン×2。
+# 1 番ピンをアンテナ側（基板の上）にした並び。
+ESP_X, ESP_Y = 62.0, 10.0
 ESP_ROW = 25.4
-ESP_L = {1: "+3V3", 5: "VSENSE", 6: "G35", 7: "G32", 8: "G33", 9: "G25", 10: "G26",
-         11: "G27", 14: "GND", 19: "+5V"}
-ESP_R = {1: "GND", 3: "SCL", 6: "SDA", 7: "GND"}
+ESP_L = {4: "VSENSE", 5: "G35", 6: "G32", 7: "G33", 8: "G25", 9: "G26", 10: "G27",
+         14: "GND", 15: "+5V"}     # EN VP VN D34 D35 D32 D33 D25 D26 D27 D14 D12 D13 GND VIN
+ESP_R = {2: "SCL", 5: "SDA", 14: "GND", 15: "+3V3"}  # D23 D22 TX0 RX0 D21 ... D15 GND 3V3
 
 # アンテナ下（ピン列の間、上端側）は銅箔禁止
-ANTENNA_KEEPOUT = (ESP_X + 1.6, 0.0, ESP_X + ESP_ROW - 1.6, 15.0)
+ANTENNA_KEEPOUT = (ESP_X + 1.6, 0.0, ESP_X + ESP_ROW - 1.6, ESP_Y + 4.0)
 
 # ---------------------------------------------------------------- 部品表
 # (ref, lib, footprint, x, y, 角度, {pad: net}, 値)
@@ -62,7 +63,7 @@ part("U1", "Converter_DCDC", "Converter_DCDC_Murata_OKI-78SR_Vertical", 44.5, 9.
      {"1": "12V_P", "2": "GND", "3": "+5V"}, "OKI-78SR-5/1.5-W36-C")
 part("C2", "Capacitor_THT", "CP_Radial_D6.3mm_P2.50mm", 55.0, 15.0, 0,
      {"1": "+5V", "2": "GND"}, "100uF 16V")
-part("C3", "Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P2.50mm", 57.0, 56.0, 90,
+part("C3", "Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P2.50mm", 57.0, 47.0, 90,
      {"1": "+5V", "2": "GND"}, "0.1uF")
 
 # バッテリー電圧測定：100k/22k 分圧 + 0.1uF + 3V3 へのクランプ
@@ -76,10 +77,10 @@ part("D3", "Diode_THT", "D_DO-35_SOD27_P7.62mm_Horizontal", 54.5, 36.0, 90,
      {"1": "+3V3", "2": "VSENSE"}, "BAT85")
 
 # ESP32-DevKitC 用ソケット
-part("J5", "Connector_PinSocket_2.54mm", "PinSocket_1x19_P2.54mm_Vertical", ESP_X, ESP_Y, 0,
-     {str(k): v for k, v in ESP_L.items()}, "ESP32 J1")
-part("J6", "Connector_PinSocket_2.54mm", "PinSocket_1x19_P2.54mm_Vertical", ESP_X + ESP_ROW, ESP_Y, 0,
-     {str(k): v for k, v in ESP_R.items()}, "ESP32 J3")
+part("J5", "Connector_PinSocket_2.54mm", "PinSocket_1x15_P2.54mm_Vertical", ESP_X, ESP_Y, 0,
+     {str(k): v for k, v in ESP_L.items()}, "ESP32 VIN row")
+part("J6", "Connector_PinSocket_2.54mm", "PinSocket_1x15_P2.54mm_Vertical", ESP_X + ESP_ROW, ESP_Y, 0,
+     {str(k): v for k, v in ESP_R.items()}, "ESP32 3V3 row")
 
 # 絶縁出力 4ch（1ch は車両の施錠信号用）：GPIO → 470Ω → PC817 LED、トランジスタ側を端子へ
 OUT_GPIO = ["G25", "G26", "G27", "G32"]  # 施錠信号 / 汎用 / 汎用 / 汎用
@@ -125,8 +126,8 @@ SILK = [
     ("- IN1 +", 11.2, 62.75, 90, 0.8, C), ("- IN2 +", 11.2, 69.75, 90, 0.8, C),
     ("GND", 93.6, 20.0, 0, 0.8, R), ("3V3", 93.6, 22.54, 0, 0.8, R),
     ("SCL", 93.6, 25.08, 0, 0.8, R), ("SDA", 93.6, 27.62, 0, 0.8, R),
-    ("HIJET STARTER v1", 74.7, 68.0, 0, 1.5, C),
-    ("ESP32-DevKitC  USB side", 74.7, 62.0, 0, 1.0, C),
+    ("HIJET MONITOR v2", 74.7, 68.0, 0, 1.5, C),
+    ("ESP32 DevKit V1 (30pin)  USB side", 74.7, 62.0, 0, 1.0, C),
 ]
 for k in range(4):
     SILK.append((f"+ {OUT_NAME[k]} -", 11.2, 30.75 + 7 * k, 90, 0.8, C))
