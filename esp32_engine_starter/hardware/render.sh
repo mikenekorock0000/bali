@@ -12,7 +12,7 @@ declare -A COLOR=( [B.Cu]="#3d6fb6" [F.Cu]="#c8492f" [F.SilkS]="#f2f2f2" [Edge.C
 render() {  # name, layers...
   local name=$1; shift
   local html="$OUTDIR/$name.html"
-  echo '<html><body style="margin:0;background:#15391f"><div style="position:relative;width:2000px;height:1700px">' > "$html"
+  echo '<html><body style="margin:0;background:#15391f"><div style="position:relative;width:2000px;height:1960px">' > "$html"
   for l in "$@"; do
     local f="$OUTDIR/${name}_${l//./_}.svg"
     kicad-cli pcb export svg -l "$l,Edge.Cuts" --page-size-mode 2 --exclude-drawing-sheet --black-and-white -o "$f" "$PCB" >/dev/null
@@ -20,7 +20,7 @@ render() {  # name, layers...
     echo "<img src=\"$(basename "$f")\" style=\"position:absolute;left:0;top:0;width:2000px\">" >> "$html"
   done
   echo '</div></body></html>' >> "$html"
-  "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=2000,1680 \
+  "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=2000,1960 \
     --screenshot="$OUTDIR/$name.png" "file://$(realpath "$html")" >/dev/null 2>&1
   rm -f "$html" "$OUTDIR/${name}_"*.svg
 }

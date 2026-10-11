@@ -1,4 +1,4 @@
-* 絶縁出力：GPIO（3.3V、出力抵抗 約 30Ω）─ 470Ω ─ PC817 LED
+* 絶縁出力：GPIO（3.3V、出力抵抗 約 30Ω）─ 330Ω ─ PC817 LED
 .include models.lib
 Vg g 0 3.3
 Rout g g1 30

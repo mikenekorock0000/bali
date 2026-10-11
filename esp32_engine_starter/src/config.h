@@ -1,5 +1,5 @@
 #pragma once
-// 基板（HIJET MONITOR v3）の配線と、動作のしきい値。実機に合わせてここを変更する。
+// 基板（HIJET MONITOR v4）の配線と、動作のしきい値。実機に合わせてここを変更する。
 #include <stdint.h>
 
 // ---- 絶縁出力（基板 J2、PC817。HIGH で出力 ON） ----

@@ -1,6 +1,6 @@
 * 汎用モデル（データシートの代表値に合わせた近似。厳密なメーカーモデルではない）
-* BAT85：小信号ショットキー（Vf ≒ 0.3V @1mA）
-.model BAT85 D(Is=2e-7 N=1.04 Rs=1.5 Cjo=10p BV=30)
+* BAT43：小信号ショットキー（Vf ≒ 0.3V @1mA）
+.model BAT43 D(Is=2e-7 N=1.04 Rs=1.5 Cjo=10p BV=30)
 * PC817 の LED：Vf ≒ 1.2V @20mA
 .model LED817 D(Is=1e-19 N=1.6 Rs=2)
 * 1N4148

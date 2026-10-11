@@ -17,7 +17,7 @@ python3 check_fab.py hijet_starter.kicad_pcb gerber/ | tee fab_report.txt
 rm -f hijet_starter_gerber.zip
 (cd gerber && zip -q ../hijet_starter_gerber.zip *)
 python3 bom.py hijet_starter.kicad_pcb bom.csv
-# 原寸印刷用（実物の DevKitC や部品を当てて穴位置を確認する）
+# 原寸印刷用（実物の ESP32 ボードや部品を当てて穴位置を確認する）
 kicad-cli pcb export pdf -l F.Cu,F.SilkS,Edge.Cuts --black-and-white \
   -o hijet_starter_1to1.pdf hijet_starter.kicad_pcb
 ./render.sh preview

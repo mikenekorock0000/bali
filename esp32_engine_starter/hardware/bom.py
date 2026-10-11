@@ -1,53 +1,75 @@
 #!/usr/bin/env python3
-"""基板の部品から BOM（部品表 CSV）を作る。"""
+"""基板の部品から BOM（部品表 CSV）を作る。購入先は原則として秋月電子通商（URL は商品ページ）。"""
 import csv
+import re
 import sys
 from collections import OrderedDict
 
 import pcbnew
 
-# 値 → 購入時の説明
+AKI = "https://akizukidenshi.com/catalog/g/g{}/"
+
+# 値 → (購入時の説明, 買う単位（部品番号 1 つあたり）, 購入先, URL)
+# 買う単位：数値なら 部品数 × その数。文字列ならそのまま（抵抗は 100 本入り 1 袋など）
 DESC = {
-    "12V IN": "端子台 5.08mm 3P（Phoenix MKDS 1,5/3-5,08 互換）",
-    "OUT": "端子台 3.5mm 8P（Phoenix PT 1,5/8-3,5-H 互換。2P×4 連結でも可）ピッチ 3.5mm（3.81/5.0mm 品は不可）",
-    "AUX IN": "端子台 3.5mm 4P（Phoenix PT 1,5/4-3,5-H 互換）",
-    "PTC 0.75A": "ポリスイッチ（リセッタブルヒューズ）保持電流 0.75A・耐圧 30V 以上・ラジアル 足の間隔 5.0〜5.1mm・本体幅 7.5mm 以下（例：Littelfuse RXEF075）",
-    "1N5819": "ショットキーダイオード 40V 1A（DO-41、立てて実装）逆接保護。SB140 なども可",
-    "P6KE22A": "TVS ダイオード 600W 22V 単方向 P6KE22A（DO-15、立てて実装）。末尾 A の単方向品",
-    "100uF 50V": "電解コンデンサ 100µF 50V φ8mm 足の間隔 3.5mm（105℃品）",
-    "100uF 16V": "電解コンデンサ 100µF 16〜25V φ6.3mm 足の間隔 2.5mm（105℃品）",
-    "OKI-78SR-5/1.5-W36-C": "DC-DC 5V 1.5A Murata OKI-78SR-5/1.5-W36-C",
-    "0.1uF": "積層セラミック 0.1µF(100nF/104) 50V X7R 足の間隔 2.5mm（5.0mm 品は不可）",
-    "100k": "抵抗 100kΩ 1/4W（立てて実装）",
-    "18k": "抵抗 18kΩ 1/4W（立てて実装）",
-    "330": "抵抗 330Ω 1/4W（立てて実装）",
-    "2.2k": "抵抗 2.2kΩ 1/4W（立てて実装）",
-    "10k": "抵抗 10kΩ 1/4W（R15 だけ横置き、ほかは立てて実装）",
-    "BAT85": "小信号ショットキー BAT85 または BAT43（DO-35）電圧測定入力のクランプ",
-    "1N4148": "小信号ダイオード 1N4148（DO-35）入力の逆電圧保護・ブザーの逆起電力吸収",
-    "PC817C": "フォトカプラ PC817C または PC817D（DIP-4）。ランク A・B は電流伝達率が低いので不可",
-    "ESP32 VIN row": "ピンソケット 1×15 2.54mm 高さ 8.5mm（1×40 分割タイプから切り出し可）",
-    "ESP32 3V3 row": "ピンソケット 1×15 2.54mm 高さ 8.5mm（1×40 分割タイプから切り出し可）",
-    "I2C": "ピンヘッダー 1×4 2.54mm",
-    "GPS": "ピンヘッダー 1×4 2.54mm（UART の GPS モジュール用）",
-    "IN": "端子台 3.5mm 6P（Phoenix PT 1,5/6-3,5-H 互換。2P×3 連結でも可）ピッチ 3.5mm",
-    "OBD-II CAN": "端子台 3.5mm 3P（Phoenix PT 1,5/3-3,5-H 互換）ピッチ 3.5mm",
-    "MCP2562-E/P": "CAN トランシーバー MCP2562-E/P または MCP2562FD-E/P（DIP-8）。MCP2561 は 5 番ピンが違うので不可",
-    "Buzzer 5V 12mm": "電子ブザー（自励式・発振回路内蔵）5V φ12mm 足の間隔 7.6mm（6.5mm 品は不可）＋側が長い足",
-    "2SC1815": "NPN トランジスタ 2SC1815-GR または KSC1815（TO-92、足の並び E-C-B。並びが違う品は不可）",
-    "1k": "抵抗 1kΩ 1/4W（立てて実装）",
+    "12V IN": ("端子台 3P 5.08mm TB112-2-3-E-1（ねじが上、電線は横から入るタイプ）", 1, "秋月", AKI.format("101310")),
+    "OUT": ("端子台 2P 5.08mm TB112-2-2-E-1 を 4 個連結して 8P にする（電線は横から入るタイプ）", 4, "秋月", AKI.format("101308")),
+    "IN": ("端子台 2P 5.08mm TB112-2-2-E-1 を 3 個連結して 6P にする", 3, "秋月", AKI.format("101308")),
+    "OBD-II CAN": ("端子台 3P 5.08mm TB112-2-3-E-1", 1, "秋月", AKI.format("101310")),
+    "PTC 0.9A": ("ポリスイッチ RXEF090（保持 0.9A・トリップ 1.8A・72V）足の間隔 5.1mm", 1, "秋月", AKI.format("100778")),
+    "1N5819": ("ショットキーダイオード 1N5819 40V 1A（DO-41、立てて実装）逆接保護", 1, "秋月", AKI.format("117244")),
+    "P6KE20A": ("TVS ダイオード P6KE20A 600W 単方向（DO-15、立てて実装）。秋月に 20V 前後の TVS がないため DigiKey などで買う。"
+                "P6KE22A も可（クランプ 30.6V で DC-DC の上限 32V 以内）", 1, "DigiKey",
+                "https://www.digikey.com/en/products/detail/littelfuse-inc/P6KE20A/285930"),
+    "100uF 50V": ("電解コンデンサ 100µF 50V φ8mm 足の間隔 3.5mm（105℃、Rubycon PX）", 1, "秋月", AKI.format("117905")),
+    "100uF 16V": ("電解コンデンサ 100µF 16V φ6.3mm 高さ 5mm 足の間隔 2.5mm（105℃）", 1, "秋月", AKI.format("105002")),
+    "M78AR05-1": ("DC-DC 5V 1A MINMAX M78AR05-1（三端子レギュレーター互換、入力 6.5〜32V）", 1, "秋月", AKI.format("113536")),
+    "0.1uF": ("積層セラミック 0.1µF 50V X7R 足の間隔 2.5mm（村田製作所）", 1, "秋月", AKI.format("113582")),
+    "100k": ("抵抗 100kΩ 1/4W（立てて実装）", "1 袋（100 本）", "秋月", AKI.format("125104")),
+    "18k": ("抵抗 18kΩ 1/4W（立てて実装）", "1 袋（100 本）", "秋月", AKI.format("125183")),
+    "330": ("抵抗 330Ω 1/4W（立てて実装）", "1 袋（100 本）", "秋月", AKI.format("125331")),
+    "3.3k": ("抵抗 3.3kΩ 1/4W（立てて実装）", "1 袋（100 本）", "秋月", AKI.format("125332")),
+    "10k": ("抵抗 10kΩ 1/4W（立てて実装）", "1 袋（100 本）", "秋月", AKI.format("125103")),
+    "1k": ("抵抗 1kΩ 1/4W（立てて実装）", "1 袋（100 本）", "秋月", AKI.format("125102")),
+    "BAT43": ("小信号ショットキー BAT43（DO-35）電圧測定入力のクランプ", 1, "秋月", AKI.format("113907")),
+    "1N4148": ("小信号ダイオード 1N4148（DO-35）入力の逆電圧保護・ブザーの逆起電力吸収", 1, "秋月", AKI.format("100941")),
+    "SMBJ45CA": ("TVS ダイオード SMBJ45CA 双方向 600W（表面実装 SMB）出力端子のサージ保護。向きはない", 1, "秋月", AKI.format("107410")),
+    "PC817": ("フォトカプラ PC817X3NSZ1B（DIP-4、VCEO 80V、CTR 200〜400%）", 1, "秋月", AKI.format("113765")),
+    "ESP32 VIN row": ("ESP32 DevKit V1 30 ピン（購入済み）を直接はんだ付けする。ピンが付いていないボードはピンヘッダー 1×15 を 2 本付ける", 0, "購入済み", ""),
+    "ESP32 3V3 row": ("（同上）", 0, "", ""),
+    "I2C": ("ピンヘッダー 1×4 2.54mm（1×40 を切って使う。GPS 用と合わせて 1 本）", "1 本（1×40）", "秋月", AKI.format("100167")),
+    "GPS": ("ピンヘッダー 1×4 2.54mm（上の 1×40 から切り出す）", 0, "", ""),
+    "MCP2562-E/P": ("CAN トランシーバー MCP2562FD-E/P（DIP-8）。MCP2561 は 5 番ピンが違うので不可", 1, "秋月", AKI.format("114383")),
+    "Buzzer 5V 12mm": ("電子ブザー（発振回路内蔵）5V φ12mm UGCM1205XP。足の間隔 7.6mm を原寸 PDF で確認", 1, "秋月", AKI.format("109800")),
+    "2SC1815": ("NPN トランジスタ 2SC1815（TO-92、足の並び E-C-B）", 1, "秋月", AKI.format("117089")),
 }
+# 基板に載らないが一緒に買うもの
+EXTRA = [
+    ("取付", "スペーサー M3 10mm（オス・メス）TP-10", "4", "秋月", AKI.format("107566")),
+    ("取付", "なべ小ねじ M3×10（スペーサーの固定用）", "1 袋", "秋月", AKI.format("110253")),
+]
 
 board = pcbnew.LoadBoard(sys.argv[1])
 groups = OrderedDict()
-for fp in sorted(board.GetFootprints(), key=lambda f: f.GetReference()):
+def natural(ref):
+    m = re.match(r"([A-Z]+)(\d+)", ref)
+    return (m.group(1), int(m.group(2)))
+
+
+for fp in sorted(board.GetFootprints(), key=lambda f: natural(f.GetReference())):
     if fp.GetReference().startswith("H"):
         continue
     groups.setdefault(fp.GetValue(), []).append(fp.GetReference())
+missing = [v for v in groups if v not in DESC]
+if missing:
+    sys.exit(f"bom.py の DESC にない部品: {missing}")
 with open(sys.argv[2], "w", newline="", encoding="utf-8-sig") as f:
     w = csv.writer(f)
-    w.writerow(["数量", "部品番号", "値", "内容"])
+    w.writerow(["部品数", "部品番号", "値", "内容", "買う数", "購入先", "URL"])
     for value, refs in groups.items():
-        # ESP32 用ソケットは 1 行にまとめる
-        w.writerow([len(refs), " ".join(refs), value, DESC.get(value, "")])
+        desc, unit, shop, url = DESC[value]
+        buy = unit if isinstance(unit, str) else ("" if unit == 0 else str(len(refs) * unit))
+        w.writerow([len(refs), " ".join(refs), value, desc, buy, shop, url])
+    for ref, desc, buy, shop, url in EXTRA:
+        w.writerow(["", ref, "", desc, buy, shop, url])
 print("wrote", sys.argv[2])

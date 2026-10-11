@@ -1,14 +1,14 @@
-* 絶縁入力：IN+ ─ 2.2k ─ PC817 LED ─ IN-、1N4148 逆並列（逆接続の保護）
+* 絶縁入力：IN+ ─ 3.3k ─ PC817 LED ─ IN-、1N4148 逆並列（逆接続の保護）
 .include models.lib
 Vin inp 0 12
-R7 inp a 2.2k
+R7 inp a 3.3k
 Dled a 0 LED817
 D4 0 a D4148
 .control
-foreach v -16 6 9 12 14.7 16
+foreach v -16 6 9 12 14.7 16 24 35
   alter vin dc = $v
   op
-  echo "  VIN=$v  ILED(mA)=" $&@dled[id]*1000 "  VLED_rev=" $&v(a) "  PR7(mW)=" $&@r7[i]*$&@r7[i]*2200*1000
+  echo "  VIN=$v  ILED(mA)=" $&@dled[id]*1000 "  VLED_rev=" $&v(a) "  PR7(mW)=" $&@r7[i]*$&@r7[i]*3300*1000
 end
 .endc
 .end

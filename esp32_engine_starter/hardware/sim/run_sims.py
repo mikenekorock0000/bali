@@ -22,7 +22,7 @@ def nums(line):
     return [float(x) for x in re.findall(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", line)]
 
 
-print("== 電圧測定（R1 100k / R2 18k、BAT85 クランプ）")
+print("== 電圧測定（R1 100k / R2 18k、BAT43 クランプ）")
 for line in run("vsense.cir").splitlines():
     if "VBAT=" not in line:
         continue
@@ -35,19 +35,23 @@ for line in run("vsense.cir").splitlines():
     elif vb < 0:
         check(f"VBAT {vb}V（逆接続）", vs >= -0.6, f"GPIO34 = {vs:.2f}V（-0.6V 以上なら保護ダイオードの電流は µA 級）")
 
-print("== 絶縁入力（2.2k ＋ PC817 LED、1N4148 逆並列）")
+print("== 絶縁入力（3.3k ＋ PC817 LED、1N4148 逆並列）")
 for line in run("opto_in.cir").splitlines():
     if "VIN=" not in line:
         continue
     m = re.search(r"VIN=(\S+)\s+ILED\(mA\)=\s*(\S+)\*1000\s+VLED_rev=\s*(\S+)", line)
     vin, i, vled = float(m.group(1)), float(m.group(2)) * 1000, float(m.group(3))
+    p = (i / 1000) ** 2 * 3300 * 1000
     if vin < 0:
         check(f"IN {vin}V（逆接続）", vled > -5.0, f"LED の逆電圧 {vled:.2f}V（最大 6V）")
+    elif vin <= 16:
+        # PC817 の CTR は低電流側で半分（50%）に見積もっても、プルアップ 10k の 0.33mA を十分引ける必要がある
+        check(f"IN {vin}V", 1.0 <= i <= 50 and i * 0.5 >= 0.33 * 2 and p < 125,
+              f"LED {i:.1f}mA（最大 50mA）、受光側で {i * 0.5:.1f}mA 以上引ける、3.3k の発熱 {p:.0f}mW（1/4W の半分以下）")
     else:
-        p = (i / 1000) ** 2 * 2200 * 1000
-        # PC817C の CTR は 200% 以上（IF=5mA）。低電流側は半分に見積もってもプルアップ 0.33mA を引ける必要がある
-        check(f"IN {vin}V", 1.5 <= i <= 50 and i * 1.0 >= 0.33 * 2 and p < 125,
-              f"LED {i:.1f}mA（最大 50mA）、受光側で {i * 1.0:.1f}mA 以上引ける、2.2k の発熱 {p:.0f}mW（1/4W の半分以下）")
+        # ジャンプスタート（24V）・抑制後のロードダンプ（35V）。抵抗の短時間過負荷は定格の 2.5 倍（5 秒）まで
+        check(f"IN {vin}V（異常電圧）", i <= 50 and p < 625,
+              f"LED {i:.1f}mA（最大 50mA）、3.3k の発熱 {p:.0f}mW（短時間過負荷 625mW 以下）")
 
 print("== 絶縁出力（GPIO ─ 330Ω ─ PC817 LED）")
 for line in run("opto_out.cir").splitlines():
@@ -75,20 +79,27 @@ loads = {"ESP32（Wi-Fi 送信ピーク、3.3V レギュレーター経由）": 
 i5 = sum(loads.values())
 for k, v in loads.items():
     print(f"     {k}: {v * 1000:.0f}mA")
-eff = 0.85
+eff = 0.80  # M78AR05-1 の効率（データシートの代表値より低めに見積もる）
 for vin in (9.0, 12.0, 14.7):
     iin = 5 * i5 / eff / (vin - 0.4)
     print(f"     入力 {vin}V のとき 12V 側 {iin * 1000:.0f}mA（効率 {eff:.0%}、1N5819 の降下 0.4V）")
 iin9 = 5 * i5 / eff / (9.0 - 0.4)
-check("DC-DC の出力電流", i5 <= 1.5, f"5V 側ピーク {i5 * 1000:.0f}mA（OKI-78SR 最大 1.5A）")
-check("ポリスイッチ（85℃で保持電流が約 6 割に低下）", 0.75 * 0.6 >= iin9,
-      f"保持 0.75A × 0.6 = {0.75 * 0.6:.2f}A ≥ 最大入力 {iin9:.2f}A（9V 時）")
+check("DC-DC の出力電流", i5 <= 1.0, f"5V 側ピーク {i5 * 1000:.0f}mA（M78AR05-1 最大 1A）")
+check("ポリスイッチ（85℃で保持電流が約 6 割に低下）", 0.9 * 0.6 >= iin9,
+      f"RXEF090 保持 0.9A × 0.6 = {0.9 * 0.6:.2f}A ≥ 最大入力 {iin9:.2f}A（9V 時）")
+check("ポリスイッチの耐圧", 72 >= 35, "RXEF090 の最大電圧 72V ≥ 抑制後のロードダンプ 35V")
 check("1N5819 の電流", iin9 <= 1.0, f"{iin9:.2f}A（定格 1A）")
-check("TVS と DC-DC の入力上限", 30.6 <= 36, "P6KE22A のクランプ電圧 30.6V（Ipp 時）≤ OKI-78SR の入力上限 36V")
-check("TVS が通常時に導通しない", 18.8 >= 14.8, "P6KE22A の逆方向スタンドオフ 18.8V ≥ 充電電圧の上限 14.8V")
-check("DC-DC の最低入力", 7.0 <= 9.0, "OKI-78SR の最低入力 7V。始動時の 9V 程度の落ち込みでは止まらない（7V 未満では ESP32 が再起動しうる）")
+check("1N5819 のサージ電流", 22 <= 25, "TVS がクランプするときのピーク 22A（P6KE20A の Ipp）≤ 1N5819 の IFSM 25A")
+check("TVS と DC-DC の入力上限", 27.7 <= 32, "P6KE20A のクランプ電圧 27.7V（Ipp 時）≤ M78AR05-1 の入力上限 32V")
+check("TVS が通常時に導通しない", 17.1 >= 14.8, "P6KE20A の逆方向スタンドオフ 17.1V ≥ 充電電圧の上限 14.8V")
+check("DC-DC の最低入力", 6.5 <= 9.0 - 0.4, "M78AR05-1 の最低入力 6.5V。始動時に 9V まで落ちても 1N5819 の後で 8.6V")
 check("3.3V 系の電流", 0.35 + 0.05 + 0.01 + 0.002 <= 0.8,
       "ESP32 ＋ GPS ＋ センサー ＋ プルアップ 約 0.41A ≤ DevKit の AMS1117（1A、放熱を考え 0.8A まで）")
+
+print("== 出力端子の保護（データシート値）")
+check("出力 TVS が通常時に導通しない", 45 >= 24, "SMBJ45CA のスタンドオフ 45V ≥ ジャンプスタート時の 24V")
+check("出力 TVS のクランプ電圧", 72.7 <= 80, "SMBJ45CA のクランプ 72.7V（Ipp 時）≤ PC817 X 系の VCEO 80V")
+check("出力の電流", 0.05 <= 0.05, "PC817 のコレクタ電流 最大 50mA。リレーのコイルなどは 50mA 以下のもの（またはリレーモジュール）")
 
 print(f"シミュレーション・計算: {len(fails)} 件の問題")
 sys.exit(1 if fails else 0)

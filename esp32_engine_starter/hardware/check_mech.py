@@ -2,7 +2,7 @@
 """DRC では分からない「実物の部品が収まるか」を確認する。
 
 - 部品の足の太さと穴径（足 + 0.15mm 以上の穴か）
-- ESP32 ボードの下に入る部品の高さ
+- ESP32 ボード（直接はんだ付け、下の隙間 2.5mm）の下に部品がないか
 - ESP32 の USB コネクタにケーブルを挿す空間
 - 端子台の電線の差し込み口が基板の外側を向いているか
 - 部品が基板からはみ出していないか
@@ -14,52 +14,52 @@ import sys
 
 import pcbnew
 
-# 値 → (足の最大径 mm, 実装時の高さ mm, 根拠)。角ピンは対角の長さ
+# 値 → (足の最大径 mm, 実装時の高さ mm, 根拠)。角ピンは対角の長さ。表面実装は足 0
 PARTS = {
-    "PC817C": (0.55, 5.0, "DIP-4 足 0.5mm、高さ 3.5mm＋浮き"),
+    "PC817": (0.55, 5.0, "DIP-4 足 0.5mm、高さ 3.5mm＋浮き"),
     "MCP2562-E/P": (0.56, 5.3, "PDIP-8 足 0.46mm、本体 3.3mm＋足の肩"),
     "330": (0.6, 10.0, "1/4W 抵抗（立てる）"),
     "100k": (0.6, 10.0, "1/4W 抵抗（立てる）"),
     "18k": (0.6, 10.0, "1/4W 抵抗（立てる）"),
-    "2.2k": (0.6, 10.0, "1/4W 抵抗（立てる）"),
+    "3.3k": (0.6, 10.0, "1/4W 抵抗（立てる）"),
     "1k": (0.6, 10.0, "1/4W 抵抗（立てる）"),
-    "10k": (0.6, 10.0, "1/4W 抵抗（立てる。R15 だけ横置きで 3mm）"),
+    "10k": (0.6, 10.0, "1/4W 抵抗（立てる）"),
     "1N4148": (0.55, 7.0, "DO-35 足 0.5mm（立てる）"),
-    "BAT85": (0.55, 7.0, "DO-35 足 0.5mm（立てる）"),
+    "BAT43": (0.55, 7.0, "DO-35 足 0.5mm（立てる）"),
     "1N5819": (0.9, 9.0, "DO-41 足 0.86mm（立てる）"),
-    "P6KE22A": (0.9, 11.0, "DO-15 足 0.86mm（立てる）"),
+    "P6KE20A": (0.9, 11.0, "DO-15 足 0.86mm（立てる）"),
+    "SMBJ45CA": (0, 2.6, "表面実装 SMB（DO-214AA）高さ 2.6mm"),
     "0.1uF": (0.55, 6.0, "積層セラミック ラジアル 足 0.5mm"),
     "100uF 50V": (0.6, 12.5, "φ8×11.5mm 電解"),
-    "100uF 16V": (0.55, 12.0, "φ6.3×11mm 電解"),
-    "PTC 0.75A": (0.65, 13.0, "ポリスイッチ ラジアル（RXEF075 相当）足 0.6mm"),
-    "OKI-78SR-5/1.5-W36-C": (0.64, 10.4, "SIP-3、足 0.64mm 角、高さ 10.4mm"),
+    "100uF 16V": (0.55, 6.0, "φ6.3×5.4mm 電解（MH5 など背の低いもの）"),
+    "PTC 0.9A": (0.65, 13.0, "ポリスイッチ RXEF090 足 0.51mm、高さ 12.2mm"),
+    "M78AR05-1": (0.64 * 1.414, 10.7, "SIP-3 本体 11.5×7.55×10.2mm。足は 0.64mm 角以下と想定（対角 0.9mm）"),
     "Buzzer 5V 12mm": (0.65, 9.5, "φ12×9.5mm 電子ブザー"),
     "2SC1815": (0.5, 8.0, "TO-92 足 0.45mm"),
-    "12V IN": (1.15, 10.0, "5.08mm 端子台（足 1.0〜1.1mm）"),
-    "OUT": (1.05, 8.6, "3.5mm 端子台（足 1.0mm）"),
-    "IN": (1.05, 8.6, "3.5mm 端子台（足 1.0mm）"),
-    "OBD-II CAN": (1.05, 8.6, "3.5mm 端子台（足 1.0mm）"),
-    "ESP32 VIN row": (0.64 * 1.414, 8.5, "ピンソケット 0.64mm 角（対角 0.9mm）、高さ 8.5mm"),
-    "ESP32 3V3 row": (0.64 * 1.414, 8.5, "同上"),
+    "12V IN": (1.15, 10.0, "5.08mm 端子台 TB112（推奨穴 1.3mm）"),
+    "OUT": (1.15, 10.0, "5.08mm 端子台 TB112（推奨穴 1.3mm）"),
+    "IN": (1.15, 10.0, "5.08mm 端子台 TB112（推奨穴 1.3mm）"),
+    "OBD-II CAN": (1.15, 10.0, "5.08mm 端子台 TB112（推奨穴 1.3mm）"),
+    "ESP32 VIN row": (0.64 * 1.414, 2.5, "DevKit のピン 0.64mm 角（対角 0.9mm）を直接はんだ付け"),
+    "ESP32 3V3 row": (0.64 * 1.414, 2.5, "同上"),
     "I2C": (0.64 * 1.414, 8.5, "ピンヘッダー 0.64mm 角"),
     "GPS": (0.64 * 1.414, 8.5, "ピンヘッダー 0.64mm 角"),
     "M3": (0, 0, "取付穴"),
 }
-# 横置きにした部品の高さの上書き
-HEIGHT_OVERRIDE = {"R15": 3.0}
 
 # ESP32 DevKit V1（HW-394）の実測：EN ピンからアンテナ側の端まで 6.7mm、VIN から USB 側の端まで 10mm、幅 28.4mm。
-# ソケット 8.5mm ＋ ESP32 側のピンヘッダーの樹脂 2.5mm で、ESP32 の基板の下面は約 11mm の高さ。
-ESP_X, ESP_Y, ESP_ROW, ESP_PINS = 59.0, 14.0, 25.4, 15
+# 直接はんだ付けなので、ESP32 の基板の下面はピンヘッダーの樹脂（2.5mm）の高さ。下には部品を一切置かない。
+ESP_X, ESP_Y, ESP_ROW, ESP_PINS = 62.0, 14.0, 25.4, 15
 DEVKIT = (ESP_X + ESP_ROW / 2 - 14.2, ESP_Y - 6.7, ESP_X + ESP_ROW / 2 + 14.2, ESP_Y + (ESP_PINS - 1) * 2.54 + 10.0)
-UNDER_DEVKIT_MAX_H = 9.5  # 1.5mm の余裕
-# USB プラグ（Type-C / micro のモールド部 幅 12mm まで）を挿す空間。高さ 8mm 以上の部品があると当たる
+UNDER_DEVKIT_MAX_H = 0.0
+# USB プラグ（micro-B のモールド部 幅 12mm・厚さ 8mm まで）を挿す空間。コネクタの中心は基板から約 5.4mm
+# （樹脂 2.5 ＋ DevKit の基板 1.6 ＋ 1.3）なので、プラグの下面は約 1.4mm。リード部品は置けない
 USB_CX = ESP_X + ESP_ROW / 2
 USB_ZONE = (USB_CX - 6.5, DEVKIT[3], USB_CX + 6.5, DEVKIT[3] + 25)
-USB_MAX_H = 7.5
+USB_MAX_H = 1.0
 DRILL_MARGIN = 0.15        # 丸い足：足径 + 0.15mm 以上の穴
 SQUARE_PIN_MARGIN = 0.05   # 角ピン（0.64mm 角）：対角 + 0.05mm 以上（ヘッダーの推奨穴径 1.0mm を満たす）
-SQUARE_PIN_PARTS = {"ESP32 VIN row", "ESP32 3V3 row", "I2C", "GPS"}
+SQUARE_PIN_PARTS = {"ESP32 VIN row", "ESP32 3V3 row", "I2C", "GPS", "M78AR05-1"}
 
 
 def mm(v):
@@ -82,13 +82,12 @@ def main():
             errors.append(f"{ref} {val}: 部品の寸法表にない（check_mech.py に追加すること）")
             continue
         lead, height, why = PARTS[val]
-        height = HEIGHT_OVERRIDE.get(ref, height)
         cy = fp.GetCourtyard(pcbnew.F_CrtYd).BBox() if fp.GetCourtyard(pcbnew.F_CrtYd).OutlineCount() else fp.GetBoundingBox(False, False)
         box = (mm(cy.GetX()), mm(cy.GetY()), mm(cy.GetX() + cy.GetWidth()), mm(cy.GetY() + cy.GetHeight()))
 
         # 穴径
         for p in fp.Pads():
-            if p.GetAttribute() == pcbnew.PAD_ATTRIB_NPTH:
+            if p.GetAttribute() in (pcbnew.PAD_ATTRIB_NPTH, pcbnew.PAD_ATTRIB_SMD):
                 continue
             d = mm(p.GetDrillSize().x)
             margin = SQUARE_PIN_MARGIN if val in SQUARE_PIN_PARTS else DRILL_MARGIN

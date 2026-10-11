@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ハイゼット スターター連携基板（ESP32-DevKitC キャリア）を生成する。
+"""HIJET MONITOR 基板（ESP32 DevKit V1 30 ピンを直接はんだ付けするキャリア）を生成する。
 
 KiCad 7 の pcbnew API で部品を配置し、簡易迷路ルーターで配線、GND ベタを敷いて
 hijet_starter.kicad_pcb を書き出す。ガーバー出力と DRC は build.sh で行う。
@@ -19,7 +19,7 @@ OUT = os.path.join(HERE, "hijet_starter.kicad_pcb")
 FPLIB = "/usr/share/kicad/footprints"
 
 # ---------------------------------------------------------------- 基板寸法
-BOARD_W, BOARD_H = 92.0, 70.0
+BOARD_W, BOARD_H = 98.0, 90.0
 GRID = 0.25            # ルーティング格子 [mm]
 CLEAR = 0.30           # 銅箔間クリアランス [mm]
 EDGE_CLEAR = 0.60      # 基板端からの距離 [mm]
@@ -28,9 +28,9 @@ VIA_D, VIA_DRILL = 0.80, 0.40
 
 POWER_NETS = {"BATT", "12V_F", "12V_P", "+5V", "GND"}
 
-# ESP32 DevKit V1 互換（30 ピン、HW-394）：列間 25.4mm、15 ピン×2。
-# 1 番ピンをアンテナ側（基板の上）にした並び。
-ESP_X, ESP_Y = 59.0, 14.0
+# ESP32 DevKit V1 互換（30 ピン、HW-394）：列間 25.4mm、15 ピン×2。基板に直接はんだ付けする。
+# 1 番ピンをアンテナ側（基板の上）にした並び。ESP32 の下（約 2.5mm の隙間）には部品を置かない。
+ESP_X, ESP_Y = 62.0, 14.0
 ESP_ROW = 25.4
 ESP_L = {2: "G36", 4: "VSENSE", 5: "G35", 6: "G32", 7: "G33", 8: "G25", 9: "G26", 10: "G27",
          13: "G13", 14: "GND", 15: "+5V"}  # EN VP VN D34 D35 D32 D33 D25 D26 D27 D14 D12 D13 GND VIN
@@ -54,107 +54,117 @@ RV = ("Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical")
 D35V = ("Diode_THT", "D_DO-35_SOD27_P5.08mm_Vertical_KathodeUp")
 CDISC = ("Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P2.50mm")
 DIP4 = ("Package_DIP", "DIP-4_W7.62mm")
+# 端子台はすべて 5.08mm ピッチ（秋月で買える TB112 系。2P を連結して 6P・8P にする）
+TB = "TerminalBlock_Phoenix"
+
+
+def tb(n):
+    return f"TerminalBlock_Phoenix_MKDS-1,5-{n}-5.08_1x{n:02d}_P5.08mm_Horizontal"
+
 
 # ---- 中央列：電源（端子 → ポリスイッチ → 逆接保護 → TVS/コンデンサ → DC-DC）と電圧測定・ブザー
-part("J1", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal",
-     53.0, 5.8, 180, {"1": "BATT", "2": "GND", "3": "12V_F"}, "12V IN")
+part("J1", TB, tb(3), 53.0, 5.8, 180, {"1": "BATT", "2": "GND", "3": "12V_F"}, "12V IN")
 part("F1", "Capacitor_THT", "C_Disc_D7.5mm_W5.0mm_P5.00mm", 41.0, 17.0, 0,
-     {"1": "BATT", "2": "12V_F"}, "PTC 0.75A")
+     {"1": "BATT", "2": "12V_F"}, "PTC 0.9A")
 part("D1", "Diode_THT", "D_DO-41_SOD81_P5.08mm_Vertical_KathodeUp", 49.5, 15.5, 0,
      {"1": "12V_P", "2": "12V_F"}, "1N5819")
 part("D2", "Diode_THT", "D_DO-15_P5.08mm_Vertical_KathodeUp", 49.5, 21.5, 0,
-     {"1": "12V_P", "2": "GND"}, "P6KE22A")
+     {"1": "12V_P", "2": "GND"}, "P6KE20A")
 part("C1", "Capacitor_THT", "CP_Radial_D8.0mm_P3.50mm", 40.5, 25.5, 0,
      {"1": "12V_P", "2": "GND"}, "100uF 50V")
 part("C2", "Capacitor_THT", "CP_Radial_D6.3mm_P2.50mm", 51.0, 27.0, 0,
      {"1": "+5V", "2": "GND"}, "100uF 16V")
 part("U1", "Converter_DCDC", "Converter_DCDC_Murata_OKI-78SR_Vertical", 40.5, 37.0, 0,
-     {"1": "12V_P", "2": "GND", "3": "+5V"}, "OKI-78SR-5/1.5-W36-C")
+     {"1": "12V_P", "2": "GND", "3": "+5V"}, "M78AR05-1")
 part("R1", *RV, 50.5, 34.0, 0, {"1": "12V_F", "2": "VSENSE"}, "100k")
 part("R2", *RV, 50.5, 38.0, 0, {"1": "GND", "2": "VSENSE"}, "18k")
 part("C4", *CDISC, 51.0, 42.0, 0, {"1": "VSENSE", "2": "GND"}, "0.1uF")
-part("D3", *D35V, 50.5, 46.0, 0, {"1": "+3V3", "2": "VSENSE"}, "BAT85")
-part("C3", *CDISC, 55.5, 55.0, 90, {"1": "+5V", "2": "GND"}, "0.1uF")
+part("D3", *D35V, 50.5, 46.0, 0, {"1": "+3V3", "2": "VSENSE"}, "BAT43")
+part("C3", *CDISC, 58.0, 52.0, 90, {"1": "+5V", "2": "GND"}, "0.1uF")
 
 # ブザー（5V 自励式）：GPIO13 → 1k → 2SC1815（E-C-B）。10k で起動時に OFF、1N4148 で逆起電力吸収
-part("BZ1", "Buzzer_Beeper", "Buzzer_12x9.5RM7.6", 40.5, 54.0, 0, {"1": "+5V", "2": "BZN"}, "Buzzer 5V 12mm")
-part("D7", *D35V, 38.5, 63.0, 0, {"1": "+5V", "2": "BZN"}, "1N4148")
-part("Q1", "Package_TO_SOT_THT", "TO-92_Inline_Wide", 38.5, 67.5, 0,
+part("BZ1", "Buzzer_Beeper", "Buzzer_12x9.5RM7.6", 43.5, 54.0, 0, {"1": "+5V", "2": "BZN"}, "Buzzer 5V 12mm")
+part("D7", *D35V, 41.5, 63.0, 0, {"1": "+5V", "2": "BZN"}, "1N4148")
+part("Q1", "Package_TO_SOT_THT", "TO-92_Inline_Wide", 41.5, 67.5, 0,
      {"1": "GND", "2": "BZN", "3": "QB"}, "2SC1815")
-part("R13", *RV, 46.8, 63.0, 0, {"1": "QB", "2": "G13"}, "1k")
-part("R14", *RV, 46.8, 67.5, 0, {"1": "QB", "2": "GND"}, "10k")
+part("R13", *RV, 49.8, 63.0, 0, {"1": "QB", "2": "G13"}, "1k")
+part("R14", *RV, 49.8, 67.5, 0, {"1": "QB", "2": "GND"}, "10k")
 
-# ---- ESP32 DevKit V1（30 ピン）用ソケット。下の空間に背の低い部品を置く
-part("J5", "Connector_PinSocket_2.54mm", "PinSocket_1x15_P2.54mm_Vertical", ESP_X, ESP_Y, 0,
+# ---- ESP32 DevKit V1（30 ピン）。ボードのピンを直接はんだ付けする（振動でソケットが緩むのを避ける）
+part("J5", "Connector_PinHeader_2.54mm", "PinHeader_1x15_P2.54mm_Vertical", ESP_X, ESP_Y, 0,
      {str(k): v for k, v in ESP_L.items()}, "ESP32 VIN row")
-part("J6", "Connector_PinSocket_2.54mm", "PinSocket_1x15_P2.54mm_Vertical", ESP_X + ESP_ROW, ESP_Y, 0,
+part("J6", "Connector_PinHeader_2.54mm", "PinHeader_1x15_P2.54mm_Vertical", ESP_X + ESP_ROW, ESP_Y, 0,
      {str(k): v for k, v in ESP_R.items()}, "ESP32 3V3 row")
 
-# OBD-II（CAN）：MCP2562（VDD=5V、VIO=3.3V）。STBY は 10k で待機側に固定し、GPIO4 で LOW にしたときだけ動作
-part("U9", "Package_DIP", "DIP-8_W7.62mm", 65.0, 33.0, 0,
+# OBD-II（CAN）：MCP2562（VDD=5V、VIO=3.3V）。STBY は 10k で待機側に固定し、GPIO4 で LOW にしたときだけ動作。
+# ESP32 の下ではなく、その左下（USB ケーブルの通り道の左）に置く
+part("U9", "Package_DIP", "DIP-8_W7.62mm", 58.0, 69.0, 0,
      {"1": "G18", "2": "GND", "3": "+5V", "4": "G19", "5": "+3V3", "6": "CANL", "7": "CANH",
       "8": "STBY"}, "MCP2562-E/P")
-part("C5", *CDISC, 65.0, 45.5, 0, {"1": "+5V", "2": "GND"}, "0.1uF")
-part("C6", *CDISC, 76.0, 45.0, 90, {"1": "+3V3", "2": "GND"}, "0.1uF")
-part("R15", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", 72.0, 29.0, 0,
-     {"1": "STBY", "2": "+3V3"}, "10k")
-part("J7", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-3-3.5-H_1x03_P3.50mm_Horizontal",
-     55.5, 64.0, 0, {"1": "CANH", "2": "CANL", "3": "GND"}, "OBD-II CAN")
+part("C5", *CDISC, 56.5, 80.5, 0, {"1": "+5V", "2": "GND"}, "0.1uF")
+part("C6", *CDISC, 62.0, 80.5, 0, {"1": "+3V3", "2": "GND"}, "0.1uF")
+part("R15", *RV, 58.5, 63.5, 0, {"1": "STBY", "2": "+3V3"}, "10k")
+part("J7", TB, tb(3), 38.0, 84.4, 0, {"1": "CANH", "2": "CANL", "3": "GND"}, "OBD-II CAN")
 
 # ---- 右端：I2C と GPS（UART2）のピンヘッダー。1 番（四角）が GND
-part("J4", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", 89.5, 18.0, 0,
+part("J4", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", 93.5, 18.0, 0,
      {"1": "GND", "2": "+3V3", "3": "SCL", "4": "SDA"}, "I2C")
-part("J8", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", 89.5, 31.0, 0,
+part("J8", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", 93.5, 31.0, 0,
      {"1": "GND", "2": "+3V3", "3": "G17", "4": "G16"}, "GPS")
 
-# ---- 左列：絶縁出力 4ch（1ch は車両の施錠信号用）
+# ---- 左列：絶縁出力 4ch（1ch は車両の施錠信号用）。端子の 2 本の間に双方向 TVS（SMBJ45CA）を入れ、
+# 配線から入るサージ・リレーコイルの逆起電力からフォトカプラ（PC817 X 系 80V）を守る
 OUT_GPIO = ["G25", "G26", "G27", "G32"]
 OUT_NAME = ["LOCK", "OUT2", "OUT3", "OUT4"]
+J2_Y0, J3_Y0, TB_X = 10.5, 53.5, 5.6
 j2nets = {}
 for k in range(4):
-    ye = 10.5 + 7 * k
-    part(f"U{2 + k}", *DIP4, 22.12, ye + 2.54, 180,
-         {"1": f"LED{k + 1}", "2": "GND", "3": f"O{k + 1}E", "4": f"O{k + 1}C"}, "PC817C")
-    part(f"R{3 + k}", *RV, 25.5, ye + 2.54, 0, {"1": f"LED{k + 1}", "2": OUT_GPIO[k]}, "330")
+    ye = J2_Y0 + 10.16 * k  # E（−）の端子の位置。C（＋）は +5.08
+    part(f"U{2 + k}", *DIP4, 27.0, ye + 2.54, 180,
+         {"1": f"LED{k + 1}", "2": "GND", "3": f"O{k + 1}E", "4": f"O{k + 1}C"}, "PC817")
+    part(f"R{3 + k}", *RV, 30.4, ye + 2.54, 0, {"1": f"LED{k + 1}", "2": OUT_GPIO[k]}, "330")
+    part(f"D{8 + k}", "Diode_SMD", "D_SMB_Handsoldering", 14.0, ye + 2.54, 90,
+         {"1": f"O{k + 1}C", "2": f"O{k + 1}E"}, "SMBJ45CA")
     j2nets[str(2 * k + 1)] = f"O{k + 1}E"
     j2nets[str(2 * k + 2)] = f"O{k + 1}C"
-part("J2", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-8-3.5-H_1x08_P3.50mm_Horizontal",
-     5.5, 10.0, 270, j2nets, "OUT")
+part("J2", TB, tb(8), TB_X, J2_Y0, 270, j2nets, "OUT")
 
-# ---- 左列：絶縁入力 3ch（IN+ → 2.2k → PC817 LED → IN-、1N4148 で逆電圧保護）。3ch 目は ACC 検知
+# ---- 左列：絶縁入力 3ch（IN+ → 3.3k → PC817 LED → IN-、1N4148 で逆電圧保護）。3ch 目は ACC 検知
 IN_GPIO = ["G33", "G35", "G36"]
 for k in range(3):
-    y = 39.0 + 7 * k
-    part(f"R{7 + k}", *RV, 12.0, y, 0, {"1": f"IN{k + 1}P", "2": f"IN{k + 1}A"}, "2.2k")
-    part(f"D{4 + k}", *D35V, 17.08, y + 3.5, 180, {"1": f"IN{k + 1}A", "2": f"IN{k + 1}N"}, "1N4148")
-    part(f"U{6 + k}", *DIP4, 20.5, y, 0,
-         {"1": f"IN{k + 1}A", "2": f"IN{k + 1}N", "3": "GND", "4": IN_GPIO[k]}, "PC817C")
-    part(f"R{10 + k}", *RV, 31.0, y, 0, {"1": IN_GPIO[k], "2": "+3V3"}, "10k")
-part("J3", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-6-3.5-H_1x06_P3.50mm_Horizontal",
-     5.5, 39.0, 270, {"1": "IN1P", "2": "IN1N", "3": "IN2P", "4": "IN2N", "5": "IN3P", "6": "IN3N"},
-     "IN")
+    y = J3_Y0 + 10.16 * k
+    part(f"R{7 + k}", *RV, 14.0, y, 0, {"1": f"IN{k + 1}P", "2": f"IN{k + 1}A"}, "3.3k")
+    part(f"D{4 + k}", *D35V, 19.08, y + 3.5, 180, {"1": f"IN{k + 1}A", "2": f"IN{k + 1}N"}, "1N4148")
+    part(f"U{6 + k}", *DIP4, 22.5, y, 0,
+         {"1": f"IN{k + 1}A", "2": f"IN{k + 1}N", "3": "GND", "4": IN_GPIO[k]}, "PC817")
+    part(f"R{10 + k}", *RV, 33.0, y, 0, {"1": IN_GPIO[k], "2": "+3V3"}, "10k")
+part("J3", TB, tb(6), TB_X, J3_Y0, 270,
+     {"1": "IN1P", "2": "IN1N", "3": "IN2P", "4": "IN2N", "5": "IN3P", "6": "IN3N"}, "IN")
 
-for i, (x, y) in enumerate([(3.5, 3.5), (88.5, 3.5), (3.5, 66.5), (88.5, 66.5)]):
+for i, (x, y) in enumerate([(3.5, 3.5), (BOARD_W - 3.5, 3.5), (3.5, BOARD_H - 3.5), (BOARD_W - 3.5, BOARD_H - 3.5)]):
     part(f"H{i + 1}", "MountingHole", "MountingHole_3.2mm_M3", x, y, 0, {}, "M3")
 
 L, R, C = "L", "R", "C"
+USB_CX = ESP_X + ESP_ROW / 2
 SILK = [
     # (文字, x, y, 角度, 大きさ, 揃え)
     ("+12V", 53.0, 12.6, 0, 0.8, C), ("GND", 47.92, 12.6, 0, 0.8, C), ("OUT", 42.84, 12.6, 0, 0.8, C),
-    ("CAN", 66.0, 66.5, 0, 0.8, L),
-    ("H", 55.5, 59.6, 0, 0.8, C), ("L", 59.0, 59.6, 0, 0.8, C), ("G", 62.5, 59.6, 0, 0.8, C),
-    ("I2C", 89.5, 15.5, 0, 0.8, C), ("GPS", 89.5, 28.5, 0, 0.8, C),
-    ("HIJET MONITOR v3", 71.7, 52.5, 0, 1.0, C),
-    ("USB side", 71.7, 56.5, 0, 0.8, C),
+    ("CAN", 34.5, 77.5, 0, 0.8, R),
+    ("H", 38.0, 77.5, 0, 0.8, C), ("L", 43.08, 77.5, 0, 0.8, C), ("G", 48.16, 77.5, 0, 0.8, C),
+    ("I2C", 93.5, 15.5, 0, 0.8, C), ("GPS", 93.5, 28.5, 0, 0.8, C),
+    ("HIJET MONITOR v4", USB_CX, 66.0, 0, 1.0, C),
+    ("USB cable", USB_CX, 70.0, 0, 0.8, C),
+    ("keep clear", USB_CX, 72.0, 0, 0.8, C),
 ]
 for k in range(4):
-    SILK.append((f"+ {OUT_NAME[k]} -", 11.2, 11.75 + 7 * k, 90, 0.8, C))
+    SILK.append((f"+ {OUT_NAME[k]} -", 17.3, J2_Y0 + 2.54 + 10.16 * k, 90, 0.8, C))
 for k, name in enumerate(["IN1", "IN2", "ACC"]):
-    SILK.append((f"- {name} +", 9.9, 40.75 + 7 * k, 90, 0.8, C))
+    SILK.append((f"+ {name} -", 12.0, J3_Y0 + 2.54 + 10.16 * k, 270, 0.8, C))
 
 # 部品番号の位置の上書き：立てる部品は既定で本体の上（-2mm）。("rel", dx, dy) はパッド中点から、
 # ("abs", x, y) は絶対位置
-REF_POS = {"D1": ("rel", 0, 2.6), "Q1": ("abs", 35.5, 67.5), "D3": ("rel", 0, 2.0), "C2": ("abs", 56.6, 27.0)}
+REF_POS = {"D1": ("rel", 0, 2.6), "Q1": ("abs", 38.5, 67.5), "D3": ("rel", 0, 2.0), "C2": ("abs", 56.6, 27.0),
+           "C5": ("abs", 57.75, 83.2), "C6": ("abs", 63.25, 83.2)}
 
 # ---------------------------------------------------------------- ボード生成
 
@@ -400,7 +410,11 @@ class Router:
             for l in (0, 1):
                 blk[l][max(0, j - r): j + r + 1, max(0, i - r): i + r + 1] &= False
 
-        connected = {(l,) + padcells(pads[0]) for l in (0, 1)}
+        def padlayers(p):
+            # 表面実装パッド（TVS）は表面だけ。そこへは表面の配線で入る
+            return (0,) if p.GetAttribute() == pcbnew.PAD_ATTRIB_SMD else (0, 1)
+
+        connected = {(l,) + padcells(pads[0]) for l in padlayers(pads[0])}
         remaining = list(pads[1:])
         segments = []
         # 近い順に繋ぐ
@@ -414,17 +428,17 @@ class Router:
             remaining.sort(key=dist)
             tgt = remaining.pop(0)
             tj, ti = padcells(tgt)
-            path = self.astar(src, (tj, ti), blk, via_ok)
+            path = self.astar(src, (tj, ti), blk, via_ok, padlayers(tgt))
             if path is None:
                 return False, segments
             segments.append(path)
             for s in path:
                 connected.add(s)
-            connected.add((0, tj, ti))
-            connected.add((1, tj, ti))
+            for l in padlayers(tgt):
+                connected.add((l, tj, ti))
         return True, segments
 
-    def astar(self, sources, target, blk, via_ok):
+    def astar(self, sources, target, blk, via_ok, tlayers=(0, 1)):
         tj, ti = target
         VIA_COST = 30
         moves = [(0, 1, 1.0), (1, 0, 1.0), (0, -1, 1.0), (-1, 0, 1.0),
@@ -443,7 +457,7 @@ class Router:
             if gc > g.get(s, 1e18):
                 continue
             l, j, i = s
-            if j == tj and i == ti:
+            if j == tj and i == ti and l in tlayers:
                 path = []
                 while s is not None:
                     path.append(s)
