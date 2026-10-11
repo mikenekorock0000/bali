@@ -63,11 +63,13 @@ def tb(n):
 
 
 # ---- 中央列：電源（端子 → ポリスイッチ → 逆接保護 → TVS/コンデンサ → DC-DC）と電圧測定・ブザー
+# 逆接保護は 3A のショットキー（ポリスイッチがトリップするまでの 1.1〜2.2A を流しても余裕がある）
 part("J1", TB, tb(3), 53.0, 5.8, 180, {"1": "BATT", "2": "GND", "3": "12V_F"}, "12V IN")
-part("F1", "Capacitor_THT", "C_Disc_D7.5mm_W5.0mm_P5.00mm", 41.0, 17.0, 0,
-     {"1": "BATT", "2": "12V_F"}, "PTC 0.9A")
-part("D1", "Diode_THT", "D_DO-41_SOD81_P5.08mm_Vertical_KathodeUp", 49.5, 15.5, 0,
-     {"1": "12V_P", "2": "12V_F"}, "1N5819")
+# ポリスイッチは本体が大きい（幅 12.8mm）ので、基板の上の端（出力回路の上）に横向きに置く
+part("F1", "footprints", "PTC_Radial_W12.8mm_T3.0mm_P5.10mm", 24.0, 4.0, 0,
+     {"1": "BATT", "2": "12V_F"}, "PTC 1.1A")
+part("D1", "Diode_THT", "D_DO-15_P5.08mm_Vertical_KathodeUp", 49.5, 15.5, 0,
+     {"1": "12V_P", "2": "12V_F"}, "SB340LS")
 part("D2", "Diode_THT", "D_DO-15_P5.08mm_Vertical_KathodeUp", 49.5, 21.5, 0,
      {"1": "12V_P", "2": "GND"}, "P6KE20A")
 part("C1", "Capacitor_THT", "CP_Radial_D8.0mm_P3.50mm", 40.5, 25.5, 0,
@@ -210,7 +212,8 @@ def build_board():
         return nets[name]
 
     for ref, lib, fpn, x, y, rot, padnets, value in PARTS:
-        fp = pcbnew.FootprintLoad(os.path.join(FPLIB, lib + ".pretty"), fpn)
+        libdir = os.path.join(HERE, lib + ".pretty") if lib == "footprints" else os.path.join(FPLIB, lib + ".pretty")
+        fp = pcbnew.FootprintLoad(libdir, fpn)
         if fp is None:
             sys.exit(f"footprint not found: {lib}:{fpn}")
         fp.SetReference(ref)
