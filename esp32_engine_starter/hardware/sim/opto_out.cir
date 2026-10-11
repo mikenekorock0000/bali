@@ -1,0 +1,14 @@
+* 絶縁出力：GPIO（3.3V、出力抵抗 約 30Ω）─ 470Ω ─ PC817 LED
+.include models.lib
+Vg g 0 3.3
+Rout g g1 30
+R3 g1 a 330
+Dled a 0 LED817
+.control
+foreach v 3.0 3.3
+  alter vg dc = $v
+  op
+  echo "  VGPIO=$v  IF(mA)=" $&@dled[id]*1000
+end
+.endc
+.end

@@ -59,7 +59,7 @@ DIP4 = ("Package_DIP", "DIP-4_W7.62mm")
 part("J1", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal",
      53.0, 5.8, 180, {"1": "BATT", "2": "GND", "3": "12V_F"}, "12V IN")
 part("F1", "Capacitor_THT", "C_Disc_D7.5mm_W5.0mm_P5.00mm", 41.0, 17.0, 0,
-     {"1": "BATT", "2": "12V_F"}, "PTC 0.5A")
+     {"1": "BATT", "2": "12V_F"}, "PTC 0.75A")
 part("D1", "Diode_THT", "D_DO-41_SOD81_P5.08mm_Vertical_KathodeUp", 49.5, 15.5, 0,
      {"1": "12V_P", "2": "12V_F"}, "1N5819")
 part("D2", "Diode_THT", "D_DO-15_P5.08mm_Vertical_KathodeUp", 49.5, 21.5, 0,
@@ -71,18 +71,18 @@ part("C2", "Capacitor_THT", "CP_Radial_D6.3mm_P2.50mm", 51.0, 27.0, 0,
 part("U1", "Converter_DCDC", "Converter_DCDC_Murata_OKI-78SR_Vertical", 40.5, 37.0, 0,
      {"1": "12V_P", "2": "GND", "3": "+5V"}, "OKI-78SR-5/1.5-W36-C")
 part("R1", *RV, 50.5, 34.0, 0, {"1": "12V_F", "2": "VSENSE"}, "100k")
-part("R2", *RV, 50.5, 38.0, 0, {"1": "GND", "2": "VSENSE"}, "22k")
+part("R2", *RV, 50.5, 38.0, 0, {"1": "GND", "2": "VSENSE"}, "18k")
 part("C4", *CDISC, 51.0, 42.0, 0, {"1": "VSENSE", "2": "GND"}, "0.1uF")
 part("D3", *D35V, 50.5, 46.0, 0, {"1": "+3V3", "2": "VSENSE"}, "BAT85")
 part("C3", *CDISC, 55.5, 55.0, 90, {"1": "+5V", "2": "GND"}, "0.1uF")
 
 # ブザー（5V 自励式）：GPIO13 → 1k → 2SC1815（E-C-B）。10k で起動時に OFF、1N4148 で逆起電力吸収
 part("BZ1", "Buzzer_Beeper", "Buzzer_12x9.5RM7.6", 40.5, 54.0, 0, {"1": "+5V", "2": "BZN"}, "Buzzer 5V 12mm")
-part("D7", *D35V, 40.0, 63.0, 0, {"1": "+5V", "2": "BZN"}, "1N4148")
-part("Q1", "Package_TO_SOT_THT", "TO-92_Inline_Wide", 40.0, 67.5, 0,
+part("D7", *D35V, 38.5, 63.0, 0, {"1": "+5V", "2": "BZN"}, "1N4148")
+part("Q1", "Package_TO_SOT_THT", "TO-92_Inline_Wide", 38.5, 67.5, 0,
      {"1": "GND", "2": "BZN", "3": "QB"}, "2SC1815")
-part("R13", *RV, 48.0, 63.0, 0, {"1": "QB", "2": "G13"}, "1k")
-part("R14", *RV, 48.0, 67.5, 0, {"1": "QB", "2": "GND"}, "10k")
+part("R13", *RV, 46.8, 63.0, 0, {"1": "QB", "2": "G13"}, "1k")
+part("R14", *RV, 46.8, 67.5, 0, {"1": "QB", "2": "GND"}, "10k")
 
 # ---- ESP32 DevKit V1（30 ピン）用ソケット。下の空間に背の低い部品を置く
 part("J5", "Connector_PinSocket_2.54mm", "PinSocket_1x15_P2.54mm_Vertical", ESP_X, ESP_Y, 0,
@@ -96,9 +96,10 @@ part("U9", "Package_DIP", "DIP-8_W7.62mm", 65.0, 33.0, 0,
       "8": "STBY"}, "MCP2562-E/P")
 part("C5", *CDISC, 65.0, 45.5, 0, {"1": "+5V", "2": "GND"}, "0.1uF")
 part("C6", *CDISC, 76.0, 45.0, 90, {"1": "+3V3", "2": "GND"}, "0.1uF")
-part("R15", *RV, 76.0, 30.0, 0, {"1": "STBY", "2": "+3V3"}, "10k")
+part("R15", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", 72.0, 29.0, 0,
+     {"1": "STBY", "2": "+3V3"}, "10k")
 part("J7", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-3-3.5-H_1x03_P3.50mm_Horizontal",
-     72.0, 64.0, 0, {"1": "CANH", "2": "CANL", "3": "GND"}, "OBD-II CAN")
+     55.5, 64.0, 0, {"1": "CANH", "2": "CANL", "3": "GND"}, "OBD-II CAN")
 
 # ---- 右端：I2C と GPS（UART2）のピンヘッダー。1 番（四角）が GND
 part("J4", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", 89.5, 18.0, 0,
@@ -114,7 +115,7 @@ for k in range(4):
     ye = 10.5 + 7 * k
     part(f"U{2 + k}", *DIP4, 22.12, ye + 2.54, 180,
          {"1": f"LED{k + 1}", "2": "GND", "3": f"O{k + 1}E", "4": f"O{k + 1}C"}, "PC817C")
-    part(f"R{3 + k}", *RV, 25.5, ye + 2.54, 0, {"1": f"LED{k + 1}", "2": OUT_GPIO[k]}, "470")
+    part(f"R{3 + k}", *RV, 25.5, ye + 2.54, 0, {"1": f"LED{k + 1}", "2": OUT_GPIO[k]}, "330")
     j2nets[str(2 * k + 1)] = f"O{k + 1}E"
     j2nets[str(2 * k + 2)] = f"O{k + 1}C"
 part("J2", "TerminalBlock_Phoenix", "TerminalBlock_Phoenix_PT-1,5-8-3.5-H_1x08_P3.50mm_Horizontal",
@@ -140,8 +141,8 @@ L, R, C = "L", "R", "C"
 SILK = [
     # (文字, x, y, 角度, 大きさ, 揃え)
     ("+12V", 53.0, 12.6, 0, 0.8, C), ("GND", 47.92, 12.6, 0, 0.8, C), ("OUT", 42.84, 12.6, 0, 0.8, C),
-    ("CAN", 68.5, 64.0, 0, 0.8, R),
-    ("H", 72.0, 59.3, 0, 0.8, C), ("L", 75.5, 59.3, 0, 0.8, C), ("G", 79.0, 59.3, 0, 0.8, C),
+    ("CAN", 66.0, 66.5, 0, 0.8, L),
+    ("H", 55.5, 59.6, 0, 0.8, C), ("L", 59.0, 59.6, 0, 0.8, C), ("G", 62.5, 59.6, 0, 0.8, C),
     ("I2C", 89.5, 15.5, 0, 0.8, C), ("GPS", 89.5, 28.5, 0, 0.8, C),
     ("HIJET MONITOR v3", 71.7, 52.5, 0, 1.0, C),
     ("USB side", 71.7, 56.5, 0, 0.8, C),
@@ -153,7 +154,7 @@ for k, name in enumerate(["IN1", "IN2", "ACC"]):
 
 # 部品番号の位置の上書き：立てる部品は既定で本体の上（-2mm）。("rel", dx, dy) はパッド中点から、
 # ("abs", x, y) は絶対位置
-REF_POS = {"D1": ("rel", 0, 2.6), "Q1": ("abs", 37.0, 67.5), "D3": ("rel", 0, 2.0), "C2": ("abs", 56.6, 27.0)}
+REF_POS = {"D1": ("rel", 0, 2.6), "Q1": ("abs", 35.5, 67.5), "D3": ("rel", 0, 2.0), "C2": ("abs", 56.6, 27.0)}
 
 # ---------------------------------------------------------------- ボード生成
 
@@ -215,7 +216,7 @@ def build_board():
         fp.Value().SetLayer(pcbnew.F_Fab)
         ref = fp.Reference()
         ref.SetTextSize(pcbnew.VECTOR2I(mm(0.8), mm(0.8)))
-        ref.SetTextThickness(mm(0.12))
+        ref.SetTextThickness(mm(0.16))  # JLCPCB のシルク最小線幅 0.153mm 以上
         if ref.GetText().startswith("H") or ref.GetText() in ("J1", "J2", "J3", "J4", "J7", "J8"):
             ref.SetVisible(False)  # 取付穴と端子台はシルクの文字で用途を示す
         name = ref.GetText()
@@ -247,7 +248,7 @@ def build_board():
         t.SetPosition(pcbnew.VECTOR2I(mm(x), mm(y)))
         t.SetLayer(pcbnew.F_SilkS)
         t.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
-        t.SetTextThickness(mm(size * 0.15))
+        t.SetTextThickness(mm(max(0.16, size * 0.15)))
         t.SetTextAngleDegrees(rot)
         t.SetHorizJustify({"L": pcbnew.GR_TEXT_H_ALIGN_LEFT, "R": pcbnew.GR_TEXT_H_ALIGN_RIGHT,
                            "C": pcbnew.GR_TEXT_H_ALIGN_CENTER}[just])
@@ -523,6 +524,62 @@ class Router:
 GND_LINKS = []
 
 
+def split_t_junctions(board):
+    """配線の端が別の配線の途中に乗っている T 字分岐で、相手側の配線をその点で分割する。"""
+    changed = True
+    while changed:
+        changed = False
+        tracks = [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK"]
+        for t in tracks:
+            for end in (t.GetStart(), t.GetEnd()):
+                for o in tracks:
+                    if o is t or o.GetLayer() != t.GetLayer() or o.GetNetCode() != t.GetNetCode():
+                        continue
+                    a, b = o.GetStart(), o.GetEnd()
+                    if end == a or end == b:
+                        continue
+                    # end が線分 a-b の上にあるか（格子上の点なので整数で厳密に判定できる）
+                    cross = (b.x - a.x) * (end.y - a.y) - (b.y - a.y) * (end.x - a.x)
+                    within = min(a.x, b.x) <= end.x <= max(a.x, b.x) and min(a.y, b.y) <= end.y <= max(a.y, b.y)
+                    if abs(cross) > 1000 * 1000 or not within:
+                        continue
+                    n = pcbnew.PCB_TRACK(board)
+                    n.SetStart(end)
+                    n.SetEnd(b)
+                    n.SetWidth(o.GetWidth())
+                    n.SetLayer(o.GetLayer())
+                    n.SetNet(o.GetNet())
+                    o.SetEnd(end)
+                    board.Add(n)
+                    changed = True
+                    break
+                if changed:
+                    break
+            if changed:
+                break
+
+
+def remove_dangling(board):
+    """どこにもつながらない端を持つ配線（ルーターの折り返しで出る切れ端）を取り除く。"""
+    while True:
+        tracks = [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK"]
+        vias = [t for t in board.GetTracks() if t.GetClass() == "PCB_VIA"]
+        pads = [p for fp in board.GetFootprints() for p in fp.Pads()]
+        removed = 0
+        for t in tracks:
+            for end in (t.GetStart(), t.GetEnd()):
+                ok = any(p.GetNetCode() == t.GetNetCode() and p.HitTest(end) for p in pads)
+                ok = ok or any(v.GetNetCode() == t.GetNetCode() and v.HitTest(end) for v in vias)
+                ok = ok or any(o is not t and o.GetLayer() == t.GetLayer() and o.GetNetCode() == t.GetNetCode()
+                               and o.HitTest(end) for o in tracks)
+                if not ok:
+                    board.Remove(t)
+                    removed += 1
+                    break
+        if not removed:
+            return
+
+
 def find_pad(board, ref, num):
     return [p for p in board.FindFootprintByReference(ref).Pads() if p.GetNumber() == num][0]
 
@@ -583,6 +640,8 @@ def main():
         print(f"route GND {a}-{b} {'ok' if ok else 'FAILED'}")
         if not ok:
             failed.append(f"GND {a}-{b}")
+    split_t_junctions(board)
+    remove_dangling(board)
     add_zones(board, nets)
     board.Save(OUT)
     # 新規 BOARD のままだと ZONE_FILLER が落ちるため、読み直してから塗りつぶす

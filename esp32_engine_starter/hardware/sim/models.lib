@@ -1,0 +1,11 @@
+* 汎用モデル（データシートの代表値に合わせた近似。厳密なメーカーモデルではない）
+* BAT85：小信号ショットキー（Vf ≒ 0.3V @1mA）
+.model BAT85 D(Is=2e-7 N=1.04 Rs=1.5 Cjo=10p BV=30)
+* PC817 の LED：Vf ≒ 1.2V @20mA
+.model LED817 D(Is=1e-19 N=1.6 Rs=2)
+* 1N4148
+.model D4148 D(Is=2.5e-9 N=1.75 Rs=0.6 BV=100)
+* 1N5819：ショットキー 1A（Vf ≒ 0.35V @0.3A）
+.model D5819 D(Is=3e-6 N=1.1 Rs=0.05 BV=40)
+* 2SC1815-GR 相当の NPN（hFE 200）
+.model Q1815 NPN(Is=1e-14 BF=200 VAF=100 Rb=10 Rc=1)
