@@ -70,8 +70,11 @@ part("F1", "footprints", "PTC_Radial_W12.8mm_T3.0mm_P5.10mm", 24.0, 4.0, 0,
      {"1": "BATT", "2": "12V_F"}, "PTC 1.1A")
 part("D1", "Diode_THT", "D_DO-15_P5.08mm_Vertical_KathodeUp", 49.5, 15.5, 0,
      {"1": "12V_P", "2": "12V_F"}, "SB340LS")
-part("D2", "Diode_THT", "D_DO-15_P5.08mm_Vertical_KathodeUp", 49.5, 21.5, 0,
-     {"1": "12V_P", "2": "GND"}, "P6KE20A")
+# サージ吸収：秋月で買える TVS を 2 本直列（P4KE15A ＋ P4KE6.8CA）。導通しない上限 18.6V、クランプ約 30V
+part("D2", "Diode_THT", "D_DO-41_SOD81_P5.08mm_Vertical_KathodeUp", 49.5, 21.5, 0,
+     {"1": "12V_P", "2": "TVSM"}, "P4KE15A")
+part("D12", "Diode_THT", "D_DO-41_SOD81_P5.08mm_Vertical_KathodeUp", 41.0, 16.5, 0,
+     {"1": "TVSM", "2": "GND"}, "P4KE6.8CA")
 part("C1", "Capacitor_THT", "CP_Radial_D8.0mm_P3.50mm", 40.5, 25.5, 0,
      {"1": "12V_P", "2": "GND"}, "100uF 50V")
 part("C2", "Capacitor_THT", "CP_Radial_D6.3mm_P2.50mm", 51.0, 27.0, 0,

@@ -19,9 +19,8 @@ DESC = {
     "PTC 1.1A": ("リセッタブルヒューズ Bourns MF-RX110/72（保持 1.1A・トリップ 2.2A・72V、幅 10.8mm・足 0.81mm・間隔 5.1mm）。"
                  "Littelfuse RXEF110（秋月 101356）でも可。RUEF 系（30V）は不可", 1, "秋月", AKI.format("113585")),
     "SB340LS": ("ショットキーダイオード SB340LS 40V 3A（DO-15、立てて実装）逆接保護", 1, "秋月", AKI.format("107788")),
-    "P6KE20A": ("TVS ダイオード P6KE20A 600W 単方向（DO-15、立てて実装）。秋月に 20V 前後の TVS がないため DigiKey などで買う。"
-                "P6KE22A も可（クランプ 30.6V で DC-DC の上限 32V 以内）", 1, "DigiKey",
-                "https://www.digikey.com/en/products/detail/littelfuse-inc/P6KE20A/285930"),
+    "P4KE15A": ("TVS ダイオード P4KE15A 400W 単方向（DO-41、立てて実装）。P4KE6.8CA と直列で電源のサージ吸収", 1, "秋月", AKI.format("129633")),
+    "P4KE6.8CA": ("TVS ダイオード P4KE6.8CA 400W 双方向（DO-41、立てて実装、向きなし）。P4KE15A と直列", 1, "秋月", AKI.format("129631")),
     "100uF 50V": ("電解コンデンサ 100µF 50V φ8mm 足の間隔 3.5mm（105℃、Rubycon PX）", 1, "秋月", AKI.format("117905")),
     "100uF 16V": ("電解コンデンサ 100µF 16V φ6.3mm 高さ 5mm 足の間隔 2.5mm（105℃）", 1, "秋月", AKI.format("105002")),
     "M78AR05-1": ("DC-DC 5V 1A MINMAX M78AR05-1（三端子レギュレーター互換、入力 6.5〜32V）", 1, "秋月", AKI.format("113536")),
