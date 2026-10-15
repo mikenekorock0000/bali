@@ -24,6 +24,7 @@
 | `hardware/VERIFICATION.md` | 実施した検証と結果、検証で見つけて直した問題 |
 | `hardware/reports/` | 各検証の生の出力（DRC・ピン照合・機構・回路計算・製造データ） |
 | `fabrication/hijet_starter_gerber.zip` | 製造データ（ガーバー＋ドリル。JLCPCB 向け） |
+| `fabrication/jlc_bom.csv` `jlc_cpl.csv` | JLCPCB の組立サービス形式の BOM と CPL（部品配置リスト）。座標は基板の左下が原点。手はんだ前提なので LCSC の部品番号は空欄 |
 | `kicad/` | KiCad 7 の基板ファイルと独自フットプリント |
 | `scripts/` | 基板を生成・検証するスクリプト（`gen_pcb.py` が正。基板は手で描いていない） |
 | `firmware/` | ファームウェア一式（PlatformIO プロジェクト）、PC で動く判定ロジックのテスト |
