@@ -22,14 +22,14 @@ def nums(line):
     return [float(x) for x in re.findall(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", line)]
 
 
-print("== 電圧測定（R1 100k / R2 18k、BAT43 クランプ）")
+print("== 電圧測定（R1 100k / R2 10k、BAT43 クランプ）")
 for line in run("vsense.cir").splitlines():
     if "VBAT=" not in line:
         continue
     m = re.search(r"VBAT=(\S+)\s+VSENSE=\s*(\S+)", line)
     vb, vs = float(m.group(1)), float(m.group(2))
     if 9 <= vb <= 16:
-        check(f"VBAT {vb}V", vs <= 2.45, f"GPIO34 = {vs:.2f}V（ADC 11dB の精度範囲 2.45V 以下）")
+        check(f"VBAT {vb}V", 0.15 <= vs <= 2.45, f"GPIO34 = {vs:.2f}V（ADC 11dB の精度範囲 0.15〜2.45V）")
     elif vb > 16:
         check(f"VBAT {vb}V（異常電圧）", vs <= 3.6, f"GPIO34 = {vs:.2f}V（絶対最大 3.6V 以下）")
     elif vb < 0:

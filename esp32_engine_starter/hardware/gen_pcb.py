@@ -82,7 +82,7 @@ part("C2", "Capacitor_THT", "CP_Radial_D6.3mm_P2.50mm", 51.0, 27.0, 0,
 part("U1", "Converter_DCDC", "Converter_DCDC_Murata_OKI-78SR_Vertical", 40.5, 37.0, 0,
      {"1": "12V_P", "2": "GND", "3": "+5V"}, "M78AR05-1")
 part("R1", *RV, 50.5, 34.0, 0, {"1": "12V_F", "2": "VSENSE"}, "100k")
-part("R2", *RV, 50.5, 38.0, 0, {"1": "GND", "2": "VSENSE"}, "18k")
+part("R2", *RV, 50.5, 38.0, 0, {"1": "GND", "2": "VSENSE"}, "10k")
 part("C4", *CDISC, 51.0, 42.0, 0, {"1": "VSENSE", "2": "GND"}, "0.1uF")
 part("D3", *D35V, 50.5, 46.0, 0, {"1": "+3V3", "2": "VSENSE"}, "BAT43")
 part("C3", *CDISC, 58.0, 52.0, 90, {"1": "+5V", "2": "GND"}, "0.1uF")

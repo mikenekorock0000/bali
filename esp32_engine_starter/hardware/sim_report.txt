@@ -1,11 +1,11 @@
-== 電圧測定（R1 100k / R2 18k、BAT43 クランプ）
-  ok  VBAT -14.0V（逆接続）: GPIO34 = -0.48V（-0.6V 以上なら保護ダイオードの電流は µA 級）
-  ok  VBAT 9.0V: GPIO34 = 1.38V（ADC 11dB の精度範囲 2.45V 以下）
-  ok  VBAT 12.0V: GPIO34 = 1.83V（ADC 11dB の精度範囲 2.45V 以下）
-  ok  VBAT 14.7V: GPIO34 = 2.25V（ADC 11dB の精度範囲 2.45V 以下）
-  ok  VBAT 16.0V: GPIO34 = 2.44V（ADC 11dB の精度範囲 2.45V 以下）
-  ok  VBAT 24.0V（異常電圧）: GPIO34 = 3.42V（絶対最大 3.6V 以下）
-  ok  VBAT 30.0V（異常電圧）: GPIO34 = 3.46V（絶対最大 3.6V 以下）
+== 電圧測定（R1 100k / R2 10k、BAT43 クランプ）
+  ok  VBAT -14.0V（逆接続）: GPIO34 = -0.47V（-0.6V 以上なら保護ダイオードの電流は µA 級）
+  ok  VBAT 9.0V: GPIO34 = 0.82V（ADC 11dB の精度範囲 0.15〜2.45V）
+  ok  VBAT 12.0V: GPIO34 = 1.09V（ADC 11dB の精度範囲 0.15〜2.45V）
+  ok  VBAT 14.7V: GPIO34 = 1.34V（ADC 11dB の精度範囲 0.15〜2.45V）
+  ok  VBAT 16.0V: GPIO34 = 1.46V（ADC 11dB の精度範囲 0.15〜2.45V）
+  ok  VBAT 24.0V（異常電圧）: GPIO34 = 2.18V（絶対最大 3.6V 以下）
+  ok  VBAT 30.0V（異常電圧）: GPIO34 = 2.73V（絶対最大 3.6V 以下）
 == 絶縁入力（3.3k ＋ PC817 LED、1N4148 逆並列）
   ok  IN -16.0V（逆接続）: LED の逆電圧 -0.66V（最大 6V）
   ok  IN 6.0V: LED 1.4mA（最大 50mA）、受光側で 0.7mA 以上引ける、3.3k の発熱 6mW（1/4W の半分以下）

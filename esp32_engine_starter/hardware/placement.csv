@@ -33,7 +33,7 @@ J7,OBD-II CAN,"TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal",38
 J8,GPS,PinHeader_1x04_P2.54mm_Vertical,93.50,31.00,0,リード
 Q1,2SC1815,TO-92_Inline_Wide,41.50,67.50,0,リード
 R1,100k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,50.50,34.00,0,リード
-R2,18k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,50.50,38.00,0,リード
+R2,10k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,50.50,38.00,0,リード
 R3,330,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,30.40,13.04,0,リード
 R4,330,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,30.40,23.20,0,リード
 R5,330,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,30.40,33.36,0,リード

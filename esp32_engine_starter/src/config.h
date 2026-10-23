@@ -17,9 +17,10 @@ constexpr int PIN_ACC = 36;   // IN3：ACC（キー ON で信号あり。内部�
 constexpr uint32_t DOOR_DEBOUNCE_MS = 80;
 constexpr uint32_t ACC_DEBOUNCE_MS = 300;
 
-// ---- バッテリー電圧（12V ─ 100k ─ GPIO34 ─ 18k ─ GND。16V で 2.44V＝ADC の精度のよい範囲内） ----
+// ---- バッテリー電圧（12V ─ 100k ─ GPIO34 ─ 10k ─ GND。16V で 1.45V＝ADC の精度のよい範囲内） ----
+// R2 を変えたら下の分圧比も変えること（R2 は 18k 以下。それより大きいと 16V で ADC の精度範囲を超える）
 constexpr int PIN_VBAT = 34;
-constexpr float VBAT_DIVIDER = (100.0f + 18.0f) / 18.0f;
+constexpr float VBAT_DIVIDER = (100.0f + 10.0f) / 10.0f;
 constexpr float VBAT_CAL = 1.00f;  // テスターの実測値 ÷ 表示値 で補正する
 constexpr float VBAT_RUNNING_ON = 13.2f;  // OBD が無いときのエンジン稼働判定（発電中の電圧）
 constexpr float VBAT_RUNNING_OFF = 12.9f;

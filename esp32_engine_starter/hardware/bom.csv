@@ -20,10 +20,9 @@
 1,J8,GPS,ピンヘッダー 1×4 2.54mm（上の 1×40 から切り出す）,,,
 1,Q1,2SC1815,NPN トランジスタ 2SC1815（TO-92、足の並び E-C-B）,1,秋月,https://akizukidenshi.com/catalog/g/g117089/
 1,R1,100k,抵抗 100kΩ 1/4W（立てて実装）,1 袋（100 本）,秋月,https://akizukidenshi.com/catalog/g/g125104/
-1,R2,18k,抵抗 18kΩ 1/4W（立てて実装）,1 袋（100 本）,秋月,https://akizukidenshi.com/catalog/g/g125183/
+6,R2 R10 R11 R12 R14 R15,10k,抵抗 10kΩ 1/4W（立てて実装）。R2（電圧測定）も 10k,1 袋（100 本）,秋月,https://akizukidenshi.com/catalog/g/g125103/
 4,R3 R4 R5 R6,330,抵抗 330Ω 1/4W（立てて実装）,1 袋（100 本）,秋月,https://akizukidenshi.com/catalog/g/g125331/
 3,R7 R8 R9,3.3k,抵抗 3.3kΩ 1/4W（立てて実装）,1 袋（100 本）,秋月,https://akizukidenshi.com/catalog/g/g125332/
-5,R10 R11 R12 R14 R15,10k,抵抗 10kΩ 1/4W（立てて実装）,1 袋（100 本）,秋月,https://akizukidenshi.com/catalog/g/g125103/
 1,R13,1k,抵抗 1kΩ 1/4W（立てて実装）,1 袋（100 本）,秋月,https://akizukidenshi.com/catalog/g/g125102/
 1,U1,M78AR05-1,DC-DC 5V 1A MINMAX M78AR05-1（三端子レギュレーター互換、入力 6.5〜32V）,1,秋月,https://akizukidenshi.com/catalog/g/g113536/
 7,U2 U3 U4 U5 U6 U7 U8,PC817,フォトカプラ PC817X3NSZ1B（DIP-4、VCEO 80V、CTR 200〜400%）,7,秋月,https://akizukidenshi.com/catalog/g/g113765/

@@ -1,7 +1,7 @@
 * 電圧測定入力：12V_F ─ R1 100k ─ VSENSE ─ R2 ─ GND、C4、D3(BAT43) で 3V3 へクランプ
 * ESP32 の入力は高インピーダンスとし、内部の保護ダイオード（GND 側・3V3 側）も含める
 .include models.lib
-.param r2v=18k
+.param r2v=10k
 Vbat bat 0 12
 V33 v33 0 3.3
 R1 bat vs 100k
@@ -11,7 +11,7 @@ D3 vs v33 BAT43
 Desd1 vs v33 D4148
 Desd2 0 vs D4148
 .control
-foreach r2 18k
+foreach r2 10k
   alterparam r2v = $r2
   reset
   echo "R2=$r2"
