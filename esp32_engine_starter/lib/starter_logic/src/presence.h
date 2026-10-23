@@ -51,6 +51,11 @@ class PresenceTracker {
     return PresenceEvent::None;
   }
 
+  // スリープから起きて一定時間キーが見つからなかったとき、イベントを出さずに「離れている」にする
+  void assumeAbsent() {
+    if (state_ == PresenceState::Unknown) state_ = PresenceState::Absent;
+  }
+
   PresenceState state() const { return state_; }
   bool everSeen() const { return everSeen_; }
   int lastRssi() const { return lastRssi_; }

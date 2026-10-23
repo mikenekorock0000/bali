@@ -4,7 +4,29 @@
 
 using namespace starter;
 
-void Gps::begin() { Serial2.begin(GPS_BAUD, SERIAL_8N1, PIN_GPS_RX, PIN_GPS_TX); }
+void Gps::begin() {
+  Serial2.begin(GPS_BAUD, SERIAL_8N1, PIN_GPS_RX, PIN_GPS_TX);
+  Serial2.write("\r\n");  // 待機中のモジュールを起こす
+}
+
+void Gps::standby() {
+  // MediaTek（GT-502MGG-N など）：$PMTK161,0*cs（チェックサムは $ と * の間の XOR）
+  const char* body = "PMTK161,0";
+  uint8_t x = 0;
+  for (const char* p = body; *p; ++p) x ^= (uint8_t)*p;
+  Serial2.printf("$%s*%02X\r\n", body, x);
+  // u-blox（NEO-6M など）：UBX-RXM-PMREQ（期間 0＝無期限、flags 2＝バックアップ）
+  uint8_t ubx[] = {0xB5, 0x62, 0x02, 0x41, 0x08, 0x00, 0, 0, 0, 0, 0x02, 0, 0, 0, 0, 0};
+  uint8_t a = 0, b = 0;
+  for (int i = 2; i < 14; ++i) {
+    a += ubx[i];
+    b += a;
+  }
+  ubx[14] = a;
+  ubx[15] = b;
+  Serial2.write(ubx, sizeof(ubx));
+  Serial2.flush();
+}
 
 void Gps::loop(uint32_t nowMs) {
   while (Serial2.available()) {

@@ -62,6 +62,16 @@ constexpr int FAR_RSSI = -90;                  // これより弱い受信は圏
 constexpr uint32_t DOOR_OPEN_WARN_MS = 5 * 60 * 1000UL;  // キーが無いままドアが開いている時間
 constexpr uint32_t ALARM_SOUND_MS = 20000;               // 侵入検知時にブザーを鳴らす時間
 
+// ---- 駐車モード（キーが離れて施錠した後はディープスリープして、駐車中の消費電流を減らす） ----
+// 眠っている間：ドアが開く・ACC ON で即座に起きる。PARK_WAKE_SEC ごとに起きて指示の確認・電圧の確認をする。
+// 振動検知（MPU6050）は眠っている間は働かない。
+constexpr bool PARK_SLEEP_DEFAULT = true;            // 初期値（指示 "park on|off" で切り替え）
+constexpr uint32_t PARK_IDLE_MS = 10 * 60000UL;      // キーが離れてからこの時間たったら眠る
+constexpr uint32_t PARK_WAKE_SEC = 15 * 60;          // 眠っている間に起きる間隔（指示の反映はこの分だけ遅れる）
+constexpr uint32_t PARK_KEY_SCAN_MS = 10000;         // 時間で起きたとき、キーを探す時間
+constexpr uint32_t PARK_AWAKE_MAX_MS = 45000;        // 時間で起きたときに起きている最長時間（Wi-Fi が無くても眠る）
+constexpr uint32_t DOOR_WAKE_GRACE_MS = 15000;       // ドアで起きたとき、キーが見つかるまで待つ時間
+
 // ---- エンジン稼働時間とメンテナンス ----
 constexpr float OIL_CHANGE_HOURS = 150.0f;  // 前回リセットからこの稼働時間で交換時期を通知
 

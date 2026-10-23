@@ -8,6 +8,7 @@
 #include "debounce.h"
 #include "nmea.h"
 #include "obd_logic.h"
+#include "park_sleep.h"
 
 using namespace starter;
 
@@ -274,6 +275,55 @@ void test_charge_check() {
   TEST_ASSERT_FALSE(c.update(true, 14.2f, 300000));
 }
 
+void test_park_sleep_timer() {
+  ParkSleepTimer t(600000);
+  ParkInputs in{true, false, false, true, false, false};
+  TEST_ASSERT_FALSE(t.update(in, 1000));
+  TEST_ASSERT_FALSE(t.update(in, 600999));
+  TEST_ASSERT_TRUE(t.update(in, 601000));
+  // 条件が崩れたら数え直す
+  in.doorOpen = true;
+  TEST_ASSERT_FALSE(t.update(in, 602000));
+  in.doorOpen = false;
+  TEST_ASSERT_FALSE(t.update(in, 603000));
+  TEST_ASSERT_TRUE(t.update(in, 1203000));
+  // どれか 1 つでも満たさなければ眠らない
+  ParkInputs base{true, false, false, true, false, false};
+  ParkInputs v[] = {base, base, base, base, base};
+  v[0].enabled = false;
+  v[1].acc = true;
+  v[2].engineRunning = true;
+  v[3].keyAbsent = false;
+  v[4].busy = true;
+  for (auto& x : v) {
+    ParkSleepTimer u(1000);
+    u.update(x, 0);
+    TEST_ASSERT_FALSE(u.update(x, 100000));
+  }
+  // millis() の桁あふれをまたいでも数えられる
+  ParkSleepTimer w(1000);
+  TEST_ASSERT_FALSE(w.update(base, 0xFFFFFF00u));
+  TEST_ASSERT_TRUE(w.update(base, 0x00000400u));
+}
+
+void test_door_wake_verdict() {
+  TEST_ASSERT_EQUAL(DoorWakeVerdict::Owner, judgeDoorWake(true, false, 1000, 15000));
+  TEST_ASSERT_EQUAL(DoorWakeVerdict::Owner, judgeDoorWake(false, true, 1000, 15000));
+  TEST_ASSERT_EQUAL(DoorWakeVerdict::Waiting, judgeDoorWake(false, false, 14999, 15000));
+  TEST_ASSERT_EQUAL(DoorWakeVerdict::Intrusion, judgeDoorWake(false, false, 15000, 15000));
+}
+
+void test_presence_assume_absent() {
+  PresenceTracker p;
+  p.assumeAbsent();
+  TEST_ASSERT_EQUAL(PresenceState::Absent, p.state());
+  p.onSeen(-60, 100);
+  TEST_ASSERT_EQUAL(PresenceEvent::Arrived, p.update(100));
+  p.assumeAbsent();  // 在のときは変えない
+  TEST_ASSERT_EQUAL(PresenceState::Present, p.state());
+}
+
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_presence_no_left_before_first_arrival);
@@ -292,5 +342,8 @@ int main(int, char**) {
   RUN_TEST(test_obd_request_and_parse);
   RUN_TEST(test_crank_monitor);
   RUN_TEST(test_charge_check);
+  RUN_TEST(test_park_sleep_timer);
+  RUN_TEST(test_door_wake_verdict);
+  RUN_TEST(test_presence_assume_absent);
   return UNITY_END();
 }

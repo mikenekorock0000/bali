@@ -10,6 +10,7 @@
 
 class BlePresence {
  public:
+  int ruleCount() const { return ruleCount_; }  // 登録したビーコンの数
   void begin();
   void setRules(const starter::BeaconRule* rules, int n);
   void setEnabled(bool on);  // 低電圧時はスキャンを止めて消費電流を抑える

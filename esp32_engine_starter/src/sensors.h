@@ -18,6 +18,7 @@ class Sensors {
   bool takeMotion();
   float lastShakeG() const { return lastShake_; }
   void rebaseline() { baseValid_ = false; }  // 警戒開始時に今の姿勢を基準にする
+  void sleep();  // 駐車モードに入る前に、MPU6050 と BME280 を低消費電力にする
 
  private:
   bool readAccel(float& x, float& y, float& z);

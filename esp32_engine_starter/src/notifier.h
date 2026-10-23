@@ -12,6 +12,17 @@ class Notifier {
   void loop(uint32_t nowMs);
   // 指示用トピックに届いた新しいメッセージを 1 件取り出す
   bool takeCommand(String& cmd);
+  // 送っていない通知がない
+  bool idle() const { return count_ == 0; }
+  // 指示用トピックをすぐ読みに行く（loop() の次の回で）
+  void pollSoon() { pollNow_ = true; }
+  uint32_t pollCount() const { return polls_; }  // 指示用トピックを読めた回数
+  // スリープをまたいで「どこまで読んだか」を引き継ぐ（空ならまだ読んでいない）
+  String since() const { return since_; }
+  void resumeFrom(const String& since) {
+    since_ = since;
+    firstPoll_ = since_.isEmpty();
+  }
 
  private:
   struct Msg {
@@ -28,6 +39,8 @@ class Notifier {
   uint32_t lastPollMs_ = 0;
   String since_;  // 最後に読んだメッセージ ID（空ならまだ 1 件も無い）
   bool firstPoll_ = true;
+  bool pollNow_ = false;
+  uint32_t polls_ = 0;
   String cmds_[4];
   int cmdCount_ = 0;
 };

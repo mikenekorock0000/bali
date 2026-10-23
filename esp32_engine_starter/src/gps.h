@@ -26,6 +26,14 @@ class Gps {
 
   // 最後に測位できた位置（駐車位置の通知用）
   bool lastKnown(double& lat, double& lon) const;
+  void setLastKnown(double lat, double lon) {  // スリープから起きたとき、前回の駐車位置を戻す
+    lastLat_ = lat;
+    lastLon_ = lon;
+    haveLast_ = true;
+  }
+  // 駐車モードに入る前にモジュールを待機させる（MediaTek 系・u-blox 系の両方の命令を送る）。
+  // どちらも UART に何か届けば起きるので、begin() で起こす
+  void standby();
 
  private:
   void handleLine(const char* line, uint32_t nowMs);

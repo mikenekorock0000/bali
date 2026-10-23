@@ -69,6 +69,7 @@ void Notifier::pollCommands() {
       start = nl + 1;
     }
     firstPoll_ = false;
+    ++polls_;
   }
   http.end();
 }
@@ -85,7 +86,8 @@ void Notifier::loop(uint32_t nowMs) {
     }
     return;  // 1 回の loop で通信は 1 つだけ
   }
-  if (nowMs - lastPollMs_ >= CMD_POLL_MS) {
+  if (pollNow_ || nowMs - lastPollMs_ >= CMD_POLL_MS) {
+    pollNow_ = false;
     lastPollMs_ = nowMs;
     pollCommands();
   }

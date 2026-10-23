@@ -12,6 +12,7 @@
 #include <ArduinoOTA.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <driver/gpio.h>
 #include <esp_sleep.h>
 #include <time.h>
 
@@ -28,6 +29,7 @@
 #include "io.h"
 #include "notifier.h"
 #include "obd.h"
+#include "park_sleep.h"
 #include "presence.h"
 #include "secrets_select.h"
 #include "sensors.h"
@@ -75,6 +77,27 @@ bool lowNotified = false;
 
 constexpr uint32_t PAUSE_FOREVER = 0xFFFFFFFF;
 
+// ---- 駐車モード ----
+bool parkOn = PARK_SLEEP_DEFAULT;
+ParkSleepTimer parkTimer(PARK_IDLE_MS);
+bool parkTimerWake = false;  // 駐車モード中に時間で起きた（用が済んだらまた眠る）
+bool doorWake = false;       // ドアが開いて起きた（キーが見つかるまで待つ）
+uint32_t wakeMs = 0;
+uint32_t pollsAtWake = 0;
+
+// ディープスリープをまたいで残す値（RTC メモリ。電源を切ると消える）
+enum SleepKind : uint8_t { SLEEP_NONE = 0, SLEEP_LOW_VOLTAGE = 1, SLEEP_PARK = 2 };
+RTC_DATA_ATTR uint8_t rtcSleepKind = SLEEP_NONE;
+RTC_DATA_ATTR char rtcSince[32] = "";
+RTC_DATA_ATTR int rtcLastReportDay = -1;
+RTC_DATA_ATTR bool rtcHaveLast = false;
+RTC_DATA_ATTR double rtcLat = 0, rtcLon = 0;
+RTC_DATA_ATTR float rtcLastCrankV = NAN;
+
+// 眠っている間 LOW に固定する出力（フォトカプラの LED とブザー）
+const gpio_num_t HOLD_PINS[] = {(gpio_num_t)PIN_OUT_LOCK, (gpio_num_t)PIN_OUT2, (gpio_num_t)PIN_OUT3,
+                                (gpio_num_t)PIN_OUT4, (gpio_num_t)PIN_BUZZER};
+
 String fmt1(float v) { return isnan(v) ? String("-") : String(v, 1); }
 
 String mapLink() {
@@ -90,6 +113,7 @@ void loadPrefs() {
   sirenOn = prefs.getBool("siren", false);
   engineSec = prefs.getUInt("engsec", 0);
   oilBaseSec = prefs.getUInt("oilbase", 0);
+  parkOn = prefs.getBool("park", PARK_SLEEP_DEFAULT);
 }
 
 void saveEngine() {
@@ -117,6 +141,7 @@ String statusText(uint32_t now) {
   s += "\nキー " + String(presenceName()) + "  ドア " + (inputs.doorOpen() ? "開" : "閉");
   s += "\n自動ロック " + String(!autoLockOn ? "OFF" : (pauseUntilMs ? "一時停止中" : "ON"));
   s += "  警戒 " + String(alarmOn ? (armed ? "警戒中" : "待機") : "OFF");
+  s += "\n駐車モード " + String(parkOn ? "ON" : "OFF");
   s += "\n稼働 " + fmt1(engineSec / 3600.0f) + "h  オイル交換まで " + fmt1(oilRemainHours()) + "h";
   return s;
 }
@@ -159,12 +184,13 @@ void handleCommand(String line, uint32_t now) {
   } else if (cmd == "resume") {
     pauseUntilMs = 0;
     notifier.send(Prio::Low, "自動ロック再開", "");
-  } else if (cmd == "autolock" || cmd == "alarm" || cmd == "siren") {
+  } else if (cmd == "autolock" || cmd == "alarm" || cmd == "siren" || cmd == "park") {
     bool on = arg != "off";
-    const char* key = cmd == "autolock" ? "autolock" : cmd == "alarm" ? "alarm" : "siren";
+    const char* key = cmd == "autolock" ? "autolock" : cmd == "alarm" ? "alarm" : cmd == "siren" ? "siren" : "park";
     if (cmd == "autolock") autoLockOn = on;
     if (cmd == "alarm") alarmOn = on;
     if (cmd == "siren") sirenOn = on;
+    if (cmd == "park") parkOn = on;
     prefs.putBool(key, on);
     notifier.send(Prio::Low, "設定変更", cmd + " = " + (on ? "on" : "off"));
   } else if (cmd == "scan") {
@@ -201,28 +227,44 @@ void handleCommand(String line, uint32_t now) {
   } else {
     notifier.send(Prio::Low, "不明な指示",
                   "status / scan / lock / pause [分] / resume / autolock on|off / alarm on|off / "
-                  "siren on|off / beep / silence / oilreset");
+                  "siren on|off / park on|off / beep / silence / oilreset");
   }
 }
 
-// ---- 低電圧時のディープスリープ（ACC ON かドアが開いたら起きる） ----
-void enterDeepSleep() {
-  Serial.println("deep sleep");
+// ---- ディープスリープ（ACC ON かドアが開いたら起きる。時間でも起きる） ----
+// kind：低電圧（SLEEP_WAKE_SEC ごとに電圧だけ見る）か駐車モード（PARK_WAKE_SEC ごとに指示と電圧を見る）
+void enterDeepSleep(SleepKind kind) {
+  Serial.printf("deep sleep kind=%d\n", (int)kind);
+  rtcSleepKind = kind;
+  String since = notifier.since();
+  strlcpy(rtcSince, since.c_str(), sizeof(rtcSince));
+  rtcLastReportDay = lastReportDay;
+  rtcLastCrankV = lastCrankV;
+  rtcHaveLast = gps.lastKnown(rtcLat, rtcLon);
   ble.setEnabled(false);
+  sensors.sleep();
+  gps.standby();
   digitalWrite(PIN_CAN_STBY, HIGH);
-  esp_sleep_enable_timer_wakeup((uint64_t)SLEEP_WAKE_SEC * 1000000ULL);
+  for (gpio_num_t p : HOLD_PINS) {
+    pinMode(p, OUTPUT);
+    digitalWrite(p, LOW);
+    gpio_hold_en(p);
+  }
+  gpio_deep_sleep_hold_en();
+  uint32_t sec = kind == SLEEP_PARK ? PARK_WAKE_SEC : SLEEP_WAKE_SEC;
+  esp_sleep_enable_timer_wakeup((uint64_t)sec * 1000000ULL);
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_ACC, 0);                      // ACC ON（LOW）
   esp_sleep_enable_ext1_wakeup(1ULL << PIN_DOOR, ESP_EXT1_WAKEUP_ALL_LOW);   // ドアが開いた（LOW）
   esp_deep_sleep_start();
 }
 
-void flushThenSleep() {
+void flushThenSleep(SleepKind kind) {
   uint32_t until = millis() + 20000;
-  while (millis() < until) {
+  while (millis() < until && !notifier.idle()) {
     notifier.loop(millis());
     delay(50);
   }
-  enterDeepSleep();
+  enterDeepSleep(kind);
 }
 
 void setupWifi() {
@@ -254,13 +296,28 @@ void setupBeacons() {
 
 void setup() {
   Serial.begin(115200);
+  // 眠っている間に固定していた出力を解放する
+  gpio_deep_sleep_hold_dis();
+  for (gpio_num_t p : HOLD_PINS) gpio_hold_dis(p);
   battery.begin();
 
-  // スリープから時間で起きたときは、電圧が戻っていなければすぐ眠り直す（Wi-Fi も BLE も使わない）
-  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER) {
+  esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+  SleepKind slept = cause == ESP_SLEEP_WAKEUP_UNDEFINED ? SLEEP_NONE : (SleepKind)rtcSleepKind;
+  rtcSleepKind = SLEEP_NONE;
+  if (slept != SLEEP_NONE) {  // スリープ前の状態を戻す（すぐ眠り直すときも引き継げるよう、最初に戻す）
+    notifier.resumeFrom(String(rtcSince));
+    lastReportDay = rtcLastReportDay;
+    lastCrankV = rtcLastCrankV;
+    if (rtcHaveLast) gps.setLastKnown(rtcLat, rtcLon);
+  }
+
+  // 時間で起きたとき：電圧が低ければ、Wi-Fi も BLE も使わずにすぐ眠り直す
+  if (cause == ESP_SLEEP_WAKEUP_TIMER) {
     pinMode(PIN_ACC, INPUT);
     float v = (battery.sampleNow() + battery.sampleNow()) / 2;
-    if (v < VBAT_LOW_RECOVER && digitalRead(PIN_ACC) == HIGH) enterDeepSleep();
+    bool accOff = digitalRead(PIN_ACC) == HIGH;
+    if (accOff && slept == SLEEP_LOW_VOLTAGE && v < VBAT_LOW_RECOVER) enterDeepSleep(SLEEP_LOW_VOLTAGE);
+    if (accOff && slept == SLEEP_PARK && v < VBAT_SLEEP) enterDeepSleep(SLEEP_LOW_VOLTAGE);
   }
 
   lockOut.begin();
@@ -283,10 +340,12 @@ void setup() {
   setupBeacons();
   setupWifi();
 
-  esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
-  if (cause == ESP_SLEEP_WAKEUP_EXT1 && alarmOn) {
-    notifier.send(Prio::Urgent, "ドアが開きました（省電力中）", "低電圧で休止中にドアが開きました" + mapLink(),
-                  "rotating_light");
+  wakeMs = millis();
+  if (cause == ESP_SLEEP_WAKEUP_EXT1) {
+    doorWake = true;  // キーが見つかるまで少し待ってから、侵入かどうか判断する
+  } else if (cause == ESP_SLEEP_WAKEUP_TIMER && slept == SLEEP_PARK) {
+    parkTimerWake = true;  // 指示の確認などが済んだらまた眠る
+    notifier.pollSoon();
   } else if (cause != ESP_SLEEP_WAKEUP_EXT0 && cause != ESP_SLEEP_WAKEUP_TIMER) {
     notifier.send(Prio::Min, "起動しました",
                   String("BME280 ") + (sensors.hasEnv() ? "あり" : "なし") + " / MPU6050 " +
@@ -381,7 +440,7 @@ void loop() {
     notifier.send(Prio::Urgent, "省電力モードに入ります",
                   fmt1(battery.volts()) + "V。ACC ON かドアが開くと復帰します", "zzz");
     saveEngine();
-    flushThenSleep();
+    flushThenSleep(SLEEP_LOW_VOLTAGE);
   }
 
   // ---- エンジン稼働時間・オイル交換 ----
@@ -431,6 +490,28 @@ void loop() {
     }
   }
 
+  // ---- ドアで起きたとき：猶予時間内にキーが見つからなければ侵入 ----
+  if (doorWake) {
+    DoorWakeVerdict v = judgeDoorWake(presence.state() == PresenceState::Present, inputs.acc(), now - wakeMs,
+                                      DOOR_WAKE_GRACE_MS);
+    if (v != DoorWakeVerdict::Waiting) {
+      doorWake = false;
+      if (v == DoorWakeVerdict::Intrusion) {
+        presence.assumeAbsent();
+        if (alarmOn && cooldown.allow(CD_INTRUSION, now, 120000)) {
+          notifier.send(Prio::Urgent, "キーが無いのにドアが開きました",
+                        "駐車中にドアが開き、キーが見つかりません" + mapLink(), "rotating_light");
+          if (sirenOn) buzzer.alarm(ALARM_SOUND_MS);
+        }
+      }
+    }
+  }
+  // 起動してからずっとキーが見つからないとき（キーを登録済みなら）は「離れている」とみなす
+  if (presence.state() == PresenceState::Unknown && !presence.everSeen() && ble.ruleCount() > 0 &&
+      now - wakeMs > (parkTimerWake ? PARK_KEY_SCAN_MS : PARK_IDLE_MS) && !doorWake) {
+    presence.assumeAbsent();
+  }
+
   // ---- 防犯（キーが離れていて ACC OFF のとき警戒） ----
   bool nowArmed = alarmOn && !inputs.acc() && presence.state() == PresenceState::Absent;
   if (nowArmed && !armed) sensors.rebaseline();
@@ -471,6 +552,25 @@ void loop() {
       lastReportDay = t.tm_yday;
       notifier.send(Prio::Min, "毎日の報告", statusText(now));
     }
+  }
+
+  // ---- 駐車モード ----
+  bool outputsOn = lockOut.on() || out2.on() || out3.on() || out4.on();
+  bool busy = lockPending || buzzer.alarming() || !notifier.idle() || pauseUntilMs != 0 || doorWake || outputsOn;
+  ParkInputs park{parkOn, inputs.acc(), engineRunning, presence.state() == PresenceState::Absent,
+                  inputs.doorOpen(), busy};
+  if (parkTimerWake) {
+    // 時間で起きたとき：キーが近くに来ている・ACC ON・ドアが開いていれば、普段どおり動く
+    if (presence.state() == PresenceState::Present || inputs.acc() || inputs.doorOpen() || !parkOn) {
+      parkTimerWake = false;
+      parkTimer.restart();
+    } else {
+      bool done = now - wakeMs >= PARK_KEY_SCAN_MS && notifier.pollCount() > pollsAtWake && notifier.idle();
+      if (done || now - wakeMs > PARK_AWAKE_MAX_MS) enterDeepSleep(SLEEP_PARK);
+    }
+  } else if (parkTimer.update(park, now)) {
+    saveEngine();
+    enterDeepSleep(SLEEP_PARK);
   }
 
   // ---- シリアルに状態を出す（動作確認用） ----

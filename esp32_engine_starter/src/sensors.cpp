@@ -39,6 +39,13 @@ void Sensors::begin() {
   }
 }
 
+void Sensors::sleep() {
+  if (hasMpu_) writeReg(MPU_ADDR, MPU_PWR_MGMT_1, 0x40);  // SLEEP ビット（約 4mA → 数 µA）
+  if (hasBme_) {
+    bme.setSampling(Adafruit_BME280::MODE_SLEEP);
+  }
+}
+
 bool Sensors::readAccel(float& x, float& y, float& z) {
   Wire.beginTransmission(MPU_ADDR);
   Wire.write(MPU_ACCEL_XOUT_H);
