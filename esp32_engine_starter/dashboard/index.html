@@ -89,7 +89,7 @@ dialog .row button.primary{background:var(--acc);border-color:var(--acc);color:v
 
   <h2>操作</h2>
   <div class="grid controls" id="controls"></div>
-  <p class="hint" id="ctlHint">指示は暗証番号付きで送ります。駐車モードで休止中は、次に起きたとき（最大 15 分後）に実行されます。</p>
+  <p class="hint" id="ctlHint">指示は「指示の鍵」で署名して送ります（他人がまねて送れないように）。駐車モードで休止中は、次に起きたとき（最大 15 分後）に実行されます。</p>
 
   <h2>電圧（24 時間）</h2>
   <div class="card" style="position:relative"><svg class="chart" id="chV"></svg><div class="tip" id="tipV"></div><div class="legend"><span id="vMin"></span><span>赤の破線：低電圧の目安 11.8V</span></div></div>
@@ -111,14 +111,15 @@ dialog .row button.primary{background:var(--acc);border-color:var(--acc);color:v
   <label>状態のトピック</label><input name="state" required>
   <label>通知のトピック</label><input name="topic" required>
   <label>指示のトピック</label><input name="cmd" required>
-  <label>暗証番号（操作に使う）</label><input name="pin" type="password" inputmode="numeric">
+  <label>指示の鍵（ESP32 の設定画面の「指示の鍵」。操作に使う）</label><input name="key" type="password" autocomplete="off" spellcheck="false">
+  <label>暗証番号（鍵が無いときの予備。読むだけの指示と施錠だけ送れる）</label><input name="pin" type="password" inputmode="numeric">
   <label>アクセストークン（ntfy のアカウントを使う場合だけ）</label><input name="token" type="password">
   <div class="row">
     <button type="button" id="linkBtn">別の端末用のリンクをコピー</button>
     <button value="cancel">閉じる</button>
     <button value="ok" class="primary">保存</button>
   </div>
-  <p class="hint">リンクには暗証番号とトークンを含めません。リンクを知っている人は状態を読めるので、人に渡さないでください。</p>
+  <p class="hint">リンクには鍵・暗証番号・トークンを含めません。リンクを知っている人は状態を読めるので、人に渡さないでください。</p>
 </form></dialog>
 
 <dialog id="confirmDlg"><form method="dialog">
@@ -155,13 +156,13 @@ function headers() { return cfg.token ? { Authorization: "Bearer " + cfg.token }
 $("#setBtn").onclick = openCfg;
 function openCfg() {
   const f = $("#cfgForm");
-  for (const k of ["server", "state", "topic", "cmd", "pin", "token"]) f.elements[k].value = cfg[k] || "";
+  for (const k of ["server", "state", "topic", "cmd", "key", "pin", "token"]) f.elements[k].value = cfg[k] || "";
   $("#dlg").showModal();
 }
 $("#dlg").addEventListener("close", () => {
   if ($("#dlg").returnValue !== "ok") return;
   const f = $("#cfgForm");
-  for (const k of ["server", "state", "topic", "cmd", "pin", "token"]) cfg[k] = f.elements[k].value.trim();
+  for (const k of ["server", "state", "topic", "cmd", "key", "pin", "token"]) cfg[k] = f.elements[k].value.trim();
   cfg.server = (cfg.server || "https://ntfy.sh").replace(/\/+$/, "");
   saveCfg(cfg);
   demo = false;
@@ -214,11 +215,60 @@ async function refresh() {
   }
 }
 
+// ---------- 指示の署名（HMAC-SHA256。ESP32 の hmac_sha256.h と同じ計算） ----------
+function sha256(bytes) {
+  const K = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+  const H = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
+  const n = bytes.length, padded = new Uint8Array(((n + 9 + 63) >> 6) << 6);
+  padded.set(bytes); padded[n] = 0x80;
+  const dv = new DataView(padded.buffer);
+  dv.setUint32(padded.length - 8, Math.floor(n / 0x20000000)); dv.setUint32(padded.length - 4, (n * 8) >>> 0);
+  const w = new Uint32Array(64), r = (x, k) => (x >>> k) | (x << (32 - k));
+  for (let o = 0; o < padded.length; o += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(o + i * 4);
+    for (let i = 16; i < 64; i++) w[i] = (w[i - 16] + (r(w[i - 15], 7) ^ r(w[i - 15], 18) ^ (w[i - 15] >>> 3)) + w[i - 7] + (r(w[i - 2], 17) ^ r(w[i - 2], 19) ^ (w[i - 2] >>> 10))) >>> 0;
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (h + (r(e, 6) ^ r(e, 11) ^ r(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) >>> 0;
+      const t2 = ((r(a, 2) ^ r(a, 13) ^ r(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    H[0] += a; H[1] += b; H[2] += c; H[3] += d; H[4] += e; H[5] += f; H[6] += g; H[7] += h;
+  }
+  const out = new Uint8Array(32), ov = new DataView(out.buffer);
+  for (let i = 0; i < 8; i++) ov.setUint32(i * 4, H[i]);
+  return out;
+}
+function hmac(keyStr, msgStr) {
+  const enc = new TextEncoder();
+  let key = enc.encode(keyStr);
+  if (key.length > 64) key = sha256(key);
+  const k = new Uint8Array(64); k.set(key);
+  const msg = enc.encode(msgStr);
+  const inner = new Uint8Array(64 + msg.length), outer = new Uint8Array(96);
+  for (let i = 0; i < 64; i++) { inner[i] = k[i] ^ 0x36; outer[i] = k[i] ^ 0x5c; }
+  inner.set(msg, 64);
+  outer.set(sha256(inner), 64);
+  return sha256(outer);
+}
+const hex = (b) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+function signCommand(key, ts, cmd) { return hex(hmac(key, ts + " " + cmd).slice(0, 16)); }
+
+const PLAIN_OK = ["status", "state", "scan", "beep", "lock"];
+
 async function send(cmd) {
   if (demo) { toast("デモ表示なので送りません：" + cmd); return; }
-  if (!cfg.pin) { toast("設定で暗証番号を入れてください"); openCfg(); return; }
+  let body;
+  if (cfg.key) {
+    const ts = Math.floor(Date.now() / 1000);
+    body = `sig1 ${ts} ${signCommand(cfg.key, ts, cmd)} ${cmd}`;
+  } else if (cfg.pin && PLAIN_OK.includes(cmd.split(" ")[0])) {
+    body = cfg.pin + " " + cmd;
+  } else {
+    toast("設定で「指示の鍵」を入れてください（ESP32 の設定画面に表示されます）"); openCfg(); return;
+  }
   try {
-    const r = await fetch(`${cfg.server}/${encodeURIComponent(cfg.cmd)}`, { method: "POST", headers: headers(), body: cfg.pin + " " + cmd });
+    const r = await fetch(`${cfg.server}/${encodeURIComponent(cfg.cmd)}`, { method: "POST", headers: headers(), body });
     if (!r.ok) throw new Error("HTTP " + r.status);
     toast(state && state.sleep ? "送りました。休止中なので、次に起きたとき（最大 15 分後）に実行されます" : "送りました。30 秒ほどで反映されます");
     setTimeout(refresh, 35000);
@@ -286,9 +336,19 @@ function render() {
   if (s.mil != null) tiles.push(["エンジン警告灯", s.mil ? "点灯" : "消灯", s.mil ? "故障コード " + s.dtc + " 件" : "", s.mil ? "bad" : "ok"]);
   tiles.push(["稼働時間", s.engh + " h", "オイル交換まで " + s.oil + " h", Number(s.oil) <= 0 ? "warn" : ""]);
   const dev = s.dev || {};
-  tiles.push(["通信", dev.wifi != null ? "Wi-Fi " + dev.wifi + " dBm" : "-", "ファームウェア " + (s.fw || "?"), ""]);
+  tiles.push(["通信", dev.wifi != null ? "Wi-Fi " + dev.wifi + " dBm" : "-", (dev.ip ? dev.ip + "　" : "") + "版 " + (s.fw || "?") + (s.ota ? "（更新の確認中）" : ""), ""]);
+  if (s.rst && s.rst !== "電源投入") tiles.push(["前回の再起動", s.rst, "", /異常|応答なし|瞬断/.test(s.rst) ? "warn" : ""]);
+  if (s.gsrc) tiles.push(["GPS", s.fix ? "測位中" : "測位なし", s.gsrc === "wifi" ? "Ottocast など（Wi-Fi）" : "基板の GPS", s.fix ? "ok" : ""]);
+  if (s.odo != null) tiles.push(["走行距離", s.odo.toLocaleString() + " km", "メーターの値から推定", ""]);
 
-  $("#body").innerHTML = `
+  const banner = s.trk ? `<div class="card" style="border-color:var(--bad);margin-bottom:12px"><b class="bad">盗難の疑いがあり、位置を追跡しています</b>
+    <div class="hint">キーが無いのに ACC が入った、または駐車位置から移動しました。キーが戻るか「追跡を終了」で止まります。</div></div>` : "";
+  const maint = (s.mt || []).map((m) => {
+    const left = m.d != null ? (m.d > 0 ? `あと ${m.d} 日` : m.d === 0 ? "今日" : `${-m.d} 日過ぎ`) : m.k != null ? (m.k > 0 ? `あと ${m.k.toLocaleString()} km` : `${(-m.k).toLocaleString()} km 過ぎ`) : "メーターの値が未入力";
+    const due = m.d != null ? m.d <= 7 : m.k != null && m.k <= 500;
+    return `<div class="card tile"><div class="k">${esc(m.n)}</div><div class="v ${due ? "warn" : ""}">${esc(left)}</div></div>`;
+  }).join("");
+  $("#body").innerHTML = banner + `
   <div class="grid top">
     <div class="card hero">
       <div class="lbl">バッテリー</div>
@@ -298,7 +358,8 @@ function render() {
       <div class="meta">最終更新 ${s.t ? fmtTime(s.t) : ago(age)}</div>
     </div>
     <div class="grid tiles">${tiles.map(([k, val, sub, cls]) => `<div class="card tile"><div class="k">${esc(k)}</div><div class="v ${cls}">${esc(val)}</div><div class="s">${esc(sub)}</div></div>`).join("")}</div>
-  </div>`;
+  </div>
+  ${maint ? `<h2>点検の予定</h2><div class="grid tiles">${maint}</div>` : ""}`;
 
   renderControls();
   renderCharts();
@@ -317,6 +378,7 @@ function renderControls() {
     btn(s.alarm === false ? "警戒を ON" : "警戒を OFF", "侵入・揺れの通知", s.alarm === false ? "alarm on" : "alarm off"),
     btn(s.siren ? "サイレンを OFF" : "サイレンを ON", "侵入時にブザーを鳴らす", s.siren ? "siren off" : "siren on"),
     btn(s.park === false ? "駐車モードを ON" : "駐車モードを OFF", "駐車中に休止して節電", s.park === false ? "park on" : "park off"),
+    s.trk ? btn("追跡を終了", "盗難の疑いが晴れたら", "track off") : btn("追跡を開始", "位置を 3 分ごとに通知", "track on"),
     btn("ブザーを鳴らす", "車の場所を探すとき", "beep"),
     btn("ブザーを止める", "", "silence"),
     btn("オイル交換を記録", "稼働時間を数え直す", "oilreset", { confirm: ["オイル交換を記録しますか？", "次の交換までの時間を数え直します。"] }),
@@ -436,7 +498,9 @@ function loadDemo() {
   state = { fw: "1.1.0", t: now - 120, v: "12.48", acc: false, eng: false, door: false, key: "absent", rssi: -93, armed: true,
     al: true, paused: false, alarm: true, siren: false, park: true, lowv: false, lockp: false, sleep: true, wake: 900,
     engh: "412.3", oil: "37.5", crank: "10.42", temp: "6.5", hum: "71", lat: "35.681236", lon: "139.767125", fix: false,
-    dev: { bme: true, mpu: true, gps: true, obd: false, keys: 1, wifi: -61 }, h: { t0, m, v, c } };
+    rst: "電源投入", gsrc: "wifi", odo: 48210,
+    mt: [{ n: "車検", d: 212 }, { n: "12ヶ月点検", d: 5 }, { n: "タイヤ交換", k: 1790 }],
+    dev: { bme: true, mpu: true, gps: true, obd: false, keys: 1, wifi: -61, ip: "172.20.10.4" }, h: { t0, m, v, c } };
   stateAt = state.t;
   events = [
     { time: now - 1300, priority: 2, title: "施錠しました", message: "キーが離れたため" },

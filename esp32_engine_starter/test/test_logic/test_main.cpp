@@ -11,6 +11,9 @@
 #include "park_sleep.h"
 #include "history.h"
 #include "settings_rules.h"
+#include "hmac_sha256.h"
+#include "maintenance.h"
+#include <string>
 
 using namespace starter;
 
@@ -367,6 +370,92 @@ void test_settings_rules() {
   TEST_ASSERT_FALSE(validCal(1.5f));
 }
 
+static std::string shaHex(const std::string& m) {
+  Sha256 s;
+  s.update(reinterpret_cast<const uint8_t*>(m.data()), m.size());
+  uint8_t o[32];
+  s.finish(o);
+  char h[65];
+  toHex(o, 32, h);
+  return h;
+}
+
+void test_sha256_vectors() {
+  TEST_ASSERT_EQUAL_STRING("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", shaHex("abc").c_str());
+  TEST_ASSERT_EQUAL_STRING("248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
+                           shaHex("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq").c_str());
+  TEST_ASSERT_EQUAL_STRING("cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
+                           shaHex(std::string(1000000, 'a')).c_str());
+  uint8_t mac[32];
+  char h[65];
+  const char* m = "what do ya want for nothing?";
+  hmacSha256((const uint8_t*)"Jefe", 4, (const uint8_t*)m, strlen(m), mac);
+  toHex(mac, 32, h);
+  TEST_ASSERT_EQUAL_STRING("5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843", h);
+  std::string longKey(100, 'k');
+  hmacSha256((const uint8_t*)longKey.data(), longKey.size(), (const uint8_t*)"msg", 3, mac);
+  toHex(mac, 32, h);
+  TEST_ASSERT_EQUAL_STRING("bd56a1782c2830e8abc6ed866a57a1230661e650b84c62f7ee3accc5fa5af491", h);
+}
+
+void test_signed_command() {
+  const char* key = "0123456789abcdef0123456789abcdef";
+  char sig[33];
+  signCommand(key, 1792836000u, "lock", sig);
+  TEST_ASSERT_EQUAL_STRING("af7be9b8d27cf545076722e2949f3068", sig);
+  SignedCommand c;
+  TEST_ASSERT_TRUE(parseSigned("sig1 1792836000 af7be9b8d27cf545076722e2949f3068 lock", c));
+  TEST_ASSERT_EQUAL(1792836000u, c.ts);
+  TEST_ASSERT_EQUAL_STRING("lock", c.cmd);
+  TEST_ASSERT_EQUAL(SigVerdict::Ok, verifyCommand(key, c, 1792836100u, 0, 1800, 300));
+  TEST_ASSERT_EQUAL(SigVerdict::Replayed, verifyCommand(key, c, 1792836100u, 1792836000u, 1800, 300));
+  TEST_ASSERT_EQUAL(SigVerdict::TooOld, verifyCommand(key, c, 1792836000u + 1801, 0, 1800, 300));
+  TEST_ASSERT_EQUAL(SigVerdict::FromFuture, verifyCommand(key, c, 1792836000u - 301, 0, 1800, 300));
+  TEST_ASSERT_EQUAL(SigVerdict::Ok, verifyCommand(key, c, 0, 0, 1800, 300));  // 時計が未設定
+  TEST_ASSERT_EQUAL(SigVerdict::BadSignature, verifyCommand("other-key-xxxxxxxxxxxxxxxxxxxxxxx", c, 1792836100u, 0, 1800, 300));
+  // 指示を書き換えると署名が合わない
+  SignedCommand d;
+  TEST_ASSERT_TRUE(parseSigned("sig1 1792836000 af7be9b8d27cf545076722e2949f3068 alarm off", d));
+  TEST_ASSERT_EQUAL(SigVerdict::BadSignature, verifyCommand(key, d, 1792836100u, 0, 1800, 300));
+  // 書式の誤り
+  TEST_ASSERT_FALSE(parseSigned("1234 lock", c));
+  TEST_ASSERT_FALSE(parseSigned("sig1 1792836000 AF7BE9B8D27CF545076722E2949F3068 lock", c));  // 大文字
+  TEST_ASSERT_FALSE(parseSigned("sig1 1792836000 af7be9b8 lock", c));
+  TEST_ASSERT_FALSE(parseSigned("sig1 x af7be9b8d27cf545076722e2949f3068 lock", c));
+  TEST_ASSERT_FALSE(parseSigned("sig1 1792836000 af7be9b8d27cf545076722e2949f3068 ", c));
+}
+
+void test_maintenance() {
+  TEST_ASSERT_EQUAL(0, daysFromCivil(1970, 1, 1));
+  TEST_ASSERT_EQUAL(20958, daysFromCivil(2027, 5, 20));
+  TEST_ASSERT_EQUAL(11017, daysFromCivil(2000, 3, 1));
+  MaintItem a, b, c;
+  TEST_ASSERT_TRUE(parseMaintLine("車検 2027-05-20", a));
+  TEST_ASSERT_TRUE(a.byDate);
+  TEST_ASSERT_EQUAL_STRING("車検", a.name);
+  TEST_ASSERT_TRUE(parseMaintLine("タイヤ 交換 45000km", b));
+  TEST_ASSERT_FALSE(b.byDate);
+  TEST_ASSERT_EQUAL(45000, b.km);
+  TEST_ASSERT_EQUAL_STRING("タイヤ 交換", b.name);
+  TEST_ASSERT_FALSE(parseMaintLine("車検", c));
+  TEST_ASSERT_FALSE(parseMaintLine("車検 2027-13-01", c));
+  TEST_ASSERT_FALSE(parseMaintLine("車検 45000", c));
+  TEST_ASSERT_FALSE(parseMaintLine(" 2027-05-20", c));
+  int32_t d = a.day;
+  TEST_ASSERT_EQUAL(0, maintLevel(a, d - 31, 0, false));
+  TEST_ASSERT_EQUAL(1, maintLevel(a, d - 30, 0, false));
+  TEST_ASSERT_EQUAL(2, maintLevel(a, d - 7, 0, false));
+  TEST_ASSERT_EQUAL(3, maintLevel(a, d - 1, 0, false));
+  TEST_ASSERT_EQUAL(4, maintLevel(a, d, 0, false));
+  TEST_ASSERT_EQUAL(4, maintLevel(a, d + 10, 0, false));
+  TEST_ASSERT_EQUAL(0, maintLevel(b, 0, 44000, false));  // メーターの値が不明
+  TEST_ASSERT_EQUAL(0, maintLevel(b, 0, 44499, true));
+  TEST_ASSERT_EQUAL(1, maintLevel(b, 0, 44500, true));
+  TEST_ASSERT_EQUAL(2, maintLevel(b, 0, 44900, true));
+  TEST_ASSERT_EQUAL(4, maintLevel(b, 0, 45000, true));
+}
+
+
 
 
 int main(int, char**) {
@@ -392,5 +481,8 @@ int main(int, char**) {
   RUN_TEST(test_presence_assume_absent);
   RUN_TEST(test_history_ring);
   RUN_TEST(test_settings_rules);
+  RUN_TEST(test_sha256_vectors);
+  RUN_TEST(test_signed_command);
+  RUN_TEST(test_maintenance);
   return UNITY_END();
 }

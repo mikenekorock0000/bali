@@ -19,12 +19,20 @@ struct Settings {
   String hostname;
   String beacons[MAX_BEACONS];  // "aa:bb:cc:dd:ee:ff" か "uuid:..."
   float vbatCal = 1.0f;
+  String cmdKey;        // 指示の署名の鍵（32 桁の 16 進。初回に自動で作る。ダッシュボードに入れる）
+  bool tlsInsecure = false;  // サーバーの証明書を確かめない（自己署名の自前サーバー用）
+  String maint;         // 点検の予定（1 行に 1 件：「車検 2027-05-20」「タイヤ交換 45000km」）
+  int32_t odoKm = 0;    // メーターの走行距離を入力したときの値（0 なら未入力）
+  float odoGpsKm = 0;   // そのときの GPS の累計距離
 
   void load();
   void save() const;
   // Wi-Fi と通知先が決まっている（普段どおり動ける）
   bool configured() const { return ssid1.length() > 0 && topic.length() > 0 && cmdTopic.length() > 0; }
   int beaconCount() const;
+  // 鍵がなければ作って保存する。ESP32 の乱数は無線が動いているときに本当の乱数になるので、Wi-Fi・BLE の開始後に呼ぶ
+  void ensureKey();
+  static String newKey();  // 32 桁の 16 進の乱数
 };
 
 extern Settings settings;

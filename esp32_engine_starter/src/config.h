@@ -87,6 +87,30 @@ constexpr uint32_t STATE_MIN_GAP_MS = 10000;         // 出来事のたびに送
 constexpr uint32_t HIST_INTERVAL_SEC = 15 * 60;      // 電圧・温度の履歴を記録する間隔
 constexpr int HIST_POINTS = 96;                      // 履歴の点数（15 分 × 96 ＝ 24 時間）
 
+// ---- 見張り（ウォッチドッグ）・ファームウェア更新の確認 ----
+constexpr uint32_t WDT_TIMEOUT_S = 30;               // main loop がこの時間止まったら再起動する
+constexpr uint32_t OTA_VERIFY_MS = 10 * 60000UL;     // 更新後、この時間内に ntfy と通信できなければ前の版に戻す
+constexpr uint32_t OTA_MIN_RUN_MS = 60000;           // 少なくともこの時間は動いてから「正常」とする
+
+// ---- 指示の署名（ダッシュボードから送る指示は、時刻と署名付き） ----
+constexpr uint32_t CMD_MAX_AGE_SEC = 30 * 60;        // これより古い指示は無視（駐車モードの 15 分の遅れを見込む）
+constexpr uint32_t CMD_MAX_FUTURE_SEC = 5 * 60;      // 時計のずれの許容
+
+// ---- 盗難の検知 ----
+constexpr uint32_t ACC_NO_KEY_GRACE_MS = 30000;      // ACC ON からこの時間キーが見つからなければ盗難の疑い
+constexpr uint32_t TRACK_STATE_MS = 30000;           // 追跡中に状態（位置）を送る間隔
+constexpr uint32_t TRACK_NOTIFY_MS = 3 * 60000UL;    // 追跡中に位置を通知する間隔
+constexpr bool PARK_GPS_CHECK = true;                // 駐車モードで起きるたびに GPS（J8 のもの）で位置を確かめる
+constexpr uint32_t PARK_GPS_WAIT_MS = 45000;         // そのとき測位を待つ最長時間
+constexpr float MOVE_ALERT_M = 150.0f;               // 駐車位置からこれ以上離れたら移動とみなす
+constexpr uint16_t NMEA_UDP_PORT = 10110;            // Ottocast などから Wi-Fi で NMEA を受け取るポート
+
+// ---- 点検の予定・凍結の注意 ----
+constexpr int MAX_MAINT = 8;
+constexpr float FREEZE_WARN_C = 1.0f;                // 朝、車内がこれ以下なら凍結に注意
+constexpr int FREEZE_HOUR_FROM = 5;                  // 凍結の注意を出す時間帯（日本時間）
+constexpr int FREEZE_HOUR_TO = 9;
+
 // ---- エンジン稼働時間とメンテナンス ----
 constexpr float OIL_CHANGE_HOURS = 150.0f;  // 前回リセットからこの稼働時間で交換時期を通知
 

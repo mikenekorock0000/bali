@@ -8,6 +8,7 @@
 class SetupPortal {
  public:
   using NearbyFn = void (*)(JsonArray arr);
+  using KmFn = float (*)();
 
   void start(const char* reason, uint32_t nowMs);
   void stop();
@@ -15,6 +16,7 @@ class SetupPortal {
   bool active() const { return active_; }
   String apName() const;
   void setNearbyProvider(NearbyFn fn) { nearby_ = fn; }
+  void setGpsKmProvider(KmFn fn) { gpsKm_ = fn; }  // メーターの値を入れたときの GPS の累計距離
 
  private:
   void handleRoot();
@@ -22,6 +24,7 @@ class SetupPortal {
   void handleScan();
   void handleBle();
   void handleRedirect();
+  void handleKey();
 
   bool active_ = false;
   bool serverUp_ = false;
@@ -29,6 +32,7 @@ class SetupPortal {
   uint32_t restartAt_ = 0;
   String reason_;
   NearbyFn nearby_ = nullptr;
+  KmFn gpsKm_ = nullptr;
 };
 
 extern SetupPortal portal;

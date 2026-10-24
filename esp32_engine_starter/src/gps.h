@@ -16,7 +16,15 @@ class Gps {
  public:
   void begin();
   void loop(uint32_t nowMs);
-  bool present() const { return sawData_; }       // モジュールから文が届いているか
+  bool present() const { return sawData_; }       // GPS の文が届いているか（どちらの経路でも）
+  bool uartPresent() const { return sawUart_; }   // 基板の J8 につないだモジュールから届いているか
+  // Wi-Fi 経由（Ottocast などの Android 機器から UDP で送られる NMEA）の 1 行を渡す
+  void feedLine(const char* line, uint32_t nowMs) {
+    fromUdp_ = true;
+    handleLine(line, nowMs);
+    fromUdp_ = false;
+  }
+  const char* source() const { return lastFromUdp_ ? "wifi" : "uart"; }
   bool hasFix(uint32_t nowMs) const { return fix_.valid && nowMs - fixMs_ < 5000; }
   const starter::GpsFix& fix() const { return fix_; }
 
@@ -40,6 +48,9 @@ class Gps {
   char buf_[100];
   size_t len_ = 0;
   bool sawData_ = false;
+  bool sawUart_ = false;
+  bool fromUdp_ = false;
+  bool lastFromUdp_ = false;
   starter::GpsFix fix_;
   uint32_t fixMs_ = 0;
   bool haveLast_ = false;

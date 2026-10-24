@@ -5,10 +5,20 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 
+#include "ca_roots.h"
 #include "config.h"
 #include "settings.h"
 
 void Notifier::begin() {}
+
+// サーバーの証明書を、入れてあるルート証明書で確かめる（設定で「確かめない」にしたときだけ省く）
+void Notifier::secure(WiFiClientSecure& client) {
+  if (settings.tlsInsecure) {
+    client.setInsecure();
+  } else {
+    client.setCACert(CA_ROOTS);
+  }
+}
 
 void Notifier::send(Prio prio, const String& title, const String& body, const char* tags) {
   Serial.printf("[notify %d] %s: %s\n", (int)prio, title.c_str(), body.c_str());
@@ -32,10 +42,8 @@ bool Notifier::post(const Msg& m) {
   String payload;
   serializeJson(doc, payload);
 
-  // 注意：証明書の検証を省略している（通信は暗号化されるが、相手の確認はしない）。
-  // より安全にするには setCACert() で ntfy サーバーのルート証明書を指定する。
   WiFiClientSecure client;
-  client.setInsecure();
+  secure(client);
   HTTPClient http;
   http.setTimeout(8000);
   if (!http.begin(client, settings.ntfyServer + "/")) return false;
@@ -53,7 +61,7 @@ void Notifier::addAuth(HTTPClient& http) {
 bool Notifier::postState(const String& json) {
   // 状態は JSON をそのまま本文にする。スマホの通知にならないよう優先度は最低
   WiFiClientSecure client;
-  client.setInsecure();
+  secure(client);
   HTTPClient http;
   http.setTimeout(8000);
   if (!http.begin(client, settings.ntfyServer + "/" + settings.stateTopic)) return false;
@@ -67,7 +75,7 @@ bool Notifier::postState(const String& json) {
 
 void Notifier::pollCommands() {
   WiFiClientSecure client;
-  client.setInsecure();
+  secure(client);
   HTTPClient http;
   http.setTimeout(8000);
   // 最初の取得は起動前に届いていた指示を読み飛ばすためだけに使う（実行しない）
@@ -99,6 +107,7 @@ void Notifier::loop(uint32_t nowMs) {
   if (WiFi.status() != WL_CONNECTED || !settings.configured()) return;
   if (count_ > 0 && static_cast<int32_t>(nowMs - nextTryMs_) >= 0) {
     if (post(q_[head_])) {
+      ++sent_;
       head_ = (head_ + 1) % QUEUE;
       --count_;
       nextTryMs_ = nowMs + 500;
@@ -109,6 +118,7 @@ void Notifier::loop(uint32_t nowMs) {
   }
   if (state_.length() && static_cast<int32_t>(nowMs - nextTryMs_) >= 0) {
     if (postState(state_)) {
+      ++sent_;
       state_ = "";
       nextTryMs_ = nowMs + 500;
     } else {

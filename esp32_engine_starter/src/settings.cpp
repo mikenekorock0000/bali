@@ -63,6 +63,11 @@ void Settings::load() {
     hostname = p.getString("host", HOSTNAME);
     for (int i = 0; i < MAX_BEACONS; ++i) beacons[i] = p.getString(("bcn" + String(i)).c_str(), "");
     vbatCal = p.getFloat("vcal", 1.0f);
+    cmdKey = p.getString("cmdkey", "");
+    tlsInsecure = p.getBool("tlsins", false);
+    maint = p.getString("maint", "");
+    odoKm = p.getInt("odokm", 0);
+    odoGpsKm = p.getFloat("odogps", 0);
   }
   p.end();
   if (have) return;
@@ -103,7 +108,26 @@ void Settings::save() const {
   p.putString("host", hostname);
   for (int i = 0; i < MAX_BEACONS; ++i) p.putString(("bcn" + String(i)).c_str(), beacons[i]);
   p.putFloat("vcal", vbatCal);
+  p.putString("cmdkey", cmdKey);
+  p.putBool("tlsins", tlsInsecure);
+  p.putString("maint", maint);
+  p.putInt("odokm", odoKm);
+  p.putFloat("odogps", odoGpsKm);
   p.end();
+}
+
+void Settings::ensureKey() {
+  if (cmdKey.length() == 32) return;
+  cmdKey = newKey();
+  p.begin(NS, false);
+  p.putString("cmdkey", cmdKey);
+  p.end();
+}
+
+String Settings::newKey() {
+  char b[33];
+  for (int i = 0; i < 4; ++i) snprintf(b + 8 * i, 9, "%08lx", (unsigned long)esp_random());
+  return String(b);
 }
 
 int Settings::beaconCount() const {

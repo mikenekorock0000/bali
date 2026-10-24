@@ -19,6 +19,7 @@ class Notifier {
   // 指示用トピックをすぐ読みに行く（loop() の次の回で）
   void pollSoon() { pollNow_ = true; }
   uint32_t pollCount() const { return polls_; }  // 指示用トピックを読めた回数
+  uint32_t sentCount() const { return sent_; }   // 送れた通知・状態の数
   // スリープをまたいで「どこまで読んだか」を引き継ぐ（空ならまだ読んでいない）
   String since() const { return since_; }
   void resumeFrom(const String& since) {
@@ -34,6 +35,7 @@ class Notifier {
   bool post(const Msg& m);
   bool postState(const String& json);
   void addAuth(class HTTPClient& http);
+  static void secure(class WiFiClientSecure& client);
   void pollCommands();
 
   static constexpr int QUEUE = 8;
@@ -45,6 +47,7 @@ class Notifier {
   bool firstPoll_ = true;
   bool pollNow_ = false;
   uint32_t polls_ = 0;
+  uint32_t sent_ = 0;
   String state_;
   String cmds_[4];
   int cmdCount_ = 0;

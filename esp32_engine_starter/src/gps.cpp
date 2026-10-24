@@ -49,8 +49,12 @@ void Gps::handleLine(const char* line, uint32_t nowMs) {
   GpsFix f;
   if (!parseRmc(line, f)) return;
   sawData_ = true;
+  if (!fromUdp_) sawUart_ = true;
+  // 両方から届くときは、測位できている方を使う
+  if (!f.valid && fix_.valid && nowMs - fixMs_ < 5000) return;
   fix_ = f;
   if (!f.valid) return;
+  lastFromUdp_ = fromUdp_;
   fixMs_ = nowMs;
   haveLast_ = true;
   lastLat_ = f.lat;

@@ -14,8 +14,11 @@
 #include <ArduinoOTA.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <WiFiUdp.h>
 #include <driver/gpio.h>
+#include <esp_ota_ops.h>
 #include <esp_sleep.h>
+#include <esp_task_wdt.h>
 #include <time.h>
 
 #include <algorithm>
@@ -32,6 +35,9 @@
 #include "notifier.h"
 #include "obd.h"
 #include "history.h"
+#include "hmac_sha256.h"
+#include "maintenance.h"
+#include "nmea.h"
 #include "park_sleep.h"
 #include "portal.h"
 #include "presence.h"
@@ -58,7 +64,7 @@ CrankMonitor crank(60000);
 ChargeCheck charge(CHARGE_MIN_V, 60000);
 
 enum CooldownKey { CD_INTRUSION, CD_MOTION, CD_DOOR_OPEN, CD_HOT, CD_COLD, CD_COOLANT, CD_MIL, CD_OIL,
-                   CD_LOW, CD_COUNT };
+                   CD_LOW, CD_BADSIG, CD_COUNT };
 Cooldown<CD_COUNT> cooldown;
 
 // 設定（NVS に保存。指示で切り替え）
@@ -108,6 +114,29 @@ bool stateDirty = true;       // 出来事があったので状態を送りた�
 bool sleepingSoon = false;    // これから眠る（状態に入れて、ダッシュボードに休止中と出す）
 uint32_t setupBtnSince = 0;
 
+// ---- 見張り・更新の確認 ----
+bool otaPending = false;     // OTA で更新した直後（正常に動くと確かめるまで前の版に戻せる）
+const char* resetReason = "";
+uint32_t lastCmdTs = 0;      // 最後に受け付けた署名付き指示の時刻（使い回しを防ぐ）
+
+// ---- 盗難の検知・追跡 ----
+bool tracking = false;       // 盗難の疑い：位置を頻繁に送る
+uint32_t accOnMs = 0;
+bool theftChecked = false;   // この ACC ON ではもう判断した
+uint32_t lastTrackNotifyMs = 0;
+bool parkGpsCheck = false;   // 駐車モードで起きたとき、GPS で位置を確かめている
+double parkedLat = 0, parkedLon = 0;
+RTC_DATA_ATTR bool rtcUartGps = false;  // J8 に GPS モジュールがある
+WiFiUDP nmeaUdp;
+
+// ---- 点検の予定・凍結 ----
+MaintItem maintItems[MAX_MAINT];
+int maintCount = 0;
+float gpsKm = 0;             // GPS で測った累計の走行距離
+uint32_t lastMaintCheckMs = 0;
+int lastFreezeDay = -1;
+RTC_DATA_ATTR int rtcFreezeDay = -1;
+
 void publishState(uint32_t now);  // 下で定義
 
 // 眠っている間 LOW に固定する出力（フォトカプラの LED とブザー）
@@ -128,6 +157,8 @@ void loadPrefs() {
   alarmOn = prefs.getBool("alarm", true);
   sirenOn = prefs.getBool("siren", false);
   engineSec = prefs.getUInt("engsec", 0);
+  gpsKm = prefs.getFloat("gpskm", 0);
+  lastCmdTs = prefs.getUInt("cmdts", 0);
   oilBaseSec = prefs.getUInt("oilbase", 0);
   parkOn = prefs.getBool("park", PARK_SLEEP_DEFAULT);
 }
@@ -173,14 +204,58 @@ void doLock(uint32_t now, const char* why) {
   lockPending = false;
 }
 
-// ---- スマホからの指示（"<暗証番号> <指示> [引数]"） ----
+// 暗証番号だけで受け付ける指示（読むだけのもの・施錠）。それ以外は署名が必要
+bool plainAllowed(const String& cmd) {
+  return cmd == "status" || cmd == "state" || cmd == "scan" || cmd == "beep" || cmd == "lock";
+}
+
+bool clockValid();
+void dispatchCommand(String cmd, uint32_t now);
+
+// ---- スマホ・ダッシュボードからの指示 ----
+// ダッシュボード："sig1 <時刻> <署名> <指示>"（署名で本物か・使い回しでないかを確かめる）
+// ntfy アプリから手で送る："<暗証番号> <指示>"（読むだけの指示と施錠だけ）
 void handleCommand(String line, uint32_t now) {
   line.trim();
+  if (line.startsWith("sig1 ")) {
+    SignedCommand sc;
+    if (!parseSigned(line.c_str(), sc)) return;
+    uint32_t nowTs = clockValid() ? (uint32_t)time(nullptr) : 0;
+    SigVerdict v = verifyCommand(settings.cmdKey.c_str(), sc, nowTs, lastCmdTs, CMD_MAX_AGE_SEC, CMD_MAX_FUTURE_SEC);
+    if (v == SigVerdict::BadSignature) {
+      if (cooldown.allow(CD_BADSIG, now, 3600000UL)) {
+        notifier.send(Prio::Default, "署名が合わない指示を無視しました",
+                      "ダッシュボードの「指示の鍵」が古いか、他人が送った可能性があります", "warning");
+      }
+      return;
+    }
+    if (v == SigVerdict::TooOld) {
+      notifier.send(Prio::Low, "古い指示を無視しました", String(sc.cmd) + "（30 分以上前に送られたもの）");
+      return;
+    }
+    if (v != SigVerdict::Ok) return;  // 使い回し・未来の時刻は黙って無視
+    lastCmdTs = sc.ts;
+    prefs.putUInt("cmdts", lastCmdTs);
+    dispatchCommand(String(sc.cmd), now);
+    return;
+  }
   if (settings.pin.isEmpty()) return;
   String pin = settings.pin + " ";
   if (!line.startsWith(pin)) return;  // 暗証番号が違うものは黙って無視
-  stateDirty = true;  // 指示を受けたら、結果をダッシュボードにも反映する
   String cmd = line.substring(pin.length());
+  cmd.trim();
+  cmd.toLowerCase();
+  String head = cmd.indexOf(' ') > 0 ? cmd.substring(0, cmd.indexOf(' ')) : cmd;
+  if (!plainAllowed(head)) {
+    notifier.send(Prio::Low, "ダッシュボードから送ってください",
+                  "\"" + head + "\" は、なりすまし防止のため署名が必要です（ダッシュボードの操作ボタンから送れます）");
+    return;
+  }
+  dispatchCommand(cmd, now);
+}
+
+void dispatchCommand(String cmd, uint32_t now) {
+  stateDirty = true;  // 指示を受けたら、結果をダッシュボードにも反映する
   cmd.trim();
   cmd.toLowerCase();
   String arg;
@@ -244,6 +319,15 @@ void handleCommand(String line, uint32_t now) {
     buzzer.beep(3);
   } else if (cmd == "silence") {
     buzzer.stop();
+  } else if (cmd == "track") {
+    if (arg == "off") {
+      tracking = false;
+      notifier.send(Prio::Low, "追跡を終わりました", "");
+    } else {
+      tracking = true;
+      lastTrackNotifyMs = 0;
+      notifier.send(Prio::Low, "追跡を始めました", "位置を " + String(TRACK_NOTIFY_MS / 60000) + " 分ごとに通知します");
+    }
   } else if (cmd == "oilreset") {
     oilBaseSec = engineSec;
     prefs.putUInt("oilbase", oilBaseSec);
@@ -252,7 +336,7 @@ void handleCommand(String line, uint32_t now) {
   } else {
     notifier.send(Prio::Low, "不明な指示",
                   "status / scan / lock / pause [分] / resume / autolock on|off / alarm on|off / "
-                  "siren on|off / park on|off / beep / silence / oilreset / setup");
+                  "siren on|off / park on|off / track on|off / beep / silence / oilreset / setup");
   }
 }
 
@@ -265,7 +349,10 @@ void enterDeepSleep(SleepKind kind) {
   strlcpy(rtcSince, since.c_str(), sizeof(rtcSince));
   rtcLastReportDay = lastReportDay;
   rtcLastCrankV = lastCrankV;
-  rtcHaveLast = gps.lastKnown(rtcLat, rtcLon);
+  // 駐車位置は、駐車してから最初に眠るときの位置のまま保つ（起きるたびの測位のぶれで動かさない）
+  if (!parkTimerWake || !rtcHaveLast) rtcHaveLast = gps.lastKnown(rtcLat, rtcLon);
+  rtcUartGps = rtcUartGps || gps.uartPresent();
+  rtcFreezeDay = lastFreezeDay;
   ble.setEnabled(false);
   sensors.sleep();
   gps.standby();
@@ -288,6 +375,7 @@ void flushThenSleep(SleepKind kind) {
   if (sleepingSoon) publishState(millis());  // ダッシュボードに「休止中」と出す
   uint32_t until = millis() + 20000;
   while (millis() < until && !notifier.idle()) {
+    esp_task_wdt_reset();
     notifier.loop(millis());
     delay(50);
   }
@@ -339,6 +427,7 @@ void setupBeacons() {
 }
 
 void nearbyForPortal(JsonArray arr) { ble.nearbyToJson(arr, millis()); }
+float gpsKmForPortal() { return gpsKm; }
 
 bool clockValid() { return time(nullptr) > 1700000000; }
 
@@ -401,7 +490,29 @@ String stateJson(uint32_t now) {
     d["lon"] = serialized(String(lon, 6));
   }
   d["fix"] = gps.hasFix(now);
+  if (tracking) d["trk"] = true;
+  if (resetReason[0]) d["rst"] = resetReason;
+  if (otaPending) d["ota"] = "verifying";
+  if (gps.present()) d["gsrc"] = gps.source();
+  if (settings.odoKm > 0) d["odo"] = (int)(settings.odoKm + gpsKm - settings.odoGpsKm);
+  if (maintCount > 0 && clockValid()) {
+    JsonArray mt = d["mt"].to<JsonArray>();
+    struct tm lt;
+    time_t tt = time(nullptr);
+    localtime_r(&tt, &lt);
+    int32_t today = daysFromCivil(lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday);
+    for (int i = 0; i < maintCount; ++i) {
+      JsonObject o = mt.add<JsonObject>();
+      o["n"] = maintItems[i].name;
+      if (maintItems[i].byDate) {
+        o["d"] = maintItems[i].day - today;
+      } else if (settings.odoKm > 0) {
+        o["k"] = (int)(maintItems[i].km - (settings.odoKm + gpsKm - settings.odoGpsKm));
+      }
+    }
+  }
   JsonObject dev = d["dev"].to<JsonObject>();
+  if (WiFi.status() == WL_CONNECTED) dev["ip"] = WiFi.localIP().toString();
   dev["bme"] = sensors.hasEnv();
   dev["mpu"] = sensors.hasMotion();
   dev["gps"] = gps.present();
@@ -438,7 +549,101 @@ void publishState(uint32_t now) {
   stateDirty = false;
 }
 
+const char* resetReasonName(esp_reset_reason_t r) {
+  switch (r) {
+    case ESP_RST_POWERON: return "電源投入";
+    case ESP_RST_SW: return "再起動の指示";
+    case ESP_RST_PANIC: return "プログラムの異常";
+    case ESP_RST_INT_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_WDT: return "応答なし（ウォッチドッグ）";
+    case ESP_RST_BROWNOUT: return "電圧の瞬断";
+    case ESP_RST_DEEPSLEEP: return "";
+    default: return "その他";
+  }
+}
+
+bool abnormalReset(esp_reset_reason_t r) {
+  return r == ESP_RST_PANIC || r == ESP_RST_INT_WDT || r == ESP_RST_TASK_WDT || r == ESP_RST_WDT ||
+         r == ESP_RST_BROWNOUT;
+}
+
+void loadMaint() {
+  maintCount = 0;
+  String all = settings.maint;
+  int start = 0;
+  while (start <= (int)all.length() && maintCount < MAX_MAINT) {
+    int nl = all.indexOf('\n', start);
+    if (nl < 0) nl = all.length();
+    String l = all.substring(start, nl);
+    l.trim();
+    if (l.length() && parseMaintLine(l.c_str(), maintItems[maintCount])) ++maintCount;
+    start = nl + 1;
+  }
+}
+
+int32_t odometerKm() { return settings.odoKm + (int32_t)(gpsKm - settings.odoGpsKm); }
+
+int32_t todayDays() {
+  struct tm lt;
+  time_t tt = time(nullptr);
+  localtime_r(&tt, &lt);
+  return daysFromCivil(lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday);
+}
+
+// 点検の予定：段階が上がったときだけ通知（段階は項目の名前と期日ごとに NVS に覚える）
+void checkMaint(uint32_t now) {
+  if (maintCount == 0 || !clockValid() || (lastMaintCheckMs && now - lastMaintCheckMs < 10 * 60000UL)) return;
+  lastMaintCheckMs = now;
+  int32_t today = todayDays();
+  bool odoKnown = settings.odoKm > 0;
+  for (int i = 0; i < maintCount; ++i) {
+    const MaintItem& it = maintItems[i];
+    int level = maintLevel(it, today, odometerKm(), odoKnown);
+    // 項目ごとの鍵（名前と期日から作る）。項目を書き換えたら数え直しになる
+    uint8_t h[32];
+    char tag[48];
+    snprintf(tag, sizeof(tag), "%s|%ld|%ld", it.name, (long)it.day, (long)it.km);
+    Sha256 sh;
+    sh.update(tag);
+    sh.finish(h);
+    char key[16];
+    snprintf(key, sizeof(key), "mt%02x%02x%02x%02x", h[0], h[1], h[2], h[3]);
+    int done = prefs.getInt(key, 0);
+    if (level <= done) {
+      if (level < done) prefs.putInt(key, level);
+      continue;
+    }
+    prefs.putInt(key, level);
+    String body;
+    if (it.byDate) {
+      int32_t left = it.day - today;
+      body = left > 0 ? "あと " + String(left) + " 日です" : (left == 0 ? String("今日です") : "期日を " + String(-left) + " 日過ぎています");
+    } else {
+      int32_t left = it.km - odometerKm();
+      body = left > 0 ? "あと " + String(left) + "km です" : "予定の距離を " + String(-left) + "km 過ぎています";
+    }
+    notifier.send(level >= 4 ? Prio::High : Prio::Default, String(it.name) + "の時期です", body, "calendar");
+  }
+}
+
+// 冬の朝、車内が氷点下近くなら凍結に注意（1 日 1 回）
+void checkFreeze() {
+  if (!sensors.hasEnv() || isnan(sensors.tempC()) || !clockValid()) return;
+  struct tm lt;
+  time_t tt = time(nullptr);
+  localtime_r(&tt, &lt);
+  if (lt.tm_hour < FREEZE_HOUR_FROM || lt.tm_hour >= FREEZE_HOUR_TO || lt.tm_yday == lastFreezeDay) return;
+  if (sensors.tempC() > FREEZE_WARN_C) return;
+  lastFreezeDay = lt.tm_yday;
+  notifier.send(Prio::Default, "凍結に注意", "車内 " + fmt1(sensors.tempC()) + "℃。窓の凍結や路面の凍結に気を付けてください",
+                "snowflake");
+}
+
 }  // namespace
+
+// 更新後の新しい版を、正常に動くと確かめるまで「仮」のままにする（Arduino の既定ではすぐ「正常」になる）
+extern "C" bool verifyRollbackLater() { return true; }
 
 void setup() {
   Serial.begin(115200);
@@ -454,7 +659,12 @@ void setup() {
     notifier.resumeFrom(String(rtcSince));
     lastReportDay = rtcLastReportDay;
     lastCrankV = rtcLastCrankV;
-    if (rtcHaveLast) gps.setLastKnown(rtcLat, rtcLon);
+    lastFreezeDay = rtcFreezeDay;
+    if (rtcHaveLast) {
+      gps.setLastKnown(rtcLat, rtcLon);
+      parkedLat = rtcLat;
+      parkedLon = rtcLon;
+    }
   }
 
   if (slept == SLEEP_NONE || !rtcHist.sane()) rtcHist.clear();
@@ -468,6 +678,18 @@ void setup() {
     bool accOff = digitalRead(PIN_ACC) == HIGH;
     if (accOff && slept == SLEEP_LOW_VOLTAGE && v < VBAT_LOW_RECOVER) enterDeepSleep(SLEEP_LOW_VOLTAGE);
     if (accOff && slept == SLEEP_PARK && v < VBAT_SLEEP) enterDeepSleep(SLEEP_LOW_VOLTAGE);
+  }
+
+  // 見張り：main loop が WDT_TIMEOUT_S 止まったら再起動する
+  esp_task_wdt_init(WDT_TIMEOUT_S, true);
+  esp_task_wdt_add(nullptr);
+  esp_reset_reason_t rr = esp_reset_reason();
+  resetReason = resetReasonName(rr);
+  // OTA で更新した直後か
+  esp_ota_img_states_t ost;
+  if (esp_ota_get_state_partition(esp_ota_get_running_partition(), &ost) == ESP_OK &&
+      ost == ESP_OTA_IMG_PENDING_VERIFY) {
+    otaPending = true;
   }
 
   lockOut.begin();
@@ -489,8 +711,12 @@ void setup() {
   ble.begin();
   setupBeacons();
   setupWifi();
+  settings.ensureKey();  // 無線が動き始めてから鍵を作る（乱数のため）
+  loadMaint();
+  nmeaUdp.begin(NMEA_UDP_PORT);
   pinMode(PIN_SETUP_BUTTON, INPUT_PULLUP);
   portal.setNearbyProvider(nearbyForPortal);
+  portal.setGpsKmProvider(gpsKmForPortal);
   if (!settings.configured()) portal.start("初期設定です。Wi-Fi と通知先を入力してください。", millis());
 
   wakeMs = millis();
@@ -499,16 +725,26 @@ void setup() {
   } else if (cause == ESP_SLEEP_WAKEUP_TIMER && slept == SLEEP_PARK) {
     parkTimerWake = true;  // 指示の確認などが済んだらまた眠る
     notifier.pollSoon();
+    // J8 の GPS で、駐車位置から動いていないか確かめる（Ottocast は駐車中は電源が切れているので使えない）
+    parkGpsCheck = PARK_GPS_CHECK && rtcUartGps && rtcHaveLast;
   } else if (cause != ESP_SLEEP_WAKEUP_EXT0 && cause != ESP_SLEEP_WAKEUP_TIMER) {
-    notifier.send(Prio::Min, "起動しました",
-                  String("BME280 ") + (sensors.hasEnv() ? "あり" : "なし") + " / MPU6050 " +
-                      (sensors.hasMotion() ? "あり" : "なし"));
+    if (abnormalReset(rr)) {
+      notifier.send(Prio::Default, "異常で再起動しました", String("理由：") + resetReason, "warning");
+    } else {
+      notifier.send(Prio::Min, "起動しました",
+                    String("ファームウェア ") + FW_VERSION + " / BME280 " + (sensors.hasEnv() ? "あり" : "なし") +
+                        " / MPU6050 " + (sensors.hasMotion() ? "あり" : "なし"));
+    }
+  }
+  if (cause == ESP_SLEEP_WAKEUP_EXT0) {
+    accOnMs = millis();  // ACC ON で起きた：盗難の判断を始める
   }
   lastEngineTickMs = millis();
 }
 
 void loop() {
   uint32_t now = millis();
+  esp_task_wdt_reset();
   ArduinoOTA.handle();
   wifiLoop(now);
   portal.loop(now);
@@ -518,6 +754,17 @@ void loop() {
   ble.loop();
   sensors.loop(now);
   gps.loop(now);
+  // Wi-Fi 経由の GPS（Ottocast などから UDP で届く NMEA。1 つのパケットに複数行のことがある）
+  for (int n = nmeaUdp.parsePacket(); n > 0; n = nmeaUdp.parsePacket()) {
+    static char pkt[512];
+    int len = nmeaUdp.read(pkt, sizeof(pkt) - 1);
+    if (len <= 0) break;
+    pkt[len] = '\0';
+    char* save = nullptr;
+    for (char* line = strtok_r(pkt, "\r\n", &save); line; line = strtok_r(nullptr, "\r\n", &save)) {
+      gps.feedLine(line, now);
+    }
+  }
   obd.loop(now);
   lockOut.loop(now);
   out2.loop(now);
@@ -569,6 +816,8 @@ void loop() {
   // ---- ACC ON / OFF ----
   if (inputs.accChanged) {
     if (inputs.acc()) {
+      accOnMs = now ? now : 1;
+      theftChecked = false;
       crank.start(now);
       obd.setActive(true, now);
       gps.startTrip(now);
@@ -578,6 +827,14 @@ void loop() {
       obd.setActive(false, now);
       saveEngine();
       TripSummary t = gps.endTrip(now);
+      if (t.distanceKm > 0) {
+        gpsKm += t.distanceKm;
+        prefs.putFloat("gpskm", gpsKm);
+      }
+      if (tracking) {
+        notifier.send(Prio::High, "ACC が切れました（追跡中）", "最後の位置" + mapLink(), "rotating_light");
+        tracking = false;
+      }
       if (t.durationSec >= 60) {
         notifier.send(Prio::Min, "走行記録",
                       String(t.durationSec / 60) + " 分  " + String(t.distanceKm, 1) + "km  最高 " +
@@ -614,7 +871,7 @@ void loop() {
   }
   if (!battery.lowVoltage()) lowNotified = false;
   ble.setEnabled(!battery.lowVoltage() || inputs.acc());
-  if (battery.valid() && battery.volts() < VBAT_SLEEP && !inputs.acc() && now > 120000) {
+  if (battery.valid() && battery.volts() < VBAT_SLEEP && !inputs.acc() && now > 120000 && !otaPending) {
     notifier.send(Prio::Urgent, "省電力モードに入ります",
                   fmt1(battery.volts()) + "V。ACC ON かドアが開くと復帰します", "zzz");
     saveEngine();
@@ -733,6 +990,65 @@ void loop() {
     }
   }
 
+  // ---- 盗難の疑い：キー（ビーコン）が無いのに ACC が入った（リレーアタックなど） ----
+  if (inputs.acc() && accOnMs && !theftChecked && now - accOnMs > ACC_NO_KEY_GRACE_MS) {
+    theftChecked = true;
+    if (alarmOn && ble.ruleCount() > 0 && presence.state() != PresenceState::Present) {
+      tracking = true;
+      lastTrackNotifyMs = now;
+      notifier.send(Prio::Urgent, "キーが無いのに ACC が入りました",
+                    "盗難の可能性があります。位置を追跡します（キーのビーコンの電池切れでも起きます）" + mapLink(),
+                    "rotating_light");
+      if (sirenOn) buzzer.alarm(ALARM_SOUND_MS);
+    }
+  }
+  // 駐車モードで起きたとき：GPS で駐車位置から動いていないか（レッカー移動など）
+  if (parkGpsCheck) {
+    if (gps.hasFix(now)) {
+      double lat, lon;
+      gps.lastKnown(lat, lon);
+      double d = haversineM(parkedLat, parkedLon, lat, lon);
+      parkGpsCheck = false;
+      if (d > MOVE_ALERT_M && alarmOn) {
+        tracking = true;
+        parkTimerWake = false;  // 眠らずに追跡する
+        lastTrackNotifyMs = now;
+        notifier.send(Prio::Urgent, "駐車位置から移動しています",
+                      String((int)d) + "m 離れています。位置を追跡します" + mapLink(), "rotating_light");
+      }
+    } else if (now - wakeMs > PARK_GPS_WAIT_MS) {
+      parkGpsCheck = false;  // 測位できなかった（屋内など）
+    }
+  }
+  // 追跡中：キーが戻れば終わり。位置を定期的に通知し、状態も頻繁に送る
+  if (tracking) {
+    if (pev == PresenceEvent::Arrived) {
+      tracking = false;
+      notifier.send(Prio::Default, "キーが見つかりました", "追跡を終わります");
+    } else if (now - lastTrackNotifyMs >= TRACK_NOTIFY_MS) {
+      lastTrackNotifyMs = now;
+      notifier.send(Prio::High, "追跡中の位置", (gps.hasFix(now) ? String("測位中") : String("最後に測位した位置")) + mapLink(),
+                    "round_pushpin");
+    }
+    if (now - lastStateMs >= TRACK_STATE_MS) stateDirty = true;
+  }
+
+  // ---- 点検の予定・凍結 ----
+  checkMaint(now);
+  checkFreeze();
+
+  // ---- 更新の確認：ntfy と通信でき、しばらく正常に動いたら「正常」にする。だめなら前の版に戻す ----
+  if (otaPending) {
+    if (now > OTA_MIN_RUN_MS && (notifier.pollCount() > 0 || notifier.sentCount() > 0)) {
+      esp_ota_mark_app_valid_cancel_rollback();
+      otaPending = false;
+      notifier.send(Prio::Low, "ファームウェアを更新しました", String("版 ") + FW_VERSION);
+    } else if (now > OTA_VERIFY_MS) {
+      Serial.println("OTA verify failed, rolling back");
+      esp_ota_mark_app_invalid_rollback_and_reboot();
+    }
+  }
+
   // ---- ダッシュボード：電圧・温度の履歴と、状態の送信 ----
   if (battery.valid()) recordHistory(battery.volts());
   if (now - lastStateMs >= STATE_PUBLISH_MS || (stateDirty && now - lastStateMs >= STATE_MIN_GAP_MS) ||
@@ -743,7 +1059,7 @@ void loop() {
   // ---- 駐車モード ----
   bool outputsOn = lockOut.on() || out2.on() || out3.on() || out4.on();
   bool busy = lockPending || buzzer.alarming() || !notifier.idle() || pauseUntilMs != 0 || doorWake || outputsOn ||
-              portal.active();
+              portal.active() || otaPending || tracking;
   ParkInputs park{parkOn, inputs.acc(), engineRunning, presence.state() == PresenceState::Absent,
                   inputs.doorOpen(), busy};
   if (parkTimerWake) {
@@ -753,8 +1069,9 @@ void loop() {
       parkTimer.restart();
     } else {
       bool done = now - wakeMs >= PARK_KEY_SCAN_MS && notifier.pollCount() > pollsAtWake && notifier.idle() &&
-                  lastStateMs != 0 && !portal.active();
-      if (done || (now - wakeMs > PARK_AWAKE_MAX_MS && !portal.active())) enterDeepSleep(SLEEP_PARK);
+                  lastStateMs != 0 && !portal.active() && !parkGpsCheck && !otaPending;
+      uint32_t maxAwake = PARK_AWAKE_MAX_MS + (parkGpsCheck ? PARK_GPS_WAIT_MS : 0);
+      if (done || (now - wakeMs > maxAwake && !portal.active() && !otaPending)) enterDeepSleep(SLEEP_PARK);
     }
   } else if (parkTimer.update(park, now)) {
     saveEngine();

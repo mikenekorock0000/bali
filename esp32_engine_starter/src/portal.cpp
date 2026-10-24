@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "settings.h"
+#include "maintenance.h"
 #include "settings_rules.h"
 
 using namespace starter;
@@ -52,6 +53,17 @@ ul{padding-left:18px;margin:6px 0}li{font-size:14px;cursor:pointer}
 <label>状態のトピック（ダッシュボード用。アプリでは購読しない）</label><input name="sttopic" value="{{sttopic}}" required>
 <p class="hint">トピック名は英数字・-・_ の 12〜64 文字。名前を知っている人は誰でも読めるので、推測されない長い文字列にしてください。</p>
 <label>アクセストークン（ntfy のアカウントを使う場合だけ）</label><input name="token" type="password" placeholder="{{tokenph}}">
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="tlsins" value="1" style="width:auto" {{tlsins}}>サーバーの証明書を確かめない（自己署名の自前サーバーの場合だけ）</label>
+</fieldset>
+<fieldset><legend>ダッシュボードの「指示の鍵」</legend>
+<p class="hint">ダッシュボードから送る指示に付ける署名の鍵です。ダッシュボードの設定に入れてください。他人に知られると指示を送られるので、人に見せないでください。</p>
+<div class="row"><input id="keyv" readonly placeholder="今の暗証番号を入れて「表示」"><button type="button" onclick="showKey()">表示</button></div>
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="newkey" value="1" style="width:auto">鍵を作り直す（前の鍵を入れたダッシュボードからは送れなくなる）</label>
+</fieldset>
+<fieldset><legend>点検の予定</legend>
+<label>1 行に 1 件。「名前 日付」か「名前 走行距離km」（例：車検 2027-05-20 / タイヤ交換 45000km）</label><textarea name="maint">{{maint}}</textarea>
+<label>今のメーターの走行距離 [km]（走行距離の予定に使う。変えるときだけ入力）</label><input name="odo" inputmode="numeric" placeholder="{{odoph}}">
+<p class="hint">走行距離は GPS で測った距離を足していきます（GPS が無いと増えません）。</p>
 </fieldset>
 <fieldset><legend>キー（BLE ビーコン）</legend>
 <label>1 行に 1 つ（MAC アドレスか uuid:...）。最大 {{maxb}} 個</label><textarea name="beacons">{{beacons}}</textarea>
@@ -70,6 +82,7 @@ ul{padding-left:18px;margin:6px 0}li{font-size:14px;cursor:pointer}
 <script>
 function fill(id,items,f){const u=document.getElementById(id);u.innerHTML='';items.forEach(x=>{const li=document.createElement('li');li.textContent=f(x);li.onclick=()=>x.pick&&x.pick();u.appendChild(li)})}
 function scan(){fetch('/scan').then(r=>r.json()).then(a=>fill('nets',a.map(n=>({...n,pick:()=>document.getElementById('ssid1').value=n.ssid})),n=>n.ssid+'（'+n.rssi+'dBm）'))}
+function showKey(){const p=document.querySelector('[name=curpin]');const pin=p?p.value:'';fetch('/key',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'curpin='+encodeURIComponent(pin)}).then(r=>r.ok?r.text():Promise.reject(r.status)).then(k=>document.getElementById('keyv').value=k).catch(()=>alert('今の暗証番号を「確認」の欄に入れてから押してください'))}
 function ble(){fetch('/ble').then(r=>r.json()).then(a=>fill('bles',a.map(b=>({...b,pick:()=>{const t=document.querySelector('[name=beacons]');t.value=(t.value.trim()+'\n'+(b.uuid?'uuid:'+b.uuid+':'+b.major+':'+b.minor:b.mac)).trim()}})),b=>b.mac+' '+b.rssi+'dBm '+(b.name||'')+(b.uuid?' iBeacon':'')))}
 </script></body></html>)HTML";
 
@@ -112,6 +125,9 @@ String page(const String& reason, const String& ap) {
   h.replace("{{pinph}}", keepPh(settings.pin));
   h.replace("{{otaph}}", keepPh(settings.otaPass));
   h.replace("{{vcal}}", String(settings.vbatCal, 3));
+  h.replace("{{tlsins}}", settings.tlsInsecure ? "checked" : "");
+  h.replace("{{maint}}", esc(settings.maint));
+  h.replace("{{odoph}}", settings.odoKm > 0 ? "（入力済み）" : "（未入力）");
   h.replace("{{ap}}", esc(ap));
   h.replace("{{timeout}}", String(SETUP_TIMEOUT_MS / 60000));
   // 設定済みなら、今の暗証番号を知っている人だけが保存できる（車の近くにいる他人に書き換えさせない）
@@ -152,6 +168,7 @@ void SetupPortal::start(const char* reason, uint32_t nowMs) {
     server.on("/save", HTTP_POST, [this] { handleSave(); });
     server.on("/scan", HTTP_GET, [this] { handleScan(); });
     server.on("/ble", HTTP_GET, [this] { handleBle(); });
+    server.on("/key", HTTP_POST, [this] { handleKey(); });
     server.onNotFound([this] { handleRedirect(); });
     serverUp_ = true;
   }
@@ -214,6 +231,16 @@ void SetupPortal::handleBle() {
   server.send(200, "application/json", out);
 }
 
+void SetupPortal::handleKey() {
+  startedMs_ = millis();
+  // 鍵は暗証番号を知っている人にだけ見せる（未設定のときは誰でも：初期設定の最中）
+  if (settings.pin.length() && server.arg("curpin") != settings.pin) {
+    server.send(403, "text/plain", "");
+    return;
+  }
+  server.send(200, "text/plain", settings.cmdKey);
+}
+
 void SetupPortal::handleSave() {
   startedMs_ = millis();
   if (settings.pin.length() && server.arg("curpin") != settings.pin) {
@@ -238,6 +265,17 @@ void SetupPortal::handleSave() {
   s.pin = keepOr(server.arg("pin"), settings.pin);
   s.otaPass = keepOr(server.arg("otapass"), settings.otaPass);
   s.vbatCal = server.arg("vcal").toFloat();
+  s.tlsInsecure = server.arg("tlsins") == "1";
+  if (server.arg("newkey") == "1") s.cmdKey = Settings::newKey();
+  s.maint = server.arg("maint");
+  s.maint.replace("\r", "");
+  if (server.arg("odo").length()) {
+    long km = server.arg("odo").toInt();
+    if (km > 0 && km < 2000000) {
+      s.odoKm = km;
+      s.odoGpsKm = gpsKm_ ? gpsKm_() : 0;
+    }
+  }
   String lines = server.arg("beacons");
   for (String& b : s.beacons) b = "";
   int n = 0, start = 0;
@@ -262,6 +300,27 @@ void SetupPortal::handleSave() {
   if (!validPin(s.pin.c_str())) err += "暗証番号（数字 4〜8 桁）<br>";
   if (!validOtaPass(s.otaPass.c_str())) err += "OTA のパスワード（8〜32 文字）<br>";
   if (!validCal(s.vbatCal)) err += "電圧の補正係数（0.8〜1.2）<br>";
+  {
+    int n = 0, start = 0;
+    String bad;
+    while (start <= (int)s.maint.length()) {
+      int nl = s.maint.indexOf('\n', start);
+      if (nl < 0) nl = s.maint.length();
+      String l = s.maint.substring(start, nl);
+      l.trim();
+      MaintItem it;
+      if (l.length()) {
+        if (parseMaintLine(l.c_str(), it)) {
+          ++n;
+        } else {
+          bad += esc(l) + "<br>";
+        }
+      }
+      start = nl + 1;
+    }
+    if (bad.length()) err += "点検の予定の書き方（「名前 2027-05-20」か「名前 45000km」）：<br>" + bad;
+    if (n > MAX_MAINT) err += "点検の予定は " + String(MAX_MAINT) + " 件まで<br>";
+  }
   if (err.length()) {
     sendMessage(400, "入力を確認してください", "<span style='color:#c62828'>" + err + "</span>保存していません。");
     return;
