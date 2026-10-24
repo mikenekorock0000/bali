@@ -12,8 +12,10 @@ class Notifier {
   void loop(uint32_t nowMs);
   // 指示用トピックに届いた新しいメッセージを 1 件取り出す
   bool takeCommand(String& cmd);
-  // 送っていない通知がない
-  bool idle() const { return count_ == 0; }
+  // ダッシュボード用の状態（JSON）を状態のトピックに送る。未送信の古い状態は新しいもので置き換える
+  void publishState(const String& json) { state_ = json; }
+  // 送っていない通知・状態がない
+  bool idle() const { return count_ == 0 && state_.isEmpty(); }
   // 指示用トピックをすぐ読みに行く（loop() の次の回で）
   void pollSoon() { pollNow_ = true; }
   uint32_t pollCount() const { return polls_; }  // 指示用トピックを読めた回数
@@ -30,6 +32,8 @@ class Notifier {
     String title, body, tags;
   };
   bool post(const Msg& m);
+  bool postState(const String& json);
+  void addAuth(class HTTPClient& http);
   void pollCommands();
 
   static constexpr int QUEUE = 8;
@@ -41,6 +45,7 @@ class Notifier {
   bool firstPoll_ = true;
   bool pollNow_ = false;
   uint32_t polls_ = 0;
+  String state_;
   String cmds_[4];
   int cmdCount_ = 0;
 };

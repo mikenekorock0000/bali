@@ -6,7 +6,7 @@
 #include <WiFiClientSecure.h>
 
 #include "config.h"
-#include "secrets_select.h"
+#include "settings.h"
 
 void Notifier::begin() {}
 
@@ -24,7 +24,7 @@ bool Notifier::post(const Msg& m) {
   // 日本語のタイトルは HTTP ヘッダーに直接入れられないので、ntfy の JSON 形式で
   // サーバーのルート（"https://ntfy.sh/"）に送る。
   JsonDocument doc;
-  doc["topic"] = NTFY_TOPIC;
+  doc["topic"] = settings.topic;
   doc["title"] = m.title;
   doc["message"] = m.body;
   doc["priority"] = (int)m.prio;
@@ -38,9 +38,29 @@ bool Notifier::post(const Msg& m) {
   client.setInsecure();
   HTTPClient http;
   http.setTimeout(8000);
-  if (!http.begin(client, String(NTFY_SERVER) + "/")) return false;
+  if (!http.begin(client, settings.ntfyServer + "/")) return false;
   http.addHeader("Content-Type", "application/json");
+  addAuth(http);
   int code = http.POST(payload);
+  http.end();
+  return code >= 200 && code < 300;
+}
+
+void Notifier::addAuth(HTTPClient& http) {
+  if (settings.token.length()) http.addHeader("Authorization", "Bearer " + settings.token);
+}
+
+bool Notifier::postState(const String& json) {
+  // 状態は JSON をそのまま本文にする。スマホの通知にならないよう優先度は最低
+  WiFiClientSecure client;
+  client.setInsecure();
+  HTTPClient http;
+  http.setTimeout(8000);
+  if (!http.begin(client, settings.ntfyServer + "/" + settings.stateTopic)) return false;
+  http.addHeader("Title", "state");
+  http.addHeader("Priority", "1");
+  addAuth(http);
+  int code = http.POST(json);
   http.end();
   return code >= 200 && code < 300;
 }
@@ -51,8 +71,9 @@ void Notifier::pollCommands() {
   HTTPClient http;
   http.setTimeout(8000);
   // 最初の取得は起動前に届いていた指示を読み飛ばすためだけに使う（実行しない）
-  String url = String(NTFY_SERVER) + "/" + NTFY_CMD_TOPIC + "/json?poll=1&since=" + (since_.isEmpty() ? "all" : since_);
+  String url = settings.ntfyServer + "/" + settings.cmdTopic + "/json?poll=1&since=" + (since_.isEmpty() ? "all" : since_);
   if (!http.begin(client, url)) return;
+  addAuth(http);
   int code = http.GET();
   if (code == 200) {
     String body = http.getString();
@@ -75,7 +96,7 @@ void Notifier::pollCommands() {
 }
 
 void Notifier::loop(uint32_t nowMs) {
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (WiFi.status() != WL_CONNECTED || !settings.configured()) return;
   if (count_ > 0 && static_cast<int32_t>(nowMs - nextTryMs_) >= 0) {
     if (post(q_[head_])) {
       head_ = (head_ + 1) % QUEUE;
@@ -85,6 +106,15 @@ void Notifier::loop(uint32_t nowMs) {
       nextTryMs_ = nowMs + 30000;  // 失敗したら 30 秒後に再送
     }
     return;  // 1 回の loop で通信は 1 つだけ
+  }
+  if (state_.length() && static_cast<int32_t>(nowMs - nextTryMs_) >= 0) {
+    if (postState(state_)) {
+      state_ = "";
+      nextTryMs_ = nowMs + 500;
+    } else {
+      nextTryMs_ = nowMs + 30000;
+    }
+    return;
   }
   if (pollNow_ || nowMs - lastPollMs_ >= CMD_POLL_MS) {
     pollNow_ = false;

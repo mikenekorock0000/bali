@@ -7,6 +7,8 @@
 // - GPS：走行ごとの距離・最高速度、駐車位置
 // - 車内の温度・湿度
 // 通知は ntfy、スマホからの指示は ntfy の指示用トピック（"<暗証番号> <指示>"）で受け取る。
+// ダッシュボード用に、状態と電圧・温度の履歴を JSON で状態のトピックに送る。
+// Wi-Fi などの設定は、設定モード（ESP32 が出す Wi-Fi「HIJET-SETUP-xxxx」）の画面で行い、NVS に保存する。
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
@@ -29,10 +31,12 @@
 #include "io.h"
 #include "notifier.h"
 #include "obd.h"
+#include "history.h"
 #include "park_sleep.h"
+#include "portal.h"
 #include "presence.h"
-#include "secrets_select.h"
 #include "sensors.h"
+#include "settings.h"
 
 using namespace starter;
 
@@ -93,6 +97,18 @@ RTC_DATA_ATTR int rtcLastReportDay = -1;
 RTC_DATA_ATTR bool rtcHaveLast = false;
 RTC_DATA_ATTR double rtcLat = 0, rtcLon = 0;
 RTC_DATA_ATTR float rtcLastCrankV = NAN;
+RTC_DATA_ATTR History<HIST_POINTS> rtcHist;  // ダッシュボードのグラフ用（電源を切ると消える）
+
+// ---- Wi-Fi・ダッシュボード ----
+uint32_t wifiTryMs = 0;
+bool wifiOnSecond = false;
+uint32_t wifiDownSince = 0;  // ACC ON で Wi-Fi が切れている時間を測る（0 なら測っていない）
+uint32_t lastStateMs = 0;
+bool stateDirty = true;       // 出来事があったので状態を送りたい
+bool sleepingSoon = false;    // これから眠る（状態に入れて、ダッシュボードに休止中と出す）
+uint32_t setupBtnSince = 0;
+
+void publishState(uint32_t now);  // 下で定義
 
 // 眠っている間 LOW に固定する出力（フォトカプラの LED とブザー）
 const gpio_num_t HOLD_PINS[] = {(gpio_num_t)PIN_OUT_LOCK, (gpio_num_t)PIN_OUT2, (gpio_num_t)PIN_OUT3,
@@ -160,8 +176,10 @@ void doLock(uint32_t now, const char* why) {
 // ---- スマホからの指示（"<暗証番号> <指示> [引数]"） ----
 void handleCommand(String line, uint32_t now) {
   line.trim();
-  String pin = String(CMD_PIN) + " ";
+  if (settings.pin.isEmpty()) return;
+  String pin = settings.pin + " ";
   if (!line.startsWith(pin)) return;  // 暗証番号が違うものは黙って無視
+  stateDirty = true;  // 指示を受けたら、結果をダッシュボードにも反映する
   String cmd = line.substring(pin.length());
   cmd.trim();
   cmd.toLowerCase();
@@ -174,6 +192,13 @@ void handleCommand(String line, uint32_t now) {
 
   if (cmd == "status") {
     notifier.send(Prio::Low, "状態", statusText(now) + mapLink());
+  } else if (cmd == "state") {
+    // ダッシュボードの「更新」：通知は出さず、状態だけ送る
+  } else if (cmd == "setup") {
+    portal.start("スマホからの指示で設定モードに入りました。", now);
+    notifier.send(Prio::Low, "設定モード",
+                  "車の近くで Wi-Fi「" + portal.apName() + "」につなぐと設定画面が開きます（" +
+                      String(SETUP_TIMEOUT_MS / 60000) + " 分で終了）");
   } else if (cmd == "lock") {
     doLock(now, "スマホからの指示");
   } else if (cmd == "pause") {
@@ -227,7 +252,7 @@ void handleCommand(String line, uint32_t now) {
   } else {
     notifier.send(Prio::Low, "不明な指示",
                   "status / scan / lock / pause [分] / resume / autolock on|off / alarm on|off / "
-                  "siren on|off / park on|off / beep / silence / oilreset");
+                  "siren on|off / park on|off / beep / silence / oilreset / setup");
   }
 }
 
@@ -259,6 +284,8 @@ void enterDeepSleep(SleepKind kind) {
 }
 
 void flushThenSleep(SleepKind kind) {
+  sleepingSoon = kind == SLEEP_PARK;
+  if (sleepingSoon) publishState(millis());  // ダッシュボードに「休止中」と出す
   uint32_t until = millis() + 20000;
   while (millis() < until && !notifier.idle()) {
     notifier.loop(millis());
@@ -267,29 +294,148 @@ void flushThenSleep(SleepKind kind) {
   enterDeepSleep(kind);
 }
 
+void wifiBegin(bool second) {
+  wifiOnSecond = second;
+  wifiTryMs = millis();
+  if (second) {
+    WiFi.begin(settings.ssid2.c_str(), settings.pass2.c_str());
+  } else {
+    WiFi.begin(settings.ssid1.c_str(), settings.pass1.c_str());
+  }
+}
+
 void setupWifi() {
   WiFi.mode(WIFI_STA);
-  WiFi.setHostname(HOSTNAME);
+  WiFi.setHostname(settings.hostname.c_str());
   WiFi.setAutoReconnect(true);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  if (settings.ssid1.length()) wifiBegin(false);
   configTzTime(TZ_JAPAN, NTP_SERVER1, NTP_SERVER2);
-  ArduinoOTA.setHostname(HOSTNAME);
-  ArduinoOTA.setPassword(OTA_PASS);
-  ArduinoOTA.begin();
+  if (settings.otaPass.length() >= 8) {  // パスワードなしの OTA は受け付けない
+    ArduinoOTA.setHostname(settings.hostname.c_str());
+    ArduinoOTA.setPassword(settings.otaPass.c_str());
+    ArduinoOTA.begin();
+  }
+}
+
+// つながらないとき、予備の Wi-Fi があれば交互に試す
+void wifiLoop(uint32_t now) {
+  if (WiFi.status() == WL_CONNECTED || settings.ssid1.isEmpty()) return;
+  if (now - wifiTryMs < WIFI_SWITCH_MS) return;
+  wifiBegin(settings.ssid2.length() ? !wifiOnSecond : false);
 }
 
 void setupBeacons() {
-  const char* rules[] = BEACON_RULES;
   BeaconRule parsed[MAX_BEACONS];
   int n = 0;
-  for (const char* r : rules) {
-    if (n < MAX_BEACONS && parseBeaconRule(r, parsed[n])) {
+  for (const String& r : settings.beacons) {
+    if (r.isEmpty()) continue;
+    if (n < MAX_BEACONS && parseBeaconRule(r.c_str(), parsed[n])) {
       ++n;
     } else {
-      Serial.printf("beacon rule ignored: %s\n", r);
+      Serial.printf("beacon rule ignored: %s\n", r.c_str());
     }
   }
   ble.setRules(parsed, n);
+}
+
+void nearbyForPortal(JsonArray arr) { ble.nearbyToJson(arr, millis()); }
+
+bool clockValid() { return time(nullptr) > 1700000000; }
+
+void recordHistory(float volts) {
+  if (!clockValid() || volts <= 0) return;
+  rtcHist.maybeAdd((uint32_t)time(nullptr), volts, sensors.hasEnv() ? sensors.tempC() : NAN, HIST_INTERVAL_SEC);
+}
+
+const char* presenceKey() {
+  switch (presence.state()) {
+    case PresenceState::Present: return "present";
+    case PresenceState::Absent: return "absent";
+    default: return "unknown";
+  }
+}
+
+// ダッシュボード用の状態（ntfy のメッセージは 4KB までなので、履歴は詰めて入れる）
+String stateJson(uint32_t now) {
+  JsonDocument d;
+  d["fw"] = FW_VERSION;
+  d["up"] = now / 1000;
+  if (clockValid()) d["t"] = (uint32_t)time(nullptr);
+  d["v"] = serialized(String(battery.volts(), 2));
+  d["acc"] = inputs.acc();
+  d["eng"] = engineRunning;
+  d["door"] = inputs.doorOpen();
+  d["in2"] = inputs.in2();
+  d["key"] = presenceKey();
+  if (presence.everSeen()) d["rssi"] = presence.lastRssi();
+  d["armed"] = armed;
+  d["al"] = autoLockOn;
+  d["paused"] = pauseUntilMs != 0;
+  d["alarm"] = alarmOn;
+  d["siren"] = sirenOn;
+  d["park"] = parkOn;
+  d["lowv"] = battery.lowVoltage();
+  d["lockp"] = lockPending;
+  if (sleepingSoon) {
+    d["sleep"] = true;
+    d["wake"] = PARK_WAKE_SEC;
+  }
+  d["engh"] = serialized(String(engineSec / 3600.0f, 1));
+  d["oil"] = serialized(String(oilRemainHours(), 1));
+  if (!isnan(lastCrankV)) d["crank"] = serialized(String(lastCrankV, 2));
+  if (sensors.hasEnv() && !isnan(sensors.tempC())) {
+    d["temp"] = serialized(String(sensors.tempC(), 1));
+    d["hum"] = serialized(String(sensors.humidity(), 0));
+  }
+  if (obd.fresh(now)) {
+    if (!isnan(obd.coolantC)) d["cool"] = serialized(String(obd.coolantC, 0));
+    if (!isnan(obd.rpm)) d["rpm"] = (int)obd.rpm;
+    if (obd.statusKnown) {
+      d["mil"] = obd.milOn;
+      d["dtc"] = obd.dtcCount;
+    }
+  }
+  double lat, lon;
+  if (gps.lastKnown(lat, lon)) {
+    d["lat"] = serialized(String(lat, 6));
+    d["lon"] = serialized(String(lon, 6));
+  }
+  d["fix"] = gps.hasFix(now);
+  JsonObject dev = d["dev"].to<JsonObject>();
+  dev["bme"] = sensors.hasEnv();
+  dev["mpu"] = sensors.hasMotion();
+  dev["gps"] = gps.present();
+  dev["obd"] = obd.fresh(now);
+  dev["keys"] = ble.ruleCount();
+  if (WiFi.status() == WL_CONNECTED) dev["wifi"] = WiFi.RSSI();
+  // 履歴：最初の時刻と、そこからの分・電圧（0.01V）・温度（0.1℃、不明は null）
+  if (rtcHist.size() > 0) {
+    JsonObject h = d["h"].to<JsonObject>();
+    uint32_t t0 = rtcHist.at(0).t;
+    h["t0"] = t0;
+    JsonArray m = h["m"].to<JsonArray>();
+    JsonArray v = h["v"].to<JsonArray>();
+    JsonArray c = h["c"].to<JsonArray>();
+    for (int i = 0; i < rtcHist.size(); ++i) {
+      const HistPoint& p = rtcHist.at(i);
+      m.add((p.t - t0) / 60);
+      v.add(p.cv);
+      if (p.temp10 == TEMP_NONE) {
+        c.add(nullptr);
+      } else {
+        c.add(p.temp10);
+      }
+    }
+  }
+  String out;
+  serializeJson(d, out);
+  return out;
+}
+
+void publishState(uint32_t now) {
+  notifier.publishState(stateJson(now));
+  lastStateMs = now;
+  stateDirty = false;
 }
 
 }  // namespace
@@ -311,10 +457,14 @@ void setup() {
     if (rtcHaveLast) gps.setLastKnown(rtcLat, rtcLon);
   }
 
+  if (slept == SLEEP_NONE || !rtcHist.sane()) rtcHist.clear();
+  settings.load();
+
   // 時間で起きたとき：電圧が低ければ、Wi-Fi も BLE も使わずにすぐ眠り直す
   if (cause == ESP_SLEEP_WAKEUP_TIMER) {
     pinMode(PIN_ACC, INPUT);
     float v = (battery.sampleNow() + battery.sampleNow()) / 2;
+    recordHistory(v);
     bool accOff = digitalRead(PIN_ACC) == HIGH;
     if (accOff && slept == SLEEP_LOW_VOLTAGE && v < VBAT_LOW_RECOVER) enterDeepSleep(SLEEP_LOW_VOLTAGE);
     if (accOff && slept == SLEEP_PARK && v < VBAT_SLEEP) enterDeepSleep(SLEEP_LOW_VOLTAGE);
@@ -339,6 +489,9 @@ void setup() {
   ble.begin();
   setupBeacons();
   setupWifi();
+  pinMode(PIN_SETUP_BUTTON, INPUT_PULLUP);
+  portal.setNearbyProvider(nearbyForPortal);
+  if (!settings.configured()) portal.start("初期設定です。Wi-Fi と通知先を入力してください。", millis());
 
   wakeMs = millis();
   if (cause == ESP_SLEEP_WAKEUP_EXT1) {
@@ -357,6 +510,8 @@ void setup() {
 void loop() {
   uint32_t now = millis();
   ArduinoOTA.handle();
+  wifiLoop(now);
+  portal.loop(now);
 
   inputs.loop(now);
   battery.loop(now);
@@ -371,10 +526,33 @@ void loop() {
   buzzer.loop(now);
   notifier.loop(now);
 
+  // ---- 設定モードに入る：BOOT ボタン長押し、ACC ON なのに Wi-Fi につながらない ----
+  if (digitalRead(PIN_SETUP_BUTTON) == LOW) {
+    if (!setupBtnSince) setupBtnSince = now ? now : 1;
+    if (now - setupBtnSince > SETUP_HOLD_MS && !portal.active()) {
+      portal.start("BOOT ボタンで設定モードに入りました。", now);
+      buzzer.beep(2);
+    }
+  } else {
+    setupBtnSince = 0;
+  }
+  if (inputs.acc() && WiFi.status() != WL_CONNECTED && settings.configured()) {
+    if (!wifiDownSince) wifiDownSince = now ? now : 1;
+    if (now - wifiDownSince > WIFI_FAIL_SETUP_MS && !portal.active()) {
+      // スマートキーが車内にあるとき（ACC ON）だけなので、持ち主が車にいる
+      portal.start("Wi-Fi につながりません。Wi-Fi の設定を確認してください。", now);
+      buzzer.beep(2);
+    }
+  } else {
+    wifiDownSince = 0;
+  }
+
   // ---- キー（ビーコン）の在・不在 ----
   int rssi;
   if (ble.takeMatch(rssi)) presence.onSeen(rssi, now);
   PresenceEvent pev = presence.update(now);
+  if (pev != PresenceEvent::None) stateDirty = true;
+  if (inputs.doorChanged || inputs.accChanged) stateDirty = true;
   if (pev == PresenceEvent::Arrived) {
     lockPending = false;
     buzzer.stop();
@@ -514,6 +692,7 @@ void loop() {
 
   // ---- 防犯（キーが離れていて ACC OFF のとき警戒） ----
   bool nowArmed = alarmOn && !inputs.acc() && presence.state() == PresenceState::Absent;
+  if (nowArmed != armed) stateDirty = true;
   if (nowArmed && !armed) sensors.rebaseline();
   armed = nowArmed;
   if (armed && inputs.doorChanged && inputs.doorOpen() && cooldown.allow(CD_INTRUSION, now, 120000)) {
@@ -554,9 +733,17 @@ void loop() {
     }
   }
 
+  // ---- ダッシュボード：電圧・温度の履歴と、状態の送信 ----
+  if (battery.valid()) recordHistory(battery.volts());
+  if (now - lastStateMs >= STATE_PUBLISH_MS || (stateDirty && now - lastStateMs >= STATE_MIN_GAP_MS) ||
+      (parkTimerWake && lastStateMs == 0 && now - wakeMs >= PARK_KEY_SCAN_MS)) {
+    publishState(now);
+  }
+
   // ---- 駐車モード ----
   bool outputsOn = lockOut.on() || out2.on() || out3.on() || out4.on();
-  bool busy = lockPending || buzzer.alarming() || !notifier.idle() || pauseUntilMs != 0 || doorWake || outputsOn;
+  bool busy = lockPending || buzzer.alarming() || !notifier.idle() || pauseUntilMs != 0 || doorWake || outputsOn ||
+              portal.active();
   ParkInputs park{parkOn, inputs.acc(), engineRunning, presence.state() == PresenceState::Absent,
                   inputs.doorOpen(), busy};
   if (parkTimerWake) {
@@ -565,12 +752,13 @@ void loop() {
       parkTimerWake = false;
       parkTimer.restart();
     } else {
-      bool done = now - wakeMs >= PARK_KEY_SCAN_MS && notifier.pollCount() > pollsAtWake && notifier.idle();
-      if (done || now - wakeMs > PARK_AWAKE_MAX_MS) enterDeepSleep(SLEEP_PARK);
+      bool done = now - wakeMs >= PARK_KEY_SCAN_MS && notifier.pollCount() > pollsAtWake && notifier.idle() &&
+                  lastStateMs != 0 && !portal.active();
+      if (done || (now - wakeMs > PARK_AWAKE_MAX_MS && !portal.active())) enterDeepSleep(SLEEP_PARK);
     }
   } else if (parkTimer.update(park, now)) {
     saveEngine();
-    enterDeepSleep(SLEEP_PARK);
+    flushThenSleep(SLEEP_PARK);
   }
 
   // ---- シリアルに状態を出す（動作確認用） ----

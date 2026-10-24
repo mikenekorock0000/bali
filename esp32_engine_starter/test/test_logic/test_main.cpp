@@ -9,6 +9,8 @@
 #include "nmea.h"
 #include "obd_logic.h"
 #include "park_sleep.h"
+#include "history.h"
+#include "settings_rules.h"
 
 using namespace starter;
 
@@ -323,6 +325,49 @@ void test_presence_assume_absent() {
   TEST_ASSERT_EQUAL(PresenceState::Present, p.state());
 }
 
+void test_history_ring() {
+  History<4> h;
+  TEST_ASSERT_TRUE(h.sane());
+  TEST_ASSERT_TRUE(h.maybeAdd(1000, 12.34f, 21.5f, 900));
+  TEST_ASSERT_FALSE(h.maybeAdd(1500, 12.0f, 20.0f, 900));  // 間隔が短い
+  TEST_ASSERT_TRUE(h.maybeAdd(1900, 12.0f, NAN, 900));
+  TEST_ASSERT_EQUAL(2, h.size());
+  TEST_ASSERT_EQUAL(1234, h.at(0).cv);
+  TEST_ASSERT_EQUAL(215, h.at(0).temp10);
+  TEST_ASSERT_EQUAL(TEMP_NONE, h.at(1).temp10);
+  for (uint32_t t = 2800; t <= 5500; t += 900) h.maybeAdd(t, 11.0f, -3.25f, 900);
+  TEST_ASSERT_EQUAL(4, h.size());  // 一杯になったら古いものから消える
+  TEST_ASSERT_EQUAL(2800, h.at(0).t);
+  TEST_ASSERT_EQUAL(5500, h.at(3).t);
+  TEST_ASSERT_EQUAL(-33, h.at(3).temp10);
+  TEST_ASSERT_TRUE(h.maybeAdd(10, 12.0f, 0, 900));  // 時計が戻ったら記録する
+  TEST_ASSERT_EQUAL(10, h.at(3).t);
+}
+
+void test_settings_rules() {
+  TEST_ASSERT_TRUE(validSsid("car"));
+  TEST_ASSERT_FALSE(validSsid(""));
+  TEST_ASSERT_FALSE(validSsid("123456789012345678901234567890123"));
+  TEST_ASSERT_TRUE(validWifiPass(""));
+  TEST_ASSERT_FALSE(validWifiPass("short"));
+  TEST_ASSERT_TRUE(validWifiPass("12345678"));
+  TEST_ASSERT_TRUE(validTopic("hijet-AbC_123456"));
+  TEST_ASSERT_FALSE(validTopic("hijet"));          // 短すぎる
+  TEST_ASSERT_FALSE(validTopic("hijet topic 1234"));  // 空白
+  TEST_ASSERT_FALSE(validTopic("hijet/aaaaaaaaaa"));
+  TEST_ASSERT_TRUE(validServer("https://ntfy.sh"));
+  TEST_ASSERT_FALSE(validServer("https://ntfy.sh/"));
+  TEST_ASSERT_FALSE(validServer("ntfy.sh"));
+  TEST_ASSERT_TRUE(validPin("1234"));
+  TEST_ASSERT_FALSE(validPin("12a4"));
+  TEST_ASSERT_FALSE(validPin("123"));
+  TEST_ASSERT_TRUE(validOtaPass("change-me"));
+  TEST_ASSERT_FALSE(validOtaPass("short"));
+  TEST_ASSERT_TRUE(validCal(1.0f));
+  TEST_ASSERT_FALSE(validCal(1.5f));
+}
+
+
 
 int main(int, char**) {
   UNITY_BEGIN();
@@ -345,5 +390,7 @@ int main(int, char**) {
   RUN_TEST(test_park_sleep_timer);
   RUN_TEST(test_door_wake_verdict);
   RUN_TEST(test_presence_assume_absent);
+  RUN_TEST(test_history_ring);
+  RUN_TEST(test_settings_rules);
   return UNITY_END();
 }

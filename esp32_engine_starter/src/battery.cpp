@@ -1,6 +1,7 @@
 #include "battery.h"
 
 #include "config.h"
+#include "settings.h"
 
 void Battery::begin() {
   analogSetPinAttenuation(PIN_VBAT, ADC_11db);
@@ -10,7 +11,7 @@ void Battery::begin() {
 float Battery::sampleNow() const {
   uint32_t mv = 0;
   for (int i = 0; i < 4; ++i) mv += analogReadMilliVolts(PIN_VBAT);
-  return (mv / 4.0f) / 1000.0f * VBAT_DIVIDER * VBAT_CAL;
+  return (mv / 4.0f) / 1000.0f * VBAT_DIVIDER * settings.vbatCal;
 }
 
 void Battery::loop(uint32_t nowMs) {

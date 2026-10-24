@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1419">
+<title>HIJET MONITOR</title>
+<style>
+:root{
+  --bg:#f3f4f6;--card:#ffffff;--ink:#16202b;--sub:#5d6876;--line:#dde1e6;--chip:#eef1f4;
+  --ok:#1a7f37;--warn:#b7791f;--bad:#c62828;--acc:#1f6feb;--accink:#ffffff;
+  --chart:#1f6feb;--chart2:#d9480f;--grid:#e6e9ed;--shadow:0 1px 2px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1419;--card:#18202a;--ink:#e7ebf0;--sub:#9aa5b3;--line:#2a3441;--chip:#222c38;
+  --ok:#3fb950;--warn:#e3b341;--bad:#ff6b6b;--acc:#4c8dff;--accink:#0b1220;
+  --chart:#6ea8ff;--chart2:#ff8a4c;--grid:#26303c;--shadow:none}}
+:root[data-theme="dark"]{
+  --bg:#0f1419;--card:#18202a;--ink:#e7ebf0;--sub:#9aa5b3;--line:#2a3441;--chip:#222c38;
+  --ok:#3fb950;--warn:#e3b341;--bad:#ff6b6b;--acc:#4c8dff;--accink:#0b1220;
+  --chart:#6ea8ff;--chart2:#ff8a4c;--grid:#26303c;--shadow:none}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+main{max-width:980px;margin:0 auto;padding:12px 16px 48px}
+header{display:flex;align-items:center;gap:8px;padding:6px 0 12px;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;letter-spacing:.02em;flex:1;white-space:nowrap}
+@media (max-width:560px){header .pill{order:9;width:100%;justify-content:flex-start}}
+.iconbtn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:6px 10px;font:inherit;cursor:pointer}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--chip);font-size:13px;color:var(--sub)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--sub)}
+a{color:var(--acc)}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.top{grid-template-columns:1.2fr 2fr;align-items:start}
+@media (max-width:720px){.top{grid-template-columns:1fr}}
+.hero .lbl{color:var(--sub);font-size:13px}
+.hero .big{font-size:48px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.hero .big small{font-size:20px;font-weight:600;margin-left:2px}
+.hero .meta{color:var(--sub);font-size:13px;margin-top:4px}
+.bar{height:8px;border-radius:4px;background:var(--chip);margin:10px 0 2px;position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;border-radius:4px}
+.tiles{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+.tile .k{color:var(--sub);font-size:12px}
+.tile .v{font-size:18px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+.tile .s{color:var(--sub);font-size:12px}
+h2{font-size:15px;margin:22px 0 8px}
+.chart{width:100%;height:180px;display:block;touch-action:pan-y}
+.chart text{fill:var(--sub);font-size:11px}
+.legend{display:flex;justify-content:space-between;color:var(--sub);font-size:12px;margin-top:4px}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);padding:3px 8px;border-radius:6px;font-size:12px;white-space:nowrap;transform:translate(-50%,-120%);display:none}
+.controls{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.controls button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:12px;font:inherit;font-weight:600;cursor:pointer;text-align:left;min-height:56px}
+.controls button small{display:block;font-weight:400;color:var(--sub);font-size:12px}
+.controls button.primary{background:var(--acc);border-color:var(--acc);color:var(--accink)}
+.controls button.primary small{color:inherit;opacity:.8}
+.controls button:disabled{opacity:.5;cursor:default}
+.log{list-style:none;margin:0;padding:0}
+.log li{display:grid;grid-template-columns:88px 1fr;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.log li:first-child{border-top:0}
+.log time{color:var(--sub);font-size:12px;font-variant-numeric:tabular-nums}
+.log b{font-weight:600}.log p{margin:2px 0 0;color:var(--sub);font-size:13px;white-space:pre-wrap;word-break:break-word}
+.log .p5 b,.log .p4 b{color:var(--bad)}
+.map{width:100%;height:220px;border:0;border-radius:10px;margin-top:8px;background:var(--chip)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;max-width:92vw;display:none;z-index:9}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);width:min(520px,94vw);padding:0}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog form{padding:16px}
+dialog label{display:block;font-size:13px;color:var(--sub);margin:10px 0 4px}
+dialog input{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+dialog .row button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 14px;font:inherit}
+dialog .row button.primary{background:var(--acc);border-color:var(--acc);color:var(--accink)}
+.hint{color:var(--sub);font-size:12px}
+.empty{color:var(--sub);text-align:center;padding:24px 8px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>HIJET MONITOR</h1>
+    <span class="pill" id="conn"><span class="dot"></span><span>接続中…</span></span>
+    <button class="iconbtn" id="themeBtn" title="表示の明暗" aria-label="表示の明暗">◐</button>
+    <button class="iconbtn" id="setBtn">設定</button>
+  </header>
+
+  <div id="body"></div>
+
+  <h2>操作</h2>
+  <div class="grid controls" id="controls"></div>
+  <p class="hint" id="ctlHint">指示は暗証番号付きで送ります。駐車モードで休止中は、次に起きたとき（最大 15 分後）に実行されます。</p>
+
+  <h2>電圧（24 時間）</h2>
+  <div class="card" style="position:relative"><svg class="chart" id="chV"></svg><div class="tip" id="tipV"></div><div class="legend"><span id="vMin"></span><span>赤の破線：低電圧の目安 11.8V</span></div></div>
+
+  <h2>車内温度（24 時間）</h2>
+  <div class="card" style="position:relative"><svg class="chart" id="chT"></svg><div class="tip" id="tipT"></div><div class="legend"><span id="tMin"></span><span></span></div></div>
+
+  <h2>駐車位置</h2>
+  <div class="card" id="mapCard"><div class="empty">GPS の位置がまだありません</div></div>
+
+  <h2>最近の通知</h2>
+  <div class="card"><ul class="log" id="log"><li class="empty">読み込み中…</li></ul></div>
+</main>
+
+<dialog id="dlg"><form method="dialog" id="cfgForm">
+  <strong>接続の設定</strong>
+  <p class="hint">ESP32 の設定画面で入力したものと同じ値を入れてください。この端末のブラウザにだけ保存されます。</p>
+  <label>ntfy のサーバー</label><input name="server" placeholder="https://ntfy.sh" required>
+  <label>状態のトピック</label><input name="state" required>
+  <label>通知のトピック</label><input name="topic" required>
+  <label>指示のトピック</label><input name="cmd" required>
+  <label>暗証番号（操作に使う）</label><input name="pin" type="password" inputmode="numeric">
+  <label>アクセストークン（ntfy のアカウントを使う場合だけ）</label><input name="token" type="password">
+  <div class="row">
+    <button type="button" id="linkBtn">別の端末用のリンクをコピー</button>
+    <button value="cancel">閉じる</button>
+    <button value="ok" class="primary">保存</button>
+  </div>
+  <p class="hint">リンクには暗証番号とトークンを含めません。リンクを知っている人は状態を読めるので、人に渡さないでください。</p>
+</form></dialog>
+
+<dialog id="confirmDlg"><form method="dialog">
+  <strong id="cTitle"></strong><p id="cBody" class="hint"></p>
+  <div class="row"><button value="cancel">やめる</button><button value="ok" class="primary">送る</button></div>
+</form></dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const KEY = "hijet-dashboard";
+const POLL_MS = 30000;
+let cfg = loadCfg();
+let state = null, stateAt = 0, events = [];
+let demo = new URLSearchParams(location.search).has("demo");
+
+// ---------- 設定 ----------
+function loadCfg() {
+  let c = {};
+  try { c = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+  // #server=...&state=...&topic=...&cmd=... で開いたら取り込む（暗証番号は含めない）
+  const h = new URLSearchParams(location.hash.slice(1));
+  for (const k of ["server", "state", "topic", "cmd"]) if (h.get(k)) c[k] = h.get(k);
+  if (location.hash) { saveCfg(c); history.replaceState(null, "", location.pathname + location.search); }
+  c.server = (c.server || "https://ntfy.sh").replace(/\/+$/, "");
+  return c;
+}
+function saveCfg(c) { try { localStorage.setItem(KEY, JSON.stringify(c)); } catch (e) {} }
+function ready() { return demo || (cfg.server && cfg.state && cfg.topic && cfg.cmd); }
+function headers() { return cfg.token ? { Authorization: "Bearer " + cfg.token } : {}; }
+
+$("#setBtn").onclick = openCfg;
+function openCfg() {
+  const f = $("#cfgForm");
+  for (const k of ["server", "state", "topic", "cmd", "pin", "token"]) f.elements[k].value = cfg[k] || "";
+  $("#dlg").showModal();
+}
+$("#dlg").addEventListener("close", () => {
+  if ($("#dlg").returnValue !== "ok") return;
+  const f = $("#cfgForm");
+  for (const k of ["server", "state", "topic", "cmd", "pin", "token"]) cfg[k] = f.elements[k].value.trim();
+  cfg.server = (cfg.server || "https://ntfy.sh").replace(/\/+$/, "");
+  saveCfg(cfg);
+  demo = false;
+  refresh();
+});
+$("#linkBtn").onclick = async () => {
+  const f = $("#cfgForm");
+  const p = new URLSearchParams();
+  for (const k of ["server", "state", "topic", "cmd"]) p.set(k, f.elements[k].value.trim());
+  const url = location.origin + location.pathname + "#" + p.toString();
+  try { await navigator.clipboard.writeText(url); toast("リンクをコピーしました"); }
+  catch (e) { prompt("このリンクを別の端末で開いてください", url); }
+};
+
+// 表示の明暗（端末の設定 → 明 → 暗 の順に切り替え）
+const THEME_KEY = "hijet-theme";
+function applyTheme(t) { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
+let theme = ""; try { theme = localStorage.getItem(THEME_KEY) || ""; } catch (e) {}
+applyTheme(theme);
+$("#themeBtn").onclick = () => {
+  theme = theme === "" ? "light" : theme === "light" ? "dark" : "";
+  applyTheme(theme);
+  try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
+  render();
+};
+
+// ---------- 通信 ----------
+async function poll(topic, since) {
+  const r = await fetch(`${cfg.server}/${encodeURIComponent(topic)}/json?poll=1&since=${since}`, { headers: headers(), cache: "no-store" });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const text = await r.text();
+  return text.split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch (e) { return null; } })
+    .filter((m) => m && m.event === "message");
+}
+
+async function refresh() {
+  if (!ready()) { setConn("bad", "未設定"); renderEmpty(); if (!$("#dlg").open) openCfg(); return; }
+  if (demo) { loadDemo(); render(); return; }
+  try {
+    const [st, ev] = await Promise.all([poll(cfg.state, "24h"), poll(cfg.topic, "24h")]);
+    const last = st[st.length - 1];
+    if (last) {
+      try { state = JSON.parse(last.message); stateAt = last.time; } catch (e) {}
+    }
+    events = ev.slice(-30).reverse();
+    render();
+  } catch (e) {
+    setConn("bad", "読み込めません");
+    if (!state) renderEmpty("ntfy から読み込めませんでした（" + e.message + "）。設定のサーバーとトピックを確認してください。");
+  }
+}
+
+async function send(cmd) {
+  if (demo) { toast("デモ表示なので送りません：" + cmd); return; }
+  if (!cfg.pin) { toast("設定で暗証番号を入れてください"); openCfg(); return; }
+  try {
+    const r = await fetch(`${cfg.server}/${encodeURIComponent(cfg.cmd)}`, { method: "POST", headers: headers(), body: cfg.pin + " " + cmd });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    toast(state && state.sleep ? "送りました。休止中なので、次に起きたとき（最大 15 分後）に実行されます" : "送りました。30 秒ほどで反映されます");
+    setTimeout(refresh, 35000);
+  } catch (e) { toast("送れませんでした（" + e.message + "）"); }
+}
+
+function confirmSend(title, body, cmd) {
+  $("#cTitle").textContent = title;
+  $("#cBody").textContent = body;
+  const d = $("#confirmDlg");
+  d.onclose = () => { if (d.returnValue === "ok") send(cmd); };
+  d.showModal();
+}
+
+// ---------- 表示 ----------
+function setConn(cls, text) {
+  const c = $("#conn");
+  c.querySelector(".dot").className = "dot " + cls;
+  c.querySelector("span:last-child").textContent = text;
+}
+function ago(sec) {
+  if (sec < 90) return "たった今";
+  if (sec < 3600) return Math.round(sec / 60) + " 分前";
+  if (sec < 86400 * 2) return Math.round(sec / 3600) + " 時間前";
+  return Math.round(sec / 86400) + " 日前";
+}
+function fmtTime(t) {
+  const d = new Date(t * 1000);
+  return d.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+function voltClass(v, eng) {
+  if (eng) return v >= 13.0 ? "ok" : "bad";
+  return v >= 12.4 ? "ok" : v >= 11.8 ? "warn" : "bad";
+}
+
+function renderEmpty(msg) {
+  $("#body").innerHTML = `<div class="card empty">${esc(msg || "まだ状態が届いていません。ESP32 が起動して Wi-Fi につながると、数分で表示されます。")}</div>`;
+  renderControls();
+}
+
+function render() {
+  if (!state) { renderEmpty(); renderLog(); return; }
+  const s = state, now = Date.now() / 1000;
+  const age = now - (stateAt || s.t || now);
+  // 接続の状態：休止中なら「最大 15 分 + 余裕」までは正常
+  const expect = s.sleep ? (s.wake || 900) + 300 : 600;
+  if (age <= expect) setConn(s.sleep ? "warn" : "ok", (s.sleep ? "駐車モードで休止中" : "動作中") + "・" + ago(age));
+  else setConn("bad", "応答なし・最終 " + ago(age));
+
+  const v = Number(s.v), vc = voltClass(v, s.eng);
+  const pct = Math.max(0, Math.min(100, (v - 10.5) / (14.8 - 10.5) * 100));
+  const keyTxt = s.key === "present" ? "車の近く" : s.key === "absent" ? "離れている" : "未確認";
+  const tiles = [
+    ["キー", keyTxt, s.rssi != null ? s.rssi + " dBm" : "", s.key === "present" ? "ok" : ""],
+    ["ドア", s.door ? "開" : "閉", "", s.door && s.key !== "present" ? "bad" : ""],
+    ["警戒", !s.alarm ? "OFF" : s.armed ? "警戒中" : "待機", s.siren ? "サイレン ON" : "サイレン OFF", s.armed ? "ok" : ""],
+    ["自動ロック", !s.al ? "OFF" : s.paused ? "一時停止中" : "ON", s.lockp ? "ドアが閉まったら施錠" : "", !s.al || s.paused ? "warn" : "ok"],
+    ["駐車モード", s.park ? "ON" : "OFF", s.sleep ? "休止中" : "", ""],
+    ["ACC", s.acc ? "ON" : "OFF", "", ""],
+  ];
+  if (s.temp != null) tiles.push(["車内", s.temp + " ℃", s.hum != null ? "湿度 " + s.hum + "%" : "", s.temp > 45 || s.temp < -5 ? "warn" : ""]);
+  if (s.cool != null || s.rpm != null) tiles.push(["水温 / 回転数", (s.cool != null ? s.cool + " ℃" : "-"), s.rpm != null ? s.rpm + " rpm" : "", s.cool > 105 ? "bad" : ""]);
+  if (s.mil != null) tiles.push(["エンジン警告灯", s.mil ? "点灯" : "消灯", s.mil ? "故障コード " + s.dtc + " 件" : "", s.mil ? "bad" : "ok"]);
+  tiles.push(["稼働時間", s.engh + " h", "オイル交換まで " + s.oil + " h", Number(s.oil) <= 0 ? "warn" : ""]);
+  const dev = s.dev || {};
+  tiles.push(["通信", dev.wifi != null ? "Wi-Fi " + dev.wifi + " dBm" : "-", "ファームウェア " + (s.fw || "?"), ""]);
+
+  $("#body").innerHTML = `
+  <div class="grid top">
+    <div class="card hero">
+      <div class="lbl">バッテリー</div>
+      <div class="big ${vc}">${isFinite(v) ? v.toFixed(2) : "-"}<small>V</small></div>
+      <div class="bar"><i style="width:${pct}%;background:var(--${vc === "ok" ? "ok" : vc === "warn" ? "warn" : "bad"})"></i></div>
+      <div class="meta">エンジン ${s.eng ? "稼働中" : "停止"}${s.crank ? "　前回始動時 " + s.crank + "V" : ""}${s.lowv ? "　<b class=bad>低電圧</b>" : ""}</div>
+      <div class="meta">最終更新 ${s.t ? fmtTime(s.t) : ago(age)}</div>
+    </div>
+    <div class="grid tiles">${tiles.map(([k, val, sub, cls]) => `<div class="card tile"><div class="k">${esc(k)}</div><div class="v ${cls}">${esc(val)}</div><div class="s">${esc(sub)}</div></div>`).join("")}</div>
+  </div>`;
+
+  renderControls();
+  renderCharts();
+  renderMap();
+  renderLog();
+}
+
+function renderControls() {
+  const s = state || {};
+  const btn = (label, sub, cmd, opt = {}) => ({ label, sub, cmd, ...opt });
+  const list = [
+    btn("今すぐ施錠", "施錠信号を出す", "lock", { primary: true, confirm: ["今すぐ施錠しますか？", "車両の施錠信号を 1 回出します。"] }),
+    btn("状態を更新", "最新の状態を送らせる", "state"),
+    s.paused ? btn("自動ロックを再開", "一時停止を解除", "resume") : btn("自動ロックを 60 分止める", "車のそばで作業するとき", "pause 60"),
+    btn(s.al === false ? "自動ロックを ON" : "自動ロックを OFF", "", s.al === false ? "autolock on" : "autolock off"),
+    btn(s.alarm === false ? "警戒を ON" : "警戒を OFF", "侵入・揺れの通知", s.alarm === false ? "alarm on" : "alarm off"),
+    btn(s.siren ? "サイレンを OFF" : "サイレンを ON", "侵入時にブザーを鳴らす", s.siren ? "siren off" : "siren on"),
+    btn(s.park === false ? "駐車モードを ON" : "駐車モードを OFF", "駐車中に休止して節電", s.park === false ? "park on" : "park off"),
+    btn("ブザーを鳴らす", "車の場所を探すとき", "beep"),
+    btn("ブザーを止める", "", "silence"),
+    btn("オイル交換を記録", "稼働時間を数え直す", "oilreset", { confirm: ["オイル交換を記録しますか？", "次の交換までの時間を数え直します。"] }),
+    btn("設定モードを開始", "車の近くで Wi-Fi 設定", "setup", { confirm: ["設定モードを開始しますか？", "ESP32 が 10 分間、設定用の Wi-Fi「HIJET-SETUP-…」を出します。車の近くでスマホからつないでください。"] }),
+  ];
+  const box = $("#controls");
+  box.innerHTML = "";
+  for (const b of list) {
+    const el = document.createElement("button");
+    if (b.primary) el.className = "primary";
+    el.innerHTML = esc(b.label) + (b.sub ? `<small>${esc(b.sub)}</small>` : "");
+    el.disabled = !ready();
+    el.onclick = () => (b.confirm ? confirmSend(b.confirm[0], b.confirm[1], b.cmd) : send(b.cmd));
+    box.appendChild(el);
+  }
+}
+
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+// 折れ線グラフ（SVG）。points: [{t, y}]、y が null の点は線を切る
+function lineChart(svg, tip, points, opt) {
+  const W = svg.clientWidth || 600, H = svg.clientHeight || 180, L = 38, R = 8, T = 10, B = 22;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const vals = points.filter((p) => p.y != null);
+  if (vals.length < 2) { svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle">データがまだ足りません</text>`; return null; }
+  const t0 = points[0].t, t1 = points[points.length - 1].t;
+  let lo = Math.min(...vals.map((p) => p.y)), hi = Math.max(...vals.map((p) => p.y));
+  for (const r of opt.refs || []) { lo = Math.min(lo, r.y); hi = Math.max(hi, r.y); }
+  const pad = Math.max((hi - lo) * 0.12, opt.minPad || 0.2); lo -= pad; hi += pad;
+  const x = (t) => L + (W - L - R) * (t1 === t0 ? 0.5 : (t - t0) / (t1 - t0));
+  const y = (v) => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  let g = "";
+  for (let i = 0; i <= 4; i++) {
+    const v = lo + (hi - lo) * i / 4, yy = y(v);
+    g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="${css("--grid")}"/>`;
+    g += `<text x="${L - 6}" y="${yy + 4}" text-anchor="end">${v.toFixed(opt.dec)}</text>`;
+  }
+  for (let i = 0; i <= 4; i++) {
+    const t = t0 + (t1 - t0) * i / 4, d = new Date(t * 1000);
+    g += `<text x="${x(t)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === 4 ? "end" : "middle"}">${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}</text>`;
+  }
+  for (const r of opt.refs || []) g += `<line x1="${L}" x2="${W - R}" y1="${y(r.y)}" y2="${y(r.y)}" stroke="${r.color}" stroke-dasharray="4 4" stroke-width="1.5"/>`;
+  let d = "", pen = false;
+  for (const p of points) {
+    if (p.y == null) { pen = false; continue; }
+    d += (pen ? "L" : "M") + x(p.t).toFixed(1) + " " + y(p.y).toFixed(1);
+    pen = true;
+  }
+  g += `<path d="${d}" fill="none" stroke="${opt.color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  g += `<circle id="${svg.id}-c" r="4" fill="${opt.color}" style="display:none"/>`;
+  svg.innerHTML = g;
+  // タップ・ホバーで値を表示
+  const show = (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
+    const tt = t0 + (t1 - t0) * Math.max(0, Math.min(1, (px * W / rect.width - L) / (W - L - R)));
+    let best = vals[0];
+    for (const p of vals) if (Math.abs(p.t - tt) < Math.abs(best.t - tt)) best = p;
+    const c = svg.querySelector("circle");
+    c.setAttribute("cx", x(best.t)); c.setAttribute("cy", y(best.y)); c.style.display = "";
+    tip.style.display = "block";
+    tip.style.left = (x(best.t) * rect.width / W + svg.offsetLeft) + "px";
+    tip.style.top = (y(best.y) * rect.height / H + svg.offsetTop) + "px";
+    tip.textContent = fmtTime(best.t) + "　" + best.y.toFixed(opt.dec) + opt.unit;
+  };
+  const hide = () => { tip.style.display = "none"; const c = svg.querySelector("circle"); if (c) c.style.display = "none"; };
+  svg.onmousemove = show; svg.ontouchstart = show; svg.ontouchmove = show; svg.onmouseleave = hide; svg.ontouchend = () => setTimeout(hide, 1500);
+  return { min: Math.min(...vals.map((p) => p.y)), max: Math.max(...vals.map((p) => p.y)) };
+}
+
+function renderCharts() {
+  const h = state && state.h;
+  const pts = [];
+  if (h && h.m) for (let i = 0; i < h.m.length; i++) pts.push({ t: h.t0 + h.m[i] * 60, v: h.v[i] / 100, c: h.c[i] == null ? null : h.c[i] / 10 });
+  const rv = lineChart($("#chV"), $("#tipV"), pts.map((p) => ({ t: p.t, y: p.v })), { dec: 1, unit: "V", color: css("--chart"), minPad: 0.3, refs: [{ y: 11.8, color: css("--bad") }] });
+  $("#vMin").textContent = rv ? `最低 ${rv.min.toFixed(2)}V　最高 ${rv.max.toFixed(2)}V` : "";
+  const rt = lineChart($("#chT"), $("#tipT"), pts.map((p) => ({ t: p.t, y: p.c })), { dec: 0, unit: "℃", color: css("--chart2"), minPad: 2 });
+  $("#tMin").textContent = rt ? `最低 ${rt.min.toFixed(1)}℃　最高 ${rt.max.toFixed(1)}℃` : (state && state.dev && !state.dev.bme ? "BME280 がつながっていません" : "");
+}
+
+function renderMap() {
+  const s = state;
+  const card = $("#mapCard");
+  if (!s || s.lat == null) { card.innerHTML = `<div class="empty">GPS の位置がまだありません${s && s.dev && !s.dev.gps ? "（GPS がつながっていません）" : ""}</div>`; return; }
+  const lat = Number(s.lat), lon = Number(s.lon), d = 0.004;
+  const bbox = [lon - d, lat - d * 0.7, lon + d, lat + d * 0.7].join(",");
+  const key = lat + "," + lon;
+  if (card.dataset.key === key) return;  // 位置が変わらなければ地図を読み直さない
+  card.dataset.key = key;
+  card.innerHTML = `<div>${lat.toFixed(5)}, ${lon.toFixed(5)}　${s.fix ? "<span class=ok>測位中</span>" : "最後に測位した位置"}
+    　<a href="https://maps.google.com/?q=${lat},${lon}" target="_blank" rel="noopener">Google マップで開く</a></div>
+    <iframe class="map" loading="lazy" title="駐車位置" src="https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}"></iframe>`;
+}
+
+function renderLog() {
+  const ul = $("#log");
+  if (!events.length) { ul.innerHTML = `<li class="empty">この 24 時間の通知はありません</li>`; return; }
+  ul.innerHTML = events.map((m) => `<li class="p${m.priority || 3}"><time>${fmtTime(m.time)}</time><div><b>${esc(m.title || "")}</b><p>${esc(m.message || "")}</p></div></li>`).join("");
+}
+
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(toast.h); toast.h = setTimeout(() => (t.style.display = "none"), 4000);
+}
+
+// ---------- デモ表示（?demo を付けて開く。ESP32 が無くても見た目を確かめられる） ----------
+function loadDemo() {
+  const now = Math.floor(Date.now() / 1000), t0 = now - 95 * 900, m = [], v = [], c = [];
+  for (let i = 0; i < 96; i++) {
+    m.push(i * 15);
+    const hour = new Date((t0 + i * 900) * 1000).getHours();
+    const driving = (i > 30 && i < 36) || (i > 70 && i < 74);
+    v.push(Math.round((driving ? 14.1 : 12.55 - i * 0.002) * 100 + Math.sin(i) * 3));
+    c.push(Math.round((8 + 7 * Math.sin((hour - 8) / 24 * 2 * Math.PI)) * 10));
+  }
+  state = { fw: "1.1.0", t: now - 120, v: "12.48", acc: false, eng: false, door: false, key: "absent", rssi: -93, armed: true,
+    al: true, paused: false, alarm: true, siren: false, park: true, lowv: false, lockp: false, sleep: true, wake: 900,
+    engh: "412.3", oil: "37.5", crank: "10.42", temp: "6.5", hum: "71", lat: "35.681236", lon: "139.767125", fix: false,
+    dev: { bme: true, mpu: true, gps: true, obd: false, keys: 1, wifi: -61 }, h: { t0, m, v, c } };
+  stateAt = state.t;
+  events = [
+    { time: now - 1300, priority: 2, title: "施錠しました", message: "キーが離れたため" },
+    { time: now - 9000, priority: 1, title: "走行記録", message: "18 分  9.4km  最高 52km/h" },
+    { time: now - 40000, priority: 1, title: "毎日の報告", message: "バッテリー 12.6V\nエンジン 停止" },
+  ];
+}
+
+refresh();
+setInterval(() => { if (!demo) refresh(); else render(); }, POLL_MS);
+window.addEventListener("resize", () => { clearTimeout(window._r); window._r = setTimeout(renderCharts, 150); });
+</script>
+</body>
+</html>

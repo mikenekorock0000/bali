@@ -21,7 +21,7 @@ constexpr uint32_t ACC_DEBOUNCE_MS = 300;
 // R2 を変えたら下の分圧比も変えること（R2 は 18k 以下。それより大きいと 16V で ADC の精度範囲を超える）
 constexpr int PIN_VBAT = 34;
 constexpr float VBAT_DIVIDER = (100.0f + 10.0f) / 10.0f;
-constexpr float VBAT_CAL = 1.00f;  // テスターの実測値 ÷ 表示値 で補正する
+// 電圧の補正係数（テスターの実測値 ÷ 表示値）は設定画面で入力する（settings.vbatCal）
 constexpr float VBAT_RUNNING_ON = 13.2f;  // OBD が無いときのエンジン稼働判定（発電中の電圧）
 constexpr float VBAT_RUNNING_OFF = 12.9f;
 constexpr float VBAT_LOW = 11.8f;          // この電圧が 1 分続いたら低電圧通知・省電力
@@ -71,6 +71,21 @@ constexpr uint32_t PARK_WAKE_SEC = 15 * 60;          // 眠っている間に起
 constexpr uint32_t PARK_KEY_SCAN_MS = 10000;         // 時間で起きたとき、キーを探す時間
 constexpr uint32_t PARK_AWAKE_MAX_MS = 45000;        // 時間で起きたときに起きている最長時間（Wi-Fi が無くても眠る）
 constexpr uint32_t DOOR_WAKE_GRACE_MS = 15000;       // ドアで起きたとき、キーが見つかるまで待つ時間
+
+// ---- 設定モード（ESP32 が Wi-Fi「HIJET-SETUP-xxxx」を出し、スマホから設定する） ----
+#define SETUP_AP_PASS "hijet-setup"                 // 設定モードの Wi-Fi のパスワード（8 文字以上）
+constexpr uint32_t SETUP_TIMEOUT_MS = 10 * 60000UL;  // 設定済みなら、この時間で設定モードを終える
+constexpr int PIN_SETUP_BUTTON = 0;                  // DevKit の BOOT ボタン（押すと LOW）
+constexpr uint32_t SETUP_HOLD_MS = 3000;             // この時間押し続けると設定モード
+constexpr uint32_t WIFI_FAIL_SETUP_MS = 3 * 60000UL; // ACC ON のままこの時間 Wi-Fi につながらなければ設定モード
+constexpr uint32_t WIFI_SWITCH_MS = 20000;           // つながらないとき、予備の Wi-Fi と交互に試す間隔
+
+// ---- ダッシュボード（状態のトピックに JSON を送る） ----
+#define FW_VERSION "1.1.0"
+constexpr uint32_t STATE_PUBLISH_MS = 5 * 60000UL;   // 起きている間に状態を送る間隔
+constexpr uint32_t STATE_MIN_GAP_MS = 10000;         // 出来事のたびに送るときの最短間隔
+constexpr uint32_t HIST_INTERVAL_SEC = 15 * 60;      // 電圧・温度の履歴を記録する間隔
+constexpr int HIST_POINTS = 96;                      // 履歴の点数（15 分 × 96 ＝ 24 時間）
 
 // ---- エンジン稼働時間とメンテナンス ----
 constexpr float OIL_CHANGE_HOURS = 150.0f;  // 前回リセットからこの稼働時間で交換時期を通知
