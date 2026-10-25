@@ -13,6 +13,9 @@ void Notifier::begin() {}
 
 // サーバーの証明書を、入れてあるルート証明書で確かめる（設定で「確かめない」にしたときだけ省く）
 void Notifier::secure(WiFiClientSecure& client) {
+  // 暗号化の手続きは、既定では最長 120 秒待つ。テザリングが途中で切れるとその間 loop が止まり、
+  // 見張り（30 秒）で再起動してしまうので、10 秒で諦める
+  client.setHandshakeTimeout(10);
   if (settings.tlsInsecure) {
     client.setInsecure();
   } else {

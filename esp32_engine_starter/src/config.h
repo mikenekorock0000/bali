@@ -85,7 +85,7 @@ constexpr uint32_t WIFI_FAIL_SETUP_MS = 3 * 60000UL; // ACC ON のままこの�
 constexpr uint32_t WIFI_SWITCH_MS = 20000;           // つながらないとき、予備の Wi-Fi と交互に試す間隔
 
 // ---- ダッシュボード（状態のトピックに JSON を送る） ----
-#define FW_VERSION "1.2.0"
+#define FW_VERSION "1.2.1"
 constexpr uint32_t STATE_PUBLISH_MS = 5 * 60000UL;   // 起きている間に状態を送る間隔
 constexpr uint32_t STATE_MIN_GAP_MS = 10000;         // 出来事のたびに送るときの最短間隔
 constexpr uint32_t HIST_INTERVAL_SEC = 15 * 60;      // 電圧・温度の履歴を記録する間隔
