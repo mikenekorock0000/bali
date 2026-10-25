@@ -24,6 +24,9 @@ PCB_T = 1.6
 CLEAR_ABOVE = 22.0   # 基板の上の空き（いちばん背の高いポリスイッチ 18mm＋余裕）
 LID_T = 2.5
 LIP_T, LIP_H, LIP_GAP = 1.5, 3.0, 0.3   # ふたの裏の位置決めの縁
+CORNER_R = 5.0       # 外側の縦の角の丸み
+TOP_R = 2.0          # ふたの上の縁の丸み
+FLANGE_R = 3.0       # 取り付けのつばの角の丸み
 SKIRT = 4.0          # ふたの外周の壁（本体の壁の上 4mm をふたの側に持たせ、角の柱の上部と一体にする）
 CBORE_D, CBORE_H = 6.2, 3.5   # ふたの座ぐり（ねじの頭を沈め、M3×10 で本体の柱に 7mm 入るようにする）
 HOLES = [(3.5, 3.5), (BOARD_W - 3.5, 3.5), (3.5, BOARD_H - 3.5), (BOARD_W - 3.5, BOARD_H - 3.5)]
@@ -60,6 +63,18 @@ def cyl(x, y, z0, h, d, seg=48):
     return m.Manifold.cylinder(h, d / 2, d / 2, seg).translate([x, y, z0])
 
 
+def rbox(x0, y0, z0, x1, y1, z1, r, rtop=0.0, seg=48):
+    """縦の角を半径 r で丸めた箱。rtop を与えると上の縁も丸める"""
+    h = z1 - z0
+    pts = [(0, 0), (r, 0), (r, h - rtop)]
+    if rtop > 0:
+        pts += [(r - rtop + rtop * np.cos(a), h - rtop + rtop * np.sin(a)) for a in np.linspace(0, np.pi / 2, 10)[1:]]
+    pts += [(0, h)]
+    col = m.Manifold.revolve(m.CrossSection([np.array(pts)]), seg)
+    cols = [col.translate([x, y, z0]) for x in (x0 + r, x1 - r) for y in (y0 + r, y1 - r)]
+    return m.Manifold.batch_hull(cols)
+
+
 def slot(x, y, z0, h, w, d):
     """角の丸い長穴（w×d）"""
     r = d / 2
@@ -87,7 +102,7 @@ def posts():
 
 
 def base():
-    body = box(OX0, OY0, 0, OX1, OY1, SPLIT)
+    body = rbox(OX0, OY0, 0, OX1, OY1, SPLIT, CORNER_R)
     body -= box(X0, Y0, FLOOR, X1, Y1, INNER_TOP + 1)
     # 内側の角の柱（ふたのねじ）
     for (xa, ya, xb, yb), (cx, cy) in posts():
@@ -101,8 +116,9 @@ def base():
     for side, a, b, z0 in NOTCHES:
         body -= notch_box(side, a, b, z0, INNER_TOP + 1)
     # 車への取り付け：左右の底に、ねじ・結束バンド用の長穴付きのつば
-    for x0, x1 in ((OX0 - 14, OX0 + 0.01), (OX1 - 0.01, OX1 + 14)):
-        body += box(x0, OY0 + 12, 0, x1, OY1 - 12, 3.0)
+    for x0, x1, xin in ((OX0 - 14, OX0 + 0.01, OX0 - 4), (OX1 - 0.01, OX1 + 14, OX1 + 4)):
+        body += rbox(x0, OY0 + 12, 0, x1, OY1 - 12, 3.0, FLANGE_R)
+        body += box(min(xin, x1 if xin < OX0 else x0), OY0 + 12, 0, max(xin, x1 if xin < OX0 else x0), OY1 - 12, 3.0)  # 壁の側の角は丸めない
         cx = (x0 + x1) / 2
         for cy in (OY0 + 22, OY1 - 22):
             body -= box(cx - 2.25, cy - 4, -1, cx + 2.25, cy + 4, 5)  # 幅 4.5（M4 か結束バンド）
@@ -111,9 +127,8 @@ def base():
 
 def lid():
     z = INNER_TOP
-    top = box(OX0, OY0, z, OX1, OY1, z + LID_T)
-    # 外周の壁（本体の壁の続き）と、角の柱の上部。どちらも上の板と一体
-    top += box(OX0, OY0, SPLIT, OX1, OY1, z + 0.01) - box(X0, Y0, SPLIT - 1, X1, Y1, z + 1)
+    # 上の板と外周の壁（本体の壁の続き）。外側の角と上の縁は丸める
+    top = rbox(OX0, OY0, SPLIT, OX1, OY1, z + LID_T, CORNER_R, TOP_R) - box(X0, Y0, SPLIT - 1, X1, Y1, z)
     for (xa, ya, xb, yb), _ in posts():
         top += box(xa - 0.01, ya - 0.01, SPLIT, xb + 0.01, yb + 0.01, z + 0.01)
     # 位置決めの縁：分かれ目から下へ、本体の壁の内側に入る（角の柱のところは切る）
@@ -131,7 +146,7 @@ def lid():
         tongue_bottom = WIRE_TOP if z0 == WIRE_BOTTOM else z0 + 7.0
         t = notch_box(side, a + g, b - g, tongue_bottom, z + 0.01)
         # 壁の厚みの中だけに残す
-        wall_band = box(OX0, OY0, 0, OX1, OY1, z + 1) - box(X0, Y0, -1, X1, Y1, z + 2)
+        wall_band = rbox(OX0, OY0, 0, OX1, OY1, z + 1, CORNER_R) - box(X0, Y0, -1, X1, Y1, z + 2)
         top += t ^ wall_band
     # ふたのねじ（座ぐり付き）
     for _, (cx, cy) in posts():
@@ -147,7 +162,7 @@ def save(man, path, flip=False):
     mesh = man.to_mesh()
     v = np.array(mesh.vert_properties)[:, :3]
     f = np.array(mesh.tri_verts)
-    tm = trimesh.Trimesh(v, f, process=True)
+    tm = trimesh.Trimesh(v, f, process=False)  # 頂点の統合はしない（細い面がつぶれて穴があくため）
     if flip:  # ふたは上面を下にして印刷する
         tm.apply_transform(trimesh.transformations.rotation_matrix(np.pi, [1, 0, 0]))
     tm.apply_translation(-tm.bounds[0])
