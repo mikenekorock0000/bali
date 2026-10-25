@@ -78,7 +78,8 @@ ul{padding-left:18px;margin:6px 0}li{font-size:14px;cursor:pointer}
 </fieldset>
 <fieldset><legend>ダッシュボードの「指示の鍵」</legend>
 <p class="hint">ダッシュボードから送る指示に付ける署名の鍵です。ダッシュボードの設定に入れてください。他人に知られると指示を送られるので、人に見せないでください。</p>
-<div class="row"><input id="keyv" readonly placeholder="今の暗証番号を入れて「表示」"><button type="button" onclick="showKey()">表示</button></div>
+<label>今の暗証番号</label><div class="row"><input id="keypin" type="password" inputmode="numeric" autocomplete="off"><button type="button" onclick="showKey()">表示</button></div>
+<input id="keyv" readonly placeholder="ここに鍵が出ます（長押しでコピー）">
 <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="newkey" value="1" style="width:auto">鍵を作り直す（前の鍵を入れたダッシュボードからは送れなくなる）</label>
 </fieldset>
 <fieldset><legend>点検の予定</legend>
@@ -103,7 +104,7 @@ ul{padding-left:18px;margin:6px 0}li{font-size:14px;cursor:pointer}
 <script>
 function fill(id,items,f){const u=document.getElementById(id);u.innerHTML='';items.forEach(x=>{const li=document.createElement('li');li.textContent=f(x);li.onclick=()=>x.pick&&x.pick();u.appendChild(li)})}
 function scan(){fetch('/scan').then(r=>r.json()).then(a=>fill('nets',a.map(n=>({...n,pick:()=>document.getElementById('ssid1').value=n.ssid})),n=>n.ssid+'（'+n.rssi+'dBm）'))}
-function showKey(){const p=document.querySelector('[name=curpin]');const pin=p?p.value:'';fetch('/key',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'curpin='+encodeURIComponent(pin)}).then(async r=>{if(r.ok)return r.text();throw r.status===429?await r.text():'今の暗証番号を「確認」の欄に入れてから押してください'}).then(k=>document.getElementById('keyv').value=k).catch(m=>alert(m))}
+function showKey(){const k=document.getElementById('keypin'),p=document.querySelector('[name=curpin]');const pin=k.value||(p?p.value:'');fetch('/key',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'curpin='+encodeURIComponent(pin)}).then(async r=>{if(r.ok)return r.text();throw r.status===429?await r.text():'暗証番号が違います'}).then(k=>document.getElementById('keyv').value=k).catch(m=>alert(m))}
 function ble(){fetch('/ble').then(r=>r.json()).then(a=>fill('bles',a.map(b=>({...b,pick:()=>{const t=document.querySelector('[name=beacons]');t.value=(t.value.trim()+'\n'+(b.uuid?'uuid:'+b.uuid+':'+b.major+':'+b.minor:b.mac)).trim()}})),b=>b.mac+' '+b.rssi+'dBm '+(b.name||'')+(b.uuid?' iBeacon':'')))}
 </script></body></html>)HTML";
 
