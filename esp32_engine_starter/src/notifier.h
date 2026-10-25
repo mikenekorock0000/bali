@@ -10,8 +10,8 @@ class Notifier {
   // title・本文は UTF-8。tags は ntfy の絵文字タグ（例 "warning"）
   void send(Prio prio, const String& title, const String& body, const char* tags = "");
   void loop(uint32_t nowMs);
-  // 指示用トピックに届いた新しいメッセージを 1 件取り出す
-  bool takeCommand(String& cmd);
+  // 指示用トピックに届いた新しいメッセージを 1 件取り出す。添付ファイルがあれば url にその URL（なければ空）
+  bool takeCommand(String& cmd, String& url);
   // ダッシュボード用の状態（JSON）を状態のトピックに送る。未送信の古い状態は新しいもので置き換える
   void publishState(const String& json) { state_ = json; }
   // 送っていない通知・状態がない
@@ -32,10 +32,15 @@ class Notifier {
     Prio prio;
     String title, body, tags;
   };
-  bool post(const Msg& m);
-  bool postState(const String& json);
+
+ public:
+  // ntfy との通信の準備（証明書の確認・アクセストークン）。遠隔更新のダウンロードでも使う
   void addAuth(class HTTPClient& http);
   static void secure(class WiFiClientSecure& client);
+
+ private:
+  bool post(const Msg& m);
+  bool postState(const String& json);
   void pollCommands();
 
   static constexpr int QUEUE = 8;
@@ -50,5 +55,6 @@ class Notifier {
   uint32_t sent_ = 0;
   String state_;
   String cmds_[4];
+  String urls_[4];
   int cmdCount_ = 0;
 };

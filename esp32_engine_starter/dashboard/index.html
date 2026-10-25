@@ -256,22 +256,23 @@ function signCommand(key, ts, cmd) { return hex(hmac(key, ts + " " + cmd).slice(
 
 const PLAIN_OK = ["status", "state", "scan", "beep", "lock"];
 
+// 署名付きの指示の本文（鍵がなければ null）
+function signedBody(cmd) {
+  if (!cfg.key) return null;
+  // 時刻は、前に送ったもの・ESP32 が最後に受け付けたものより必ず後にする
+  // （1 秒以内に続けて押したときや、端末の時計が遅れているときに「使い回し」と判断されないように）
+  let last = 0;
+  try { last = Number(localStorage.getItem(KEY + "-ts") || 0); } catch (e) {}
+  const ts = Math.max(Math.floor(Date.now() / 1000), last + 1, ((state && state.cts) || 0) + 1);
+  try { localStorage.setItem(KEY + "-ts", String(ts)); } catch (e) {}
+  return `sig1 ${ts} ${signCommand(cfg.key, ts, cmd)} ${cmd}`;
+}
+
 async function send(cmd) {
   if (demo) { toast("デモ表示なので送りません：" + cmd); return; }
-  let body;
-  if (cfg.key) {
-    // 時刻は、前に送ったもの・ESP32 が最後に受け付けたものより必ず後にする
-    // （1 秒以内に続けて押したときや、端末の時計が遅れているときに「使い回し」と判断されないように）
-    let last = 0;
-    try { last = Number(localStorage.getItem(KEY + "-ts") || 0); } catch (e) {}
-    const ts = Math.max(Math.floor(Date.now() / 1000), last + 1, ((state && state.cts) || 0) + 1);
-    try { localStorage.setItem(KEY + "-ts", String(ts)); } catch (e) {}
-    body = `sig1 ${ts} ${signCommand(cfg.key, ts, cmd)} ${cmd}`;
-  } else if (cfg.pin && PLAIN_OK.includes(cmd.split(" ")[0])) {
-    body = cfg.pin + " " + cmd;
-  } else {
-    toast("設定で「指示の鍵」を入れてください（ESP32 の設定画面に表示されます）"); openCfg(); return;
-  }
+  let body = signedBody(cmd);
+  if (!body && cfg.pin && PLAIN_OK.includes(cmd.split(" ")[0])) body = cfg.pin + " " + cmd;
+  if (!body) { toast("設定で「指示の鍵」を入れてください（ESP32 の設定画面に表示されます）"); openCfg(); return; }
   try {
     const r = await fetch(`${cfg.server}/${encodeURIComponent(cfg.cmd)}`, { method: "POST", headers: headers(), body });
     if (!r.ok) throw new Error("HTTP " + r.status);
@@ -280,13 +281,14 @@ async function send(cmd) {
   } catch (e) { toast("送れませんでした（" + e.message + "）"); }
 }
 
-function confirmSend(title, body, cmd) {
+function ask(title, body) {
   $("#cTitle").textContent = title;
   $("#cBody").textContent = body;
   const d = $("#confirmDlg");
-  d.onclose = () => { if (d.returnValue === "ok") send(cmd); };
-  d.showModal();
+  d.returnValue = "";
+  return new Promise((res) => { d.onclose = () => res(d.returnValue === "ok"); d.showModal(); });
 }
+async function confirmSend(title, body, cmd) { if (await ask(title, body)) send(cmd); }
 
 // ---------- 表示 ----------
 function setConn(cls, text) {
@@ -372,6 +374,27 @@ function render() {
   renderLog();
 }
 
+// ---------- 遠隔更新：ファームウェアを指示用トピックに添付して送る（同じ Wi-Fi にいなくてよい） ----------
+async function sendFirmware(file) {
+  if (demo) { toast("デモ表示なので送りません"); return; }
+  if (!cfg.key) { toast("設定で「指示の鍵」を入れてください"); openCfg(); return; }
+  const buf = new Uint8Array(await file.arrayBuffer());
+  if (buf[0] !== 0xE9 || buf.length < 100000) { toast("firmware.bin ではないようです"); return; }
+  const ok = await ask("ファームウェアを更新しますか？",
+    `${file.name}（${Math.round(buf.length / 1024)} KB）を送ります。ESP32 が次に指示を読んだとき（休止中なら最大 15 分後）に書き込み、再起動します。新しい版が 10 分以内に ntfy とやり取りできなければ、自動で前の版に戻ります。`);
+  if (!ok) return;
+  toast("送っています…");
+  const sha = hex(sha256(buf));
+  try {
+    const r = await fetch(`${cfg.server}/${encodeURIComponent(cfg.cmd)}`, {
+      method: "PUT", body: buf,
+      headers: { ...headers(), "Filename": "firmware.bin", "X-Message": signedBody("ota " + sha) },
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    toast("送りました。書き込みが終わると「ファームウェアを更新しました」と通知が届きます");
+  } catch (e) { toast("送れませんでした（" + e.message + "）"); }
+}
+
 function renderControls() {
   const s = state || {};
   const btn = (label, sub, cmd, opt = {}) => ({ label, sub, cmd, ...opt });
@@ -399,6 +422,16 @@ function renderControls() {
     el.onclick = () => (b.confirm ? confirmSend(b.confirm[0], b.confirm[1], b.cmd) : send(b.cmd));
     box.appendChild(el);
   }
+  const fw = document.createElement("button");
+  fw.innerHTML = "ファームウェアを更新<small>firmware.bin を選んで送る</small>";
+  fw.disabled = !ready();
+  fw.onclick = () => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = ".bin";
+    inp.onchange = () => inp.files[0] && sendFirmware(inp.files[0]);
+    inp.click();
+  };
+  box.appendChild(fw);
 }
 
 function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }

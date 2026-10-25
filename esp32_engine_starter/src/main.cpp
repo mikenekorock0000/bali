@@ -40,6 +40,7 @@
 #include "logic/nmea.h"
 #include "logic/park_sleep.h"
 #include "portal.h"
+#include "remote_ota.h"
 #include "logic/presence.h"
 #include "sensors.h"
 #include "settings.h"
@@ -115,6 +116,7 @@ bool sleepingSoon = false;    // これから眠る（状態に入れて、ダ�
 uint32_t setupBtnSince = 0;
 
 // ---- 見張り・更新の確認 ----
+String cmdAttachUrl;        // いま処理している指示に付いていた添付ファイル（遠隔更新のファームウェア）
 bool otaPending = false;     // OTA で更新した直後（正常に動くと確かめるまで前の版に戻せる）
 const char* resetReason = "";
 uint32_t lastCmdTs = 0;      // 最後に受け付けた署名付き指示の時刻（使い回しを防ぐ）
@@ -330,6 +332,23 @@ void dispatchCommand(String cmd, uint32_t now) {
       lastTrackNotifyMs = 0;
       notifier.send(Prio::Low, "追跡を始めました", "位置を " + String(TRACK_NOTIFY_MS / 60000) + " 分ごとに通知します");
     }
+  } else if (cmd == "ota") {
+    // 遠隔更新（署名付きの指示だけ。arg はファームウェアの SHA-256）
+    if (cmdAttachUrl.isEmpty()) {
+      notifier.send(Prio::Default, "更新できません", "ファームウェアのファイルが添付されていません", "warning");
+      return;
+    }
+    Serial.printf("[ota] %s\n", cmdAttachUrl.c_str());
+    ble.setEnabled(false);  // ダウンロード中は Bluetooth を止める（メモリと無線を空ける）
+    String err;
+    if (remoteOtaUpdate(notifier, cmdAttachUrl, arg, err)) {
+      Serial.println("[ota] 書き込み完了。再起動します");
+      saveEngine();
+      delay(200);
+      ESP.restart();  // 新しい版が ntfy と通信できれば確定、できなければ 10 分で前の版に戻る
+    }
+    Serial.printf("[ota] 失敗：%s\n", err.c_str());
+    notifier.send(Prio::Default, "更新に失敗しました", err + "。今の版のまま動いています", "warning");
   } else if (cmd == "oilreset") {
     oilBaseSec = engineSec;
     prefs.putUInt("oilbase", oilBaseSec);
@@ -338,7 +357,7 @@ void dispatchCommand(String cmd, uint32_t now) {
   } else {
     notifier.send(Prio::Low, "不明な指示",
                   "status / scan / lock / pause [分] / resume / autolock on|off / alarm on|off / "
-                  "siren on|off / park on|off / track on|off / beep / silence / oilreset / setup");
+                  "siren on|off / park on|off / track on|off / beep / silence / oilreset / setup / ota（ダッシュボードから）");
   }
 }
 
@@ -983,7 +1002,8 @@ void loop() {
 
   // ---- スマホからの指示 ----
   String cmd;
-  while (notifier.takeCommand(cmd)) handleCommand(cmd, now);
+  while (notifier.takeCommand(cmd, cmdAttachUrl)) handleCommand(cmd, now);
+  cmdAttachUrl = "";
 
   // ---- 毎日の報告 ----
   struct tm t;

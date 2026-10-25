@@ -94,7 +94,10 @@ void Notifier::pollCommands() {
       JsonDocument doc;
       if (!deserializeJson(doc, body.substring(start, nl)) && doc["event"] == "message") {
         since_ = doc["id"].as<String>();
-        if (!firstPoll_ && cmdCount_ < 4) cmds_[cmdCount_++] = doc["message"].as<String>();
+        if (!firstPoll_ && cmdCount_ < 4) {
+          urls_[cmdCount_] = doc["attachment"]["url"] | "";
+          cmds_[cmdCount_++] = doc["message"].as<String>();
+        }
       }
       start = nl + 1;
     }
@@ -134,10 +137,14 @@ void Notifier::loop(uint32_t nowMs) {
   }
 }
 
-bool Notifier::takeCommand(String& cmd) {
+bool Notifier::takeCommand(String& cmd, String& url) {
   if (cmdCount_ == 0) return false;
   cmd = cmds_[0];
-  for (int i = 1; i < cmdCount_; ++i) cmds_[i - 1] = cmds_[i];
+  url = urls_[0];
+  for (int i = 1; i < cmdCount_; ++i) {
+    cmds_[i - 1] = cmds_[i];
+    urls_[i - 1] = urls_[i];
+  }
   --cmdCount_;
   return true;
 }
