@@ -181,8 +181,13 @@ void SetupPortal::start(const char* reason, uint32_t nowMs) {
   startedMs_ = nowMs;
   if (active_) return;
   active_ = true;
-  WiFi.mode(WIFI_AP_STA);  // 設定中も、つながる Wi-Fi があれば通知は送り続ける
-  WiFi.softAP(apName().c_str(), SETUP_AP_PASS);
+  WiFi.mode(WIFI_AP_STA);  // 設定中も、つながっている Wi-Fi があれば通知は送り続ける
+  if (WiFi.status() != WL_CONNECTED) {
+    // つながっていない Wi-Fi を探し続けると、無線のチャンネルが動き回って設定用の Wi-Fi が不安定になる。設定中は探さない
+    WiFi.setAutoReconnect(false);
+    WiFi.disconnect(false);
+  }
+  WiFi.softAP(apName().c_str(), SETUP_AP_PASS, 1, 0, 4);
   dns.start(53, "*", WiFi.softAPIP());  // どのアドレスを開いても設定画面へ（キャプティブポータル）
   if (!serverUp_) {
     server.on("/", HTTP_GET, [this] { handleRoot(); });
@@ -204,6 +209,7 @@ void SetupPortal::stop() {
   dns.stop();
   WiFi.softAPdisconnect(true);
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
 }
 
 void SetupPortal::loop(uint32_t nowMs) {

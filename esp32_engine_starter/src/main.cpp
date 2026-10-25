@@ -407,7 +407,7 @@ void setupWifi() {
 
 // つながらないとき、予備の Wi-Fi があれば交互に試す
 void wifiLoop(uint32_t now) {
-  if (WiFi.status() == WL_CONNECTED || settings.ssid1.isEmpty()) return;
+  if (WiFi.status() == WL_CONNECTED || settings.ssid1.isEmpty() || portal.active()) return;
   if (now - wifiTryMs < WIFI_SWITCH_MS) return;
   wifiBegin(settings.ssid2.length() ? !wifiOnSecond : false);
 }
