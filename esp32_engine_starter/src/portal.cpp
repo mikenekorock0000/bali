@@ -181,12 +181,13 @@ void SetupPortal::start(const char* reason, uint32_t nowMs) {
   startedMs_ = nowMs;
   if (active_) return;
   active_ = true;
-  WiFi.mode(WIFI_AP_STA);  // 設定中も、つながっている Wi-Fi があれば通知は送り続ける
-  // 設定中はスマホなどの Wi-Fi にはつながない。つなぎっぱなしだと、設定用の Wi-Fi が相手のチャンネルに引きずられて不安定になる。
-  // また、テザリングの本体（スマホ）は、自分でテザリングを出しながら別の Wi-Fi にはつなげない。
+  // 設定中は設定用の Wi-Fi（AP）だけを出す。ほかの Wi-Fi にはつながない（つなぐと、相手のチャンネルに引きずられて切れる。
+  // また、テザリングを出しているスマホは、自分では別の Wi-Fi につなげない）
   WiFi.setAutoReconnect(false);
-  WiFi.disconnect(false);
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_AP);
   WiFi.softAP(apName().c_str(), SETUP_AP_PASS, 1, 0, 4);
+  delay(100);  // AP と DHCP サーバーが立ち上がるのを待つ
   dns.start(53, "*", WiFi.softAPIP());  // どのアドレスを開いても設定画面へ（キャプティブポータル）
   if (!serverUp_) {
     server.on("/", HTTP_GET, [this] { handleRoot(); });
@@ -209,6 +210,7 @@ void SetupPortal::stop() {
   WiFi.softAPdisconnect(true);
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
+  WiFi.reconnect();
 }
 
 void SetupPortal::loop(uint32_t nowMs) {
@@ -232,6 +234,7 @@ void SetupPortal::handleRoot() {
 
 void SetupPortal::handleScan() {
   startedMs_ = millis();
+  WiFi.mode(WIFI_AP_STA);  // AP だけのモードでは探せない。探している間は設定用の Wi-Fi が一瞬不安定になる
   int n = WiFi.scanNetworks();
   JsonDocument doc;
   JsonArray arr = doc.to<JsonArray>();
@@ -242,6 +245,8 @@ void SetupPortal::handleScan() {
     o["rssi"] = WiFi.RSSI(i);
   }
   WiFi.scanDelete();
+  WiFi.disconnect(false);
+  WiFi.mode(WIFI_AP);
   String out;
   serializeJson(doc, out);
   server.send(200, "application/json", out);
