@@ -15,6 +15,8 @@ class SetupPortal {
   void loop(uint32_t nowMs);
   bool active() const { return active_; }
   String apName() const;
+  // 設定中は Bluetooth のスキャンを止める（Wi-Fi の電波と干渉して接続が切れるため）。キーの検索を押されたあとだけ動かす
+  bool wantsBle(uint32_t nowMs) const { return bleReqMs_ && nowMs - bleReqMs_ < 20000; }
   void setNearbyProvider(NearbyFn fn) { nearby_ = fn; }
   void setGpsKmProvider(KmFn fn) { gpsKm_ = fn; }  // メーターの値を入れたときの GPS の累計距離
 
@@ -30,6 +32,7 @@ class SetupPortal {
   bool serverUp_ = false;
   uint32_t startedMs_ = 0;
   uint32_t restartAt_ = 0;
+  uint32_t bleReqMs_ = 0;
   String reason_;
   NearbyFn nearby_ = nullptr;
   KmFn gpsKm_ = nullptr;

@@ -249,6 +249,7 @@ void SetupPortal::handleScan() {
 
 void SetupPortal::handleBle() {
   startedMs_ = millis();
+  bleReqMs_ = startedMs_ ? startedMs_ : 1;
   JsonDocument doc;
   JsonArray arr = doc.to<JsonArray>();
   if (nearby_) nearby_(arr);
