@@ -11,7 +11,9 @@ import numpy as np
 import trimesh
 
 BOARD_W, BOARD_H = 98.0, 90.0
-GAP = 0.5            # 基板と内壁のすき間
+GAP = 0.5            # 基板と内壁のすき間（上下）
+SIDE = 8.5           # 左右は広げて、内側の角にふたのねじの柱を立てる
+POST = 8.0           # 角の柱（一辺）
 WALL = 2.0           # 壁の厚さ
 FLOOR = 2.0          # 底の厚さ
 BOSS_H = 8.0         # 基板を載せる柱の高さ（裏に出た足が底に当たらないように）
@@ -22,17 +24,16 @@ PCB_T = 1.6
 CLEAR_ABOVE = 22.0   # 基板の上の空き（いちばん背の高いポリスイッチ 18mm＋余裕）
 LID_T = 2.5
 LIP_T, LIP_H, LIP_GAP = 1.5, 3.0, 0.3   # ふたの裏の位置決めの縁
-EAR = 9.0            # 角のねじの耳（一辺）
-SKIRT = 4.0          # ふたの外周の壁（本体の壁の上 4mm をふたの側に持たせ、耳と一体にして強くする）
-CBORE_D, CBORE_H = 6.2, 3.5   # ふたの耳の座ぐり（ねじの頭を沈め、M3×10 で本体に 7mm 入るようにする）
+SKIRT = 4.0          # ふたの外周の壁（本体の壁の上 4mm をふたの側に持たせ、角の柱の上部と一体にする）
+CBORE_D, CBORE_H = 6.2, 3.5   # ふたの座ぐり（ねじの頭を沈め、M3×10 で本体の柱に 7mm 入るようにする）
 HOLES = [(3.5, 3.5), (BOARD_W - 3.5, 3.5), (3.5, BOARD_H - 3.5), (BOARD_W - 3.5, BOARD_H - 3.5)]
 
 PCB_BOTTOM = FLOOR + BOSS_H
 PCB_TOP = PCB_BOTTOM + PCB_T
 INNER_TOP = PCB_TOP + CLEAR_ABOVE      # ふたの裏
 SPLIT = INNER_TOP - SKIRT               # 本体とふたの分かれ目
-X0, Y0 = -GAP, -GAP                     # 内側の空間
-X1, Y1 = BOARD_W + GAP, BOARD_H + GAP
+X0, Y0 = -SIDE, -GAP                    # 内側の空間
+X1, Y1 = BOARD_W + SIDE, BOARD_H + GAP
 OX0, OY0, OX1, OY1 = X0 - WALL, Y0 - WALL, X1 + WALL, Y1 + WALL
 
 # 電線を通す切り欠き：(壁, 始め, 終わり)。端子台の電線の差し込み口の前を、基板の上面から上に開ける
@@ -41,7 +42,7 @@ WIRE_TOP = PCB_TOP + 9.0         # ふたの舌がここまで下りて、すき
 NOTCHES = [
     ("top", 38.8, 57.0, WIRE_BOTTOM),      # J1 電源（42.84〜53.0）
     ("bottom", 34.0, 52.2, WIRE_BOTTOM),   # J7 CAN（38.0〜48.16）
-    ("left", 7.0, 48.6, WIRE_BOTTOM),      # J2 出力（10.5〜46.06）
+    ("left", 8.5, 48.6, WIRE_BOTTOM),      # J2 出力（10.5〜46.06）。角の柱（〜7.5）を避ける
     ("left", 51.0, 81.4, WIRE_BOTTOM),     # J3 入力（53.5〜78.9）
     ("right", 14.0, 42.0, PCB_TOP + 10.0), # J4 I2C・J8 GPS のケーブル（ピンの上で曲げて出す）
 ]
@@ -76,17 +77,21 @@ def notch_box(side, a, b, z0, z1, extra=0.0):
     return box(X1 - 1, a - extra, z0, OX1 + 1, b + extra, z1)
 
 
-def ear_centers():
-    d = EAR / 2 - WALL  # 耳が内側の空間にはみ出さない位置
-    return [(OX0 - d, OY0 - d), (OX1 + d, OY0 - d), (OX0 - d, OY1 + d), (OX1 + d, OY1 + d)]
+def posts():
+    """角の柱の範囲 (x0, y0, x1, y1) と中心"""
+    out = []
+    for xa, xb in ((X0, X0 + POST), (X1 - POST, X1)):
+        for ya, yb in ((Y0, Y0 + POST), (Y1 - POST, Y1)):
+            out.append(((xa, ya, xb, yb), ((xa + xb) / 2, (ya + yb) / 2)))
+    return out
 
 
 def base():
     body = box(OX0, OY0, 0, OX1, OY1, SPLIT)
     body -= box(X0, Y0, FLOOR, X1, Y1, INNER_TOP + 1)
-    # 角の耳（ふたのねじ）
-    for cx, cy in ear_centers():
-        body += box(cx - EAR / 2, cy - EAR / 2, 0, cx + EAR / 2, cy + EAR / 2, SPLIT)
+    # 内側の角の柱（ふたのねじ）
+    for (xa, ya, xb, yb), (cx, cy) in posts():
+        body += box(xa - 0.01, ya - 0.01, FLOOR - 0.01, xb + 0.01, yb + 0.01, SPLIT)
         body -= cyl(cx, cy, 4.0, INNER_TOP, SCREW_PILOT)
     # 基板の柱
     for x, y in HOLES:
@@ -107,16 +112,19 @@ def base():
 def lid():
     z = INNER_TOP
     top = box(OX0, OY0, z, OX1, OY1, z + LID_T)
-    # 外周の壁（本体の壁の続き）。耳はこの壁と上の板の両方につながる
+    # 外周の壁（本体の壁の続き）と、角の柱の上部。どちらも上の板と一体
     top += box(OX0, OY0, SPLIT, OX1, OY1, z + 0.01) - box(X0, Y0, SPLIT - 1, X1, Y1, z + 1)
-    for cx, cy in ear_centers():
-        top += box(cx - EAR / 2, cy - EAR / 2, SPLIT, cx + EAR / 2, cy + EAR / 2, z + LID_T)
-        top -= cyl(cx, cy, SPLIT - 1, z + LID_T - SPLIT + 2, SCREW_CLEAR)
-        top -= cyl(cx, cy, z + LID_T - CBORE_H, CBORE_H + 1, CBORE_D)
-    # 位置決めの縁（内壁の内側に入る）
+    for (xa, ya, xb, yb), _ in posts():
+        top += box(xa - 0.01, ya - 0.01, SPLIT, xb + 0.01, yb + 0.01, z + 0.01)
+    # 位置決めの縁：分かれ目から下へ、本体の壁の内側に入る（角の柱のところは切る）
     g = LIP_GAP
-    lip = box(X0 + g, Y0 + g, z - LIP_H, X1 - g, Y1 - g, z + 0.01)
-    lip -= box(X0 + g + LIP_T, Y0 + g + LIP_T, z - LIP_H - 1, X1 - g - LIP_T, Y1 - g - LIP_T, z + 1)
+    lip = box(X0 + g, Y0 + g, SPLIT - LIP_H, X1 - g, Y1 - g, z + 0.01)  # 上の板までつなげる
+    lip -= box(X0 + g + LIP_T, Y0 + g + LIP_T, SPLIT - LIP_H - 1, X1 - g - LIP_T, Y1 - g - LIP_T, z + 1)
+    for (xa, ya, xb, yb), _ in posts():
+        lip -= box(xa - 1, ya - 1, SPLIT - LIP_H - 1, xb + g, yb + g, SPLIT) if xa == X0 and ya == Y0 else \
+            box(xa - g, ya - 1, SPLIT - LIP_H - 1, xb + 1, yb + g, SPLIT) if ya == Y0 else \
+            box(xa - 1, ya - g, SPLIT - LIP_H - 1, xb + g, yb + 1, SPLIT) if xa == X0 else \
+            box(xa - g, ya - g, SPLIT - LIP_H - 1, xb + 1, yb + 1, SPLIT)
     top += lip
     # 切り欠きをふさぐ舌（電線の通るすき間だけ残す）
     for side, a, b, z0 in NOTCHES:
@@ -125,6 +133,10 @@ def lid():
         # 壁の厚みの中だけに残す
         wall_band = box(OX0, OY0, 0, OX1, OY1, z + 1) - box(X0, Y0, -1, X1, Y1, z + 2)
         top += t ^ wall_band
+    # ふたのねじ（座ぐり付き）
+    for _, (cx, cy) in posts():
+        top -= cyl(cx, cy, SPLIT - 1, z + LID_T - SPLIT + 2, SCREW_CLEAR)
+        top -= cyl(cx, cy, z + LID_T - CBORE_H, CBORE_H + 1, CBORE_D)
     # BOOT・EN ボタンの穴
     for bx, by in BUTTONS:
         top -= slot(bx, by, z - 1, LID_T + 2, *BUTTON_SLOT)
