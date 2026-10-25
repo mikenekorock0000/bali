@@ -79,7 +79,7 @@ ul{padding-left:18px;margin:6px 0}li{font-size:14px;cursor:pointer}
 <fieldset><legend>ダッシュボードの「指示の鍵」</legend>
 <p class="hint">ダッシュボードから送る指示に付ける署名の鍵です。ダッシュボードの設定に入れてください。他人に知られると指示を送られるので、人に見せないでください。</p>
 <label>今の暗証番号</label><div class="row"><input id="keypin" type="password" inputmode="numeric" autocomplete="off"><button type="button" onclick="showKey()">表示</button></div>
-<input id="keyv" readonly placeholder="ここに鍵が出ます（長押しでコピー）">
+<textarea id="keyv" readonly rows="6" placeholder="ここにダッシュボードの設定（サーバー・3 つのトピック・鍵）が出ます"></textarea>
 <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="newkey" value="1" style="width:auto">鍵を作り直す（前の鍵を入れたダッシュボードからは送れなくなる）</label>
 </fieldset>
 <fieldset><legend>点検の予定</legend>
@@ -282,7 +282,10 @@ void SetupPortal::handleKey() {
     server.send(pc == 2 ? 429 : 403, "text/plain; charset=utf-8", pc == 2 ? lockedMessage() : String(""));
     return;
   }
-  server.send(200, "text/plain", settings.cmdKey);
+  // ダッシュボードの設定に入れるものをまとめて返す
+  String t = "サーバー: " + settings.ntfyServer + "\n状態のトピック: " + settings.stateTopic + "\n通知のトピック: " +
+             settings.topic + "\n指示のトピック: " + settings.cmdTopic + "\n鍵: " + settings.cmdKey;
+  server.send(200, "text/plain; charset=utf-8", t);
 }
 
 void SetupPortal::handleSave() {
