@@ -24,7 +24,7 @@ cp "$PCB" hijet_starter.kicad_pro "$P/kicad/"
 cp -r footprints.pretty "$P/kicad/"
 cp gen_pcb.py check_pins.py check_mech.py check_fab.py drc_check.py bom.py export_netlist.py export_jlc.py build.sh render.sh "$P/scripts/"
 cp sim/*.cir sim/*.lib sim/*.py sim/*.sh "$P/scripts/sim/"
-cp -r ../src ../lib ../test ../dashboard ../platformio.ini ../README.md "$P/firmware/"
+cp -r ../src ../test ../dashboard ../platformio.ini ../esp32_engine_starter.ino ../README.md "$P/firmware/"
 rm -f "$P/firmware/src/secrets.h"  # 個人の Wi-Fi・ntfy の設定は含めない
 rm -f "$OUT"
 (cd "$TMP" && zip -qr "$OUT" hijet_monitor_review)

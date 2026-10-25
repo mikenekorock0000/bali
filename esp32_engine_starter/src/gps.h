@@ -2,7 +2,7 @@
 // GPS（UART、NMEA）の読み取りと、走行（ACC ON〜OFF）ごとの距離・最高速度の集計。
 #include <Arduino.h>
 
-#include "nmea.h"
+#include "logic/nmea.h"
 
 struct TripSummary {
   uint32_t durationSec = 0;

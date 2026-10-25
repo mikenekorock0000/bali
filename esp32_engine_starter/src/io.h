@@ -2,7 +2,7 @@
 // 絶縁入力（ドア・ACC など、チャタリング除去付き）と絶縁出力（施錠信号などのパルス）。
 #include <Arduino.h>
 
-#include "debounce.h"
+#include "logic/debounce.h"
 
 class Inputs {
  public:

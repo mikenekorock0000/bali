@@ -76,7 +76,7 @@ ntfy アプリから手で「`暗証番号 指示`」（例：`1234 status`）�
 ## セットアップ
 
 1. スマホに **ntfy** アプリを入れる。トピック名を 3 つ決める（通知・指示・状態。推測されない長いランダムな文字列）。アプリでは**通知のトピックだけ**を購読する。
-2. PlatformIO で書き込む：`pio run -e esp32dev -t upload`（初回は USB。2 回目からは Wi-Fi 経由の OTA でもよい）。
+2. 書き込む。**Arduino IDE** か **PlatformIO** のどちらでもよい（下の「書き込み方」）。初回は USB、2 回目からは Wi-Fi 経由の OTA でもよい。
 3. 初めて起動すると、ESP32 が **設定モード**になり、Wi-Fi「`HIJET-SETUP-xxxx`」（パスワード `hijet-setup`）を出す。スマホでつなぐと設定画面が開くので、次を入力して保存する（保存すると再起動する）。
    - Wi-Fi（主と予備の 2 つまで）
    - ntfy のサーバーと 3 つのトピック（ntfy のアカウントを使うならアクセストークン）
@@ -94,6 +94,28 @@ ntfy アプリから手で「`暗証番号 指示`」（例：`1234 status`）�
 机の上で何度も書き込み直すときは、`src/secrets.example.h` を `src/secrets.h` にコピーして値を書いておくと、初回の設定の入力を省ける（一度保存した設定は上書きしない）。
 
 USB で書き込むときは、基板の 12V（J1）を外すこと。
+
+### 書き込み方：Arduino IDE
+
+1. Arduino IDE 2 を入れる。「ファイル → 基本設定」の「追加のボードマネージャの URL」に
+   `https://espressif.github.io/arduino-esp32/package_esp32_index.json` を入れる。
+2. ボードマネージャで「esp32 by Espressif Systems」の **2.0.17** を入れる（3.x ではビルドできない）。
+3. ライブラリマネージャで次の版を入れる（依存するライブラリも聞かれたら一緒に入れる）。
+   - NimBLE-Arduino **1.4.3**（2.x は使い方が違うのでビルドできない）
+   - ArduinoJson **7.2.1**
+   - Adafruit BME280 Library **2.2.4**
+4. このフォルダ（`esp32_engine_starter`）の `esp32_engine_starter.ino` を開く。中身はほぼ空だが、
+   `src/` の中も一緒にビルドされる。フォルダ名を変えると開けないので、名前はそのままにする。
+5. 「ツール」で次を選ぶ。
+   - ボード：**ESP32 Dev Module**
+   - Partition Scheme：**Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)**（既定のままだと大きすぎて書き込めない）
+   - シリアルポート：ESP32 の COM ポート
+6. 「書き込み」（→）を押す。`Connecting...` で止まったら、DevKit の BOOT ボタンを押したままにし、書き込みが始まったら離す。
+7. 「ツール → シリアルモニタ」を **115200 baud** で開く。`setup portal: HIJET-SETUP-xxxx` と出れば動いている。
+
+### 書き込み方：PlatformIO
+
+`pio run -e esp32dev -t upload`（ボード・パーティション・ライブラリの版は `platformio.ini` で決めてある）。
 
 ## Ottocast の GPS を使う
 
@@ -115,7 +137,7 @@ Ottocast（中身は Android）に GPS が入っていれば、その位置を W
   - `main.cpp` 全体の動作・通知・指示 / `io` 入出力 / `buzzer` / `battery` / `ble_presence` /
     `sensors`（BME280・MPU6050）/ `obd`（CAN）/ `gps` / `notifier`（ntfy）/
     `settings`（設定の保存）/ `portal`（設定モードの画面）/ `ca_roots.h`（ntfy の証明書を確かめるルート証明書）
-- `lib/starter_logic/` … PC でテストできる判定ロジック（在・不在、ビーコン、チャタリング除去、通知の間引き、
+- `src/logic/` … PC でテストできる判定ロジック（在・不在、ビーコン、チャタリング除去、通知の間引き、
   NMEA、OBD、バッテリー診断、駐車モード、履歴、設定の書式、指示の署名、点検の予定）
 - `test/` … 上記のテスト
 - `dashboard/` … ダッシュボード（ブラウザで開く 1 枚の HTML）。詳しくは [dashboard/README.md](dashboard/README.md)
@@ -123,11 +145,12 @@ Ottocast（中身は Android）に GPS が入っていれば、その位置を W
 
 ## 確認したこと・していないこと
 
-- **確認済み：** ロジックのテスト 16 件が合格。ESP32 用の実際のコンパイラ（arduino-esp32 2.0.17、
-  PlatformIO の `espressif32@6.9.0` と同じコア）で、警告なしでビルドできる（フラッシュ 64%、RAM 19%）。
+- **確認済み：** ロジックのテスト 25 件が合格。ESP32 用の実際のコンパイラ（arduino-esp32 2.0.17、
+  PlatformIO の `espressif32@6.9.0` と同じコア）で、PlatformIO と arduino-cli（Arduino IDE と同じ仕組み）の
+  どちらでも警告なしでビルドできる（フラッシュ 69%、RAM 19%）。
 - **未確認：** 実機での動作（ntfy への通知、BLE、CAN、GPS、センサー、スリープからの復帰）。
   特に OBD-II は、ハイゼットが標準の要求（500kbps、ID 0x7DF）に応答するかを実車で確かめる必要がある。
-- ntfy との通信は暗号化しているが、サーバー証明書の検証は省略している（`notifier.cpp` の注意書きを参照）。
+- ntfy との通信は暗号化し、サーバー証明書もルート証明書で確かめている（証明書の期限は確かめない。`notifier.cpp` を参照）。
 
 ## テスト
 

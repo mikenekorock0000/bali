@@ -6,9 +6,9 @@
 
 #include "config.h"
 #include "settings.h"
-#include "maintenance.h"
-#include "pin_guard.h"
-#include "settings_rules.h"
+#include "logic/maintenance.h"
+#include "logic/pin_guard.h"
+#include "logic/settings_rules.h"
 
 using namespace starter;
 

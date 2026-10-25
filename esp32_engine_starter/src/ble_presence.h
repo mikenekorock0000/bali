@@ -5,7 +5,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
-#include "beacon.h"
+#include "logic/beacon.h"
 #include "config.h"
 
 class BlePresence {
