@@ -7,6 +7,7 @@
 #include "config.h"
 #include "settings.h"
 #include "maintenance.h"
+#include "pin_guard.h"
 #include "settings_rules.h"
 
 using namespace starter;
@@ -16,6 +17,26 @@ SetupPortal portal;
 namespace {
 WebServer server(80);
 DNSServer dns;
+PinGuard pinGuard(PIN_MAX_FAILS, PIN_LOCK_MS, PIN_LOCK_MAX_MS);
+
+// 今の暗証番号の確認。総当たりされないよう、続けて間違えたらしばらく受け付けない。
+// 0：正しい（未設定も含む）、1：違う、2：ロック中
+int checkPin() {
+  if (settings.pin.isEmpty()) return 0;
+  uint32_t now = millis();
+  if (!pinGuard.allowed(now)) return 2;
+  if (server.arg("curpin") == settings.pin) {
+    pinGuard.success();
+    return 0;
+  }
+  pinGuard.fail(now);
+  return pinGuard.allowed(now) ? 1 : 2;
+}
+
+String lockedMessage() {
+  uint32_t min = (pinGuard.remainingMs(millis()) + 59999) / 60000;
+  return "暗証番号を続けて間違えたので、" + String(min) + " 分間は受け付けません。";
+}
 
 // 設定画面。{{名前}} を値に置き換えて返す。パスワード類は表示しない（空欄なら変更しない）
 const char PAGE[] PROGMEM = R"HTML(<!doctype html>
@@ -82,7 +103,7 @@ ul{padding-left:18px;margin:6px 0}li{font-size:14px;cursor:pointer}
 <script>
 function fill(id,items,f){const u=document.getElementById(id);u.innerHTML='';items.forEach(x=>{const li=document.createElement('li');li.textContent=f(x);li.onclick=()=>x.pick&&x.pick();u.appendChild(li)})}
 function scan(){fetch('/scan').then(r=>r.json()).then(a=>fill('nets',a.map(n=>({...n,pick:()=>document.getElementById('ssid1').value=n.ssid})),n=>n.ssid+'（'+n.rssi+'dBm）'))}
-function showKey(){const p=document.querySelector('[name=curpin]');const pin=p?p.value:'';fetch('/key',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'curpin='+encodeURIComponent(pin)}).then(r=>r.ok?r.text():Promise.reject(r.status)).then(k=>document.getElementById('keyv').value=k).catch(()=>alert('今の暗証番号を「確認」の欄に入れてから押してください'))}
+function showKey(){const p=document.querySelector('[name=curpin]');const pin=p?p.value:'';fetch('/key',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'curpin='+encodeURIComponent(pin)}).then(async r=>{if(r.ok)return r.text();throw r.status===429?await r.text():'今の暗証番号を「確認」の欄に入れてから押してください'}).then(k=>document.getElementById('keyv').value=k).catch(m=>alert(m))}
 function ble(){fetch('/ble').then(r=>r.json()).then(a=>fill('bles',a.map(b=>({...b,pick:()=>{const t=document.querySelector('[name=beacons]');t.value=(t.value.trim()+'\n'+(b.uuid?'uuid:'+b.uuid+':'+b.major+':'+b.minor:b.mac)).trim()}})),b=>b.mac+' '+b.rssi+'dBm '+(b.name||'')+(b.uuid?' iBeacon':'')))}
 </script></body></html>)HTML";
 
@@ -234,8 +255,9 @@ void SetupPortal::handleBle() {
 void SetupPortal::handleKey() {
   startedMs_ = millis();
   // 鍵は暗証番号を知っている人にだけ見せる（未設定のときは誰でも：初期設定の最中）
-  if (settings.pin.length() && server.arg("curpin") != settings.pin) {
-    server.send(403, "text/plain", "");
+  int pc = checkPin();
+  if (pc != 0) {
+    server.send(pc == 2 ? 429 : 403, "text/plain; charset=utf-8", pc == 2 ? lockedMessage() : String(""));
     return;
   }
   server.send(200, "text/plain", settings.cmdKey);
@@ -243,7 +265,12 @@ void SetupPortal::handleKey() {
 
 void SetupPortal::handleSave() {
   startedMs_ = millis();
-  if (settings.pin.length() && server.arg("curpin") != settings.pin) {
+  int pc = checkPin();
+  if (pc == 2) {
+    sendMessage(429, "しばらく待ってください", lockedMessage() + "保存していません。");
+    return;
+  }
+  if (pc == 1) {
     sendMessage(403, "暗証番号が違います", "保存していません。");
     return;
   }

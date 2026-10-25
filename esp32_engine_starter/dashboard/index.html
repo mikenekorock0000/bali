@@ -260,7 +260,12 @@ async function send(cmd) {
   if (demo) { toast("デモ表示なので送りません：" + cmd); return; }
   let body;
   if (cfg.key) {
-    const ts = Math.floor(Date.now() / 1000);
+    // 時刻は、前に送ったもの・ESP32 が最後に受け付けたものより必ず後にする
+    // （1 秒以内に続けて押したときや、端末の時計が遅れているときに「使い回し」と判断されないように）
+    let last = 0;
+    try { last = Number(localStorage.getItem(KEY + "-ts") || 0); } catch (e) {}
+    const ts = Math.max(Math.floor(Date.now() / 1000), last + 1, ((state && state.cts) || 0) + 1);
+    try { localStorage.setItem(KEY + "-ts", String(ts)); } catch (e) {}
     body = `sig1 ${ts} ${signCommand(cfg.key, ts, cmd)} ${cmd}`;
   } else if (cfg.pin && PLAIN_OK.includes(cmd.split(" ")[0])) {
     body = cfg.pin + " " + cmd;

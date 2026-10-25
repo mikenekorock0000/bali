@@ -491,6 +491,7 @@ String stateJson(uint32_t now) {
   }
   d["fix"] = gps.hasFix(now);
   if (tracking) d["trk"] = true;
+  if (lastCmdTs) d["cts"] = lastCmdTs;  // ダッシュボードは、これより後の時刻で署名する
   if (resetReason[0]) d["rst"] = resetReason;
   if (otaPending) d["ota"] = "verifying";
   if (gps.present()) d["gsrc"] = gps.source();

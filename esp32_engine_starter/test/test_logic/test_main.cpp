@@ -13,6 +13,7 @@
 #include "settings_rules.h"
 #include "hmac_sha256.h"
 #include "maintenance.h"
+#include "pin_guard.h"
 #include <string>
 
 using namespace starter;
@@ -455,6 +456,37 @@ void test_maintenance() {
   TEST_ASSERT_EQUAL(4, maintLevel(b, 0, 45000, true));
 }
 
+void test_pin_guard() {
+  PinGuard g(5, 300000, 3600000);
+  for (int i = 0; i < 4; ++i) {
+    TEST_ASSERT_TRUE(g.allowed(1000));
+    g.fail(1000);
+  }
+  TEST_ASSERT_TRUE(g.allowed(1000));
+  g.fail(1000);  // 5 回目でロック
+  TEST_ASSERT_FALSE(g.allowed(1000));
+  TEST_ASSERT_FALSE(g.allowed(300999));
+  TEST_ASSERT_TRUE(g.allowed(301000));
+  // 2 回目のロックは 2 倍
+  for (int i = 0; i < 5; ++i) g.fail(400000);
+  TEST_ASSERT_FALSE(g.allowed(400000 + 599999));
+  TEST_ASSERT_TRUE(g.allowed(400000 + 600000));
+  // 正しく入れたら元に戻る
+  g.success();
+  TEST_ASSERT_EQUAL(0, g.lockCount());
+  for (int i = 0; i < 4; ++i) g.fail(2000000);
+  TEST_ASSERT_TRUE(g.allowed(2000000));
+  // 待ち時間は上限で止まる
+  PinGuard h(1, 300000, 3600000);
+  uint32_t t = 0;
+  for (int i = 0; i < 10; ++i) {
+    t += 4000000;
+    h.fail(t);
+  }
+  TEST_ASSERT_EQUAL(3600000u, h.remainingMs(t));
+}
+
+
 
 
 
@@ -484,5 +516,6 @@ int main(int, char**) {
   RUN_TEST(test_sha256_vectors);
   RUN_TEST(test_signed_command);
   RUN_TEST(test_maintenance);
+  RUN_TEST(test_pin_guard);
   return UNITY_END();
 }

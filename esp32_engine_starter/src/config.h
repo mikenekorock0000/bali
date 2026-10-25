@@ -75,6 +75,9 @@ constexpr uint32_t DOOR_WAKE_GRACE_MS = 15000;       // ドアで起きたとき
 // ---- 設定モード（ESP32 が Wi-Fi「HIJET-SETUP-xxxx」を出し、スマホから設定する） ----
 #define SETUP_AP_PASS "hijet-setup"                 // 設定モードの Wi-Fi のパスワード（8 文字以上）
 constexpr uint32_t SETUP_TIMEOUT_MS = 10 * 60000UL;  // 設定済みなら、この時間で設定モードを終える
+constexpr int PIN_MAX_FAILS = 5;                     // 設定画面で暗証番号をこの回数続けて間違えたらロック
+constexpr uint32_t PIN_LOCK_MS = 5 * 60000UL;        // ロックの時間（ロックのたびに倍、上限 1 時間）
+constexpr uint32_t PIN_LOCK_MAX_MS = 60 * 60000UL;
 constexpr int PIN_SETUP_BUTTON = 0;                  // DevKit の BOOT ボタン（押すと LOW）
 constexpr uint32_t SETUP_HOLD_MS = 3000;             // この時間押し続けると設定モード
 constexpr uint32_t WIFI_FAIL_SETUP_MS = 3 * 60000UL; // ACC ON のままこの時間 Wi-Fi につながらなければ設定モード
