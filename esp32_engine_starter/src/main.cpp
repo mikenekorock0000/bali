@@ -872,7 +872,8 @@ void loop() {
   }
   if (!battery.lowVoltage()) lowNotified = false;
   ble.setEnabled(!battery.lowVoltage() || inputs.acc());
-  if (battery.valid() && battery.volts() < VBAT_SLEEP && !inputs.acc() && now > 120000 && !otaPending) {
+  if (battery.valid() && battery.volts() < VBAT_SLEEP && battery.volts() >= VBAT_BENCH && !inputs.acc() &&
+      now > 120000 && !otaPending && !portal.active()) {
     notifier.send(Prio::Urgent, "省電力モードに入ります",
                   fmt1(battery.volts()) + "V。ACC ON かドアが開くと復帰します", "zzz");
     saveEngine();

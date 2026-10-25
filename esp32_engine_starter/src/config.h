@@ -28,6 +28,7 @@ constexpr float VBAT_LOW = 11.8f;          // この電圧が 1 分続いたら�
 constexpr float VBAT_LOW_RECOVER = 12.4f;
 constexpr uint32_t VBAT_LOW_HOLD_MS = 60000;
 constexpr float VBAT_SLEEP = 11.5f;          // これ以下でエンジン停止中ならディープスリープ
+constexpr float VBAT_BENCH = 6.0f;           // これ未満は 12V をつないでいない（USB だけの机の上）。基板の 5V レギュレータは約 7V 以上で動くので、実車ではありえない
 constexpr uint32_t SLEEP_WAKE_SEC = 30 * 60; // スリープ中に電圧を見に起きる間隔
 constexpr float CRANK_WEAK_V = 9.6f;         // 始動時にこれを下回ったら「バッテリーが弱っている」
 constexpr float CHARGE_MIN_V = 13.0f;        // 稼働中にこれ未満が 1 分続いたら充電不良
