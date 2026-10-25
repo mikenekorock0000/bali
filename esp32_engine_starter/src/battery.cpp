@@ -25,7 +25,7 @@ void Battery::loop(uint32_t nowMs) {
   if (!running_ && volts_ >= VBAT_RUNNING_ON) running_ = true;
   if (running_ && volts_ <= VBAT_RUNNING_OFF) running_ = false;
 
-  if (volts_ < VBAT_LOW) {
+  if (volts_ < VBAT_LOW && volts_ >= VBAT_BENCH) {  // 6V 未満は 12V 未接続（机の上）なので低電圧にしない
     if (!below_) {
       below_ = true;
       belowSinceMs_ = nowMs;

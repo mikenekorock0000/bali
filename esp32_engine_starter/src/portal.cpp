@@ -182,11 +182,10 @@ void SetupPortal::start(const char* reason, uint32_t nowMs) {
   if (active_) return;
   active_ = true;
   WiFi.mode(WIFI_AP_STA);  // 設定中も、つながっている Wi-Fi があれば通知は送り続ける
-  if (WiFi.status() != WL_CONNECTED) {
-    // つながっていない Wi-Fi を探し続けると、無線のチャンネルが動き回って設定用の Wi-Fi が不安定になる。設定中は探さない
-    WiFi.setAutoReconnect(false);
-    WiFi.disconnect(false);
-  }
+  // 設定中はスマホなどの Wi-Fi にはつながない。つなぎっぱなしだと、設定用の Wi-Fi が相手のチャンネルに引きずられて不安定になる。
+  // また、テザリングの本体（スマホ）は、自分でテザリングを出しながら別の Wi-Fi にはつなげない。
+  WiFi.setAutoReconnect(false);
+  WiFi.disconnect(false);
   WiFi.softAP(apName().c_str(), SETUP_AP_PASS, 1, 0, 4);
   dns.start(53, "*", WiFi.softAPIP());  // どのアドレスを開いても設定画面へ（キャプティブポータル）
   if (!serverUp_) {
