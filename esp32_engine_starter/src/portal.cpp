@@ -181,11 +181,15 @@ void SetupPortal::start(const char* reason, uint32_t nowMs) {
   startedMs_ = nowMs;
   if (active_) return;
   active_ = true;
-  // 設定中は設定用の Wi-Fi（AP）だけを出す。ほかの Wi-Fi にはつながない（つなぐと、相手のチャンネルに引きずられて切れる。
-  // また、テザリングを出しているスマホは、自分では別の Wi-Fi につなげない）
+  // 設定中はつなぎ直さない。つながらない Wi-Fi を探し続けると、無線のチャンネルが動いて設定用の Wi-Fi が切れる。
+  // つながっていれば、通知を送れるようにそのまま残す（AP は同じチャンネルで出る）
   WiFi.setAutoReconnect(false);
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_AP);
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFi.mode(WIFI_AP_STA);
+  } else {
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_AP);
+  }
   WiFi.softAP(apName().c_str(), SETUP_AP_PASS, 1, 0, 4);
   delay(100);  // AP と DHCP サーバーが立ち上がるのを待つ
   dns.start(53, "*", WiFi.softAPIP());  // どのアドレスを開いても設定画面へ（キャプティブポータル）
@@ -210,7 +214,8 @@ void SetupPortal::stop() {
   WiFi.softAPdisconnect(true);
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
-  WiFi.reconnect();
+  if (WiFi.status() != WL_CONNECTED) WiFi.reconnect();
+  Serial.println("setup portal: 終了");
 }
 
 void SetupPortal::loop(uint32_t nowMs) {
@@ -218,8 +223,10 @@ void SetupPortal::loop(uint32_t nowMs) {
   dns.processNextRequest();
   server.handleClient();
   if (restartAt_ && static_cast<int32_t>(nowMs - restartAt_) >= 0) ESP.restart();
-  // 設定済みなら一定時間で終わる（未設定のままなら続ける）
-  if (settings.configured() && !restartAt_ && nowMs - startedMs_ > SETUP_TIMEOUT_MS) stop();
+  // 設定済みなら一定時間で終わる（未設定のままなら続ける）。
+  // 画面を開くと startedMs_ が今の時刻になり、nowMs より後になるので、時刻は取り直して符号付きで比べる
+  int32_t idle = static_cast<int32_t>(millis() - startedMs_);
+  if (settings.configured() && !restartAt_ && idle > static_cast<int32_t>(SETUP_TIMEOUT_MS)) stop();
 }
 
 void SetupPortal::handleRedirect() {
@@ -234,7 +241,8 @@ void SetupPortal::handleRoot() {
 
 void SetupPortal::handleScan() {
   startedMs_ = millis();
-  WiFi.mode(WIFI_AP_STA);  // AP だけのモードでは探せない。探している間は設定用の Wi-Fi が一瞬不安定になる
+  bool apOnly = WiFi.getMode() == WIFI_AP;
+  if (apOnly) WiFi.mode(WIFI_AP_STA);  // AP だけのモードでは探せない。探している間は設定用の Wi-Fi が一瞬不安定になる
   int n = WiFi.scanNetworks();
   JsonDocument doc;
   JsonArray arr = doc.to<JsonArray>();
@@ -245,8 +253,10 @@ void SetupPortal::handleScan() {
     o["rssi"] = WiFi.RSSI(i);
   }
   WiFi.scanDelete();
-  WiFi.disconnect(false);
-  WiFi.mode(WIFI_AP);
+  if (apOnly) {
+    WiFi.disconnect(false);
+    WiFi.mode(WIFI_AP);
+  }
   String out;
   serializeJson(doc, out);
   server.send(200, "application/json", out);
