@@ -3,6 +3,8 @@
     python3 gen_case.py      → case_base.stl（本体）と case_lid.stl（ふた）
 
 座標：基板の左上が原点、x が右、y が下（gen_pcb.py と同じ）。z は本体の底面が 0。
+この座標は「y が下で z が上」なので、そのまま STL にすると鏡像になる。書き出すときに y を反転して、
+上から見て基板の図面と同じ並び（J1 が奥、J2・J3 が左）にする。
 本体は底を下に、ふたは上面を下にして置けば、サポートなしで印刷できる。
 寸法は下の定数にまとめてある。部品の位置は gen_pcb.py の値を写したもの（基板を変えたら合わせる）。
 """
@@ -158,8 +160,13 @@ def lid():
     return top
 
 
+def to_world(man):
+    """基板の座標（y が下）から、実物の座標（y が奥）へ。鏡像にならないよう y を反転する"""
+    return man.mirror([0, 1, 0])
+
+
 def save(man, path, flip=False):
-    mesh = man.to_mesh()
+    mesh = to_world(man).to_mesh()
     v = np.array(mesh.vert_properties)[:, :3]
     f = np.array(mesh.tri_verts)
     tm = trimesh.Trimesh(v, f, process=False)  # 頂点の統合はしない（細い面がつぶれて穴があくため）
@@ -176,6 +183,12 @@ if __name__ == "__main__":
     b, l = base(), lid()
     assert b.status() == m.Error.NoError and l.status() == m.Error.NoError
     assert (b ^ l).volume() < 1e-6, "本体とふたが重なっている"
+    # 向きの確認：上から見て、J1 の切り欠きが奥（y が大きい側）、J2・J3 の切り欠きが左（x が小さい側）
+    w = to_world(b)
+    probe = lambda x, y, z: (w ^ box(x - 0.2, y - 0.2, z - 0.2, x + 0.2, y + 0.2, z + 0.2)).volume() < 1e-9
+    assert probe(48.0, -(Y0 - WALL / 2), PCB_TOP + 3), "J1 の切り欠きが奥にない"
+    assert probe(X0 - WALL / 2, -30.0, PCB_TOP + 3), "J2 の切り欠きが左にない"
+    assert not probe(X1 + WALL / 2, -30.0, PCB_TOP + 3), "右の壁に J2 の切り欠きがある"
     save(b, "case_base.stl")
     save(l, "case_lid.stl", flip=True)
     print(f"基板の上面 z={PCB_TOP:.1f}、ふたの裏 z={INNER_TOP:.1f}、全高 {INNER_TOP + LID_T:.1f} mm")
