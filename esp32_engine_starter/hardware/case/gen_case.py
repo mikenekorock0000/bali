@@ -23,11 +23,14 @@ CLEAR_ABOVE = 22.0   # 基板の上の空き（いちばん背の高いポリス
 LID_T = 2.5
 LIP_T, LIP_H, LIP_GAP = 1.5, 3.0, 0.3   # ふたの裏の位置決めの縁
 EAR = 9.0            # 角のねじの耳（一辺）
+SKIRT = 4.0          # ふたの外周の壁（本体の壁の上 4mm をふたの側に持たせ、耳と一体にして強くする）
+CBORE_D, CBORE_H = 6.2, 3.5   # ふたの耳の座ぐり（ねじの頭を沈め、M3×10 で本体に 7mm 入るようにする）
 HOLES = [(3.5, 3.5), (BOARD_W - 3.5, 3.5), (3.5, BOARD_H - 3.5), (BOARD_W - 3.5, BOARD_H - 3.5)]
 
 PCB_BOTTOM = FLOOR + BOSS_H
 PCB_TOP = PCB_BOTTOM + PCB_T
 INNER_TOP = PCB_TOP + CLEAR_ABOVE      # ふたの裏
+SPLIT = INNER_TOP - SKIRT               # 本体とふたの分かれ目
 X0, Y0 = -GAP, -GAP                     # 内側の空間
 X1, Y1 = BOARD_W + GAP, BOARD_H + GAP
 OX0, OY0, OX1, OY1 = X0 - WALL, Y0 - WALL, X1 + WALL, Y1 + WALL
@@ -79,11 +82,11 @@ def ear_centers():
 
 
 def base():
-    body = box(OX0, OY0, 0, OX1, OY1, INNER_TOP)
+    body = box(OX0, OY0, 0, OX1, OY1, SPLIT)
     body -= box(X0, Y0, FLOOR, X1, Y1, INNER_TOP + 1)
     # 角の耳（ふたのねじ）
     for cx, cy in ear_centers():
-        body += box(cx - EAR / 2, cy - EAR / 2, 0, cx + EAR / 2, cy + EAR / 2, INNER_TOP)
+        body += box(cx - EAR / 2, cy - EAR / 2, 0, cx + EAR / 2, cy + EAR / 2, SPLIT)
         body -= cyl(cx, cy, 4.0, INNER_TOP, SCREW_PILOT)
     # 基板の柱
     for x, y in HOLES:
@@ -104,9 +107,12 @@ def base():
 def lid():
     z = INNER_TOP
     top = box(OX0, OY0, z, OX1, OY1, z + LID_T)
+    # 外周の壁（本体の壁の続き）。耳はこの壁と上の板の両方につながる
+    top += box(OX0, OY0, SPLIT, OX1, OY1, z + 0.01) - box(X0, Y0, SPLIT - 1, X1, Y1, z + 1)
     for cx, cy in ear_centers():
-        top += box(cx - EAR / 2, cy - EAR / 2, z, cx + EAR / 2, cy + EAR / 2, z + LID_T)
-        top -= cyl(cx, cy, z - 1, LID_T + 2, SCREW_CLEAR)
+        top += box(cx - EAR / 2, cy - EAR / 2, SPLIT, cx + EAR / 2, cy + EAR / 2, z + LID_T)
+        top -= cyl(cx, cy, SPLIT - 1, z + LID_T - SPLIT + 2, SCREW_CLEAR)
+        top -= cyl(cx, cy, z + LID_T - CBORE_H, CBORE_H + 1, CBORE_D)
     # 位置決めの縁（内壁の内側に入る）
     g = LIP_GAP
     lip = box(X0 + g, Y0 + g, z - LIP_H, X1 - g, Y1 - g, z + 0.01)
