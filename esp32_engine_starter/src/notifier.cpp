@@ -70,6 +70,7 @@ bool Notifier::postState(const String& json) {
   addAuth(http);
   int code = http.POST(json);
   http.end();
+  Serial.printf("[state] 送信 %d\n", code);
   return code >= 200 && code < 300;
 }
 

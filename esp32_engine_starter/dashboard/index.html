@@ -317,7 +317,7 @@ function renderEmpty(msg) {
 }
 
 function render() {
-  if (!state) { renderEmpty(); renderLog(); return; }
+  if (!state) { setConn("warn", "ntfy に接続・状態待ち"); renderEmpty(); renderLog(); return; }
   const s = state, now = Date.now() / 1000;
   const age = now - (stateAt || s.t || now);
   // 接続の状態：休止中なら「最大 15 分 + 余裕」までは正常

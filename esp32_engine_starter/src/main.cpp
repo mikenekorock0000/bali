@@ -217,11 +217,13 @@ void dispatchCommand(String cmd, uint32_t now);
 // ntfy アプリから手で送る："<暗証番号> <指示>"（読むだけの指示と施錠だけ）
 void handleCommand(String line, uint32_t now) {
   line.trim();
+  Serial.printf("[cmd] %s\n", line.startsWith("sig1 ") ? line.substring(line.lastIndexOf(' ') + 1).c_str() : "(暗証番号つき)");
   if (line.startsWith("sig1 ")) {
     SignedCommand sc;
     if (!parseSigned(line.c_str(), sc)) return;
     uint32_t nowTs = clockValid() ? (uint32_t)time(nullptr) : 0;
     SigVerdict v = verifyCommand(settings.cmdKey.c_str(), sc, nowTs, lastCmdTs, CMD_MAX_AGE_SEC, CMD_MAX_FUTURE_SEC);
+    Serial.printf("[cmd] 署名の判定 %d（0=OK）時計=%u 指示の時刻=%u\n", (int)v, (unsigned)nowTs, (unsigned)sc.ts);
     if (v == SigVerdict::BadSignature) {
       if (cooldown.allow(CD_BADSIG, now, 3600000UL)) {
         notifier.send(Prio::Default, "署名が合わない指示を無視しました",
@@ -1053,7 +1055,9 @@ void loop() {
 
   // ---- ダッシュボード：電圧・温度の履歴と、状態の送信 ----
   if (battery.valid()) recordHistory(battery.volts());
-  if (now - lastStateMs >= STATE_PUBLISH_MS || (stateDirty && now - lastStateMs >= STATE_MIN_GAP_MS) ||
+  // 起動して Wi-Fi につながったら、すぐ 1 回送る（そのあとは 5 分ごとと、出来事のたび）
+  bool firstState = lastStateMs == 0 && !parkTimerWake && WiFi.status() == WL_CONNECTED;
+  if (firstState || now - lastStateMs >= STATE_PUBLISH_MS || (stateDirty && now - lastStateMs >= STATE_MIN_GAP_MS) ||
       (parkTimerWake && lastStateMs == 0 && now - wakeMs >= PARK_KEY_SCAN_MS)) {
     publishState(now);
   }
