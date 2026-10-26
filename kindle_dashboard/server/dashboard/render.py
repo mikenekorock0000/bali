@@ -121,10 +121,12 @@ class Canvas:
     def battery(self, x, y, w, h, level):
         icons.battery(self.d, x * self.s, y * self.s, w * self.s, h * self.s, level)
 
-    def label_box(self, x, y, txt):
+    def label_box(self, x, y, txt) -> float:
+        """白抜き文字の見出し。幅を返す。"""
         w = self.text_width(txt, 17, "Bold") + 16
         self.rect(x, y, x + w, y + 27, fill=DARK)
         self.text(x + w / 2, y + 14, txt, 17, "Bold", fill=WHITE, anchor="mm")
+        return w
 
     def finish(self) -> Image.Image:
         return self.img.resize((self.w, self.h), Image.LANCZOS)
@@ -202,8 +204,24 @@ def draw_indoor(c: Canvas, ind: Indoor | None):
         c.text(x + 2 + bw / 2, 219, level, 16, "Bold", anchor="mm")
 
 
+def draw_clothing(c: Canvas, w: Weather | None):
+    """時計・天気の下の帯: [今日の服装] 60 長袖シャツで快適　傘を持って（降水80%）・…"""
+    cl = w.clothing if w else None
+    if cl is None:
+        return
+    y, x1 = 256, c.w - M
+    x = M + c.label_box(M, y - 13, f"{cl.day_label}の服装") + 10
+    x += c.text(x, y, str(cl.index), 24, "Bold", anchor="lm") + 10
+    x += c.text(x, y, cl.phrase, 21, "Bold", anchor="lm") + 18
+    tips = list(cl.tips)
+    while tips and c.text_width("・".join(tips), 17, "Medium") > x1 - x:
+        tips.pop()  # 入りきらないひとことは後ろから省く
+    if tips:
+        c.text(x, y, "・".join(tips), 17, "Medium", anchor="lm")
+
+
 def draw_hourly(c: Canvas, w: Weather | None):
-    top, bottom = 246, 396
+    top, bottom = 276, 396
     c.line(M, top, c.w - M, top, 3)
     c.line(M, bottom, c.w - M, bottom, 3)
     slots = w.hourly if w else []
@@ -216,14 +234,14 @@ def draw_hourly(c: Canvas, w: Weather | None):
         if i >= len(slots):
             continue
         s, cx = slots[i], x0 + cw / 2
-        c.text(cx, 256, f"{s.time.hour}時", 20, "SemiBold", anchor="ma")
-        c.weather_icon(s.code, cx, 310, 52, s.is_day)
-        c.text(cx, 340, _deg(s.temperature), 26, "Bold", anchor="ma")
+        c.text(cx, 282, f"{s.time.hour}時", 18, "SemiBold", anchor="ma")
+        c.weather_icon(s.code, cx, 329, 40, s.is_day)
+        c.text(cx, 349, _deg(s.temperature), 23, "Bold", anchor="ma")
         if s.precip_prob is not None:
             label = f"{s.precip_prob}%"
-            tw = c.text_width(label, 15, "Medium")
-            c.umbrella(cx - tw / 2 - 4, 382, 13)
-            c.text(cx - tw / 2 + 6, 382, label, 15, "Medium", anchor="lm")
+            tw = c.text_width(label, 14, "Medium")
+            c.umbrella(cx - tw / 2 - 4, 386, 12)
+            c.text(cx - tw / 2 + 6, 386, label, 14, "Medium", anchor="lm")
 
 
 def draw_heading(c: Canvas, x0, x1, y, title, sub=""):
@@ -307,6 +325,7 @@ def render(data: DashboardData, fonts: Fonts, width: int = 1024, height: int = 7
     draw_outdoor(c, data.weather)
     c.line(806, 24, 806, 232, 2)
     draw_indoor(c, data.indoor)
+    draw_clothing(c, data.weather)
     draw_hourly(c, data.weather)
     draw_daily(c, data.weather)
     draw_market(c, data.quotes)

@@ -19,6 +19,8 @@ def open_meteo_fixture():
         "hourly": {
             "time": hours,
             "temperature_2m": [float(i % 24) for i in range(len(hours))],
+            "apparent_temperature": [float(i % 24) + 1 for i in range(len(hours))],
+            "wind_speed_10m": [2.0] * len(hours),
             "weather_code": [3] * len(hours),
             "precipitation_probability": [i % 101 for i in range(len(hours))],
             "is_day": [1 if 6 <= i % 24 < 18 else 0 for i in range(len(hours))],
@@ -45,6 +47,8 @@ def test_parse_open_meteo_picks_next_three_hour_slots():
     assert [d.date for d in w.daily] == [date(2026, 10, 27), date(2026, 10, 28), date(2026, 10, 29)]
     assert w.daily[0].precip_prob == 98
     assert w.current.code == 61
+    # 14〜21時の体感 15〜22℃ → 0.6*22 + 0.4*15 = 19.2 → 指数 60
+    assert (w.clothing.day_label, w.clothing.index) == ("今日", 60)
 
 
 def test_parse_open_meteo_skips_current_slot_exactly_on_the_hour():

@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
+from .clothing import Clothing, HourPoint, clothing_advice
+
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) kindle-dashboard/1.0"
 
 
@@ -117,6 +119,7 @@ class Weather:
     precip_prob: int | None
     hourly: list[HourSlot]
     daily: list[DaySlot]
+    clothing: Clothing | None = None
 
 
 def open_meteo_url(latitude: float, longitude: float, timezone: str) -> str:
@@ -125,7 +128,8 @@ def open_meteo_url(latitude: float, longitude: float, timezone: str) -> str:
         "longitude": longitude,
         "current": "temperature_2m,relative_humidity_2m,apparent_temperature,"
                    "weather_code,wind_speed_10m,wind_direction_10m,is_day",
-        "hourly": "temperature_2m,weather_code,precipitation_probability,is_day",
+        "hourly": "temperature_2m,apparent_temperature,weather_code,precipitation_probability,"
+                  "wind_speed_10m,is_day",
         "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
         "timezone": timezone,
         "wind_speed_unit": "ms",
@@ -162,6 +166,12 @@ def parse_open_meteo(data: dict, now: datetime, hourly_count: int = 8,
         if t > now and t.hour % hourly_step == 0
     ][:hourly_count]
 
+    points = [
+        HourPoint(t, h["temperature_2m"][i], (h.get("apparent_temperature") or h["temperature_2m"])[i],
+                  pops[i], (h.get("wind_speed_10m") or [None] * len(hours))[i])
+        for i, t in enumerate(hours)
+    ]
+
     d = data["daily"]
     days = [date.fromisoformat(s) for s in d["time"]]
     today = now.date()
@@ -181,6 +191,7 @@ def parse_open_meteo(data: dict, now: datetime, hourly_count: int = 8,
         precip_prob=precip_prob,
         hourly=hourly,
         daily=daily,
+        clothing=clothing_advice(points, now),
     )
 
 

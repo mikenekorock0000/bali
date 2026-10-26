@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from .clothing import Clothing
 from .render import DashboardData
 from .sources import Current, DaySlot, HourSlot, Indoor, Quote, Weather
 
@@ -27,6 +28,7 @@ def demo_data(now: datetime) -> DashboardData:
         current=Current(temperature=19.6, apparent=21.0, humidity=93, code=61,
                         wind_speed=2.1, wind_direction=22, is_day=True),
         today_max=20, today_min=19, precip_prob=100, hourly=hourly, daily=daily,
+        clothing=Clothing(60, "長袖シャツで快適", "今日", ["傘を持って（降水100%）", "寒暖差に注意（11℃）"]),
     )
     market_time = now.replace(second=0, microsecond=0) - timedelta(minutes=4)
     fund_date = (now - timedelta(days=3)).date()
