@@ -1,0 +1,20 @@
+# Raspberry Pi などで常時起動する場合の systemd 設定例
+#   sudo cp kindle-dashboard.service /etc/systemd/system/
+#   sudo systemctl enable --now kindle-dashboard
+[Unit]
+Description=Kindle dashboard server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/bali/kindle_dashboard/server
+ExecStart=/usr/bin/python3 serve.py
+# SwitchBot を使う場合
+#Environment=SWITCHBOT_TOKEN=xxxx
+#Environment=SWITCHBOT_SECRET=xxxx
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,136 @@
+"""設定の読み込み、データ源の登録、HTTP サーバー。"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import threading
+from datetime import datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Callable
+from urllib.parse import parse_qs, urlparse
+from zoneinfo import ZoneInfo
+
+from . import sources
+from .render import DashboardData, Fonts, png_bytes, render, to_kindle
+from .store import DataStore
+
+log = logging.getLogger(__name__)
+
+SERVER_DIR = Path(__file__).resolve().parent.parent
+
+DEFAULT_CONFIG = {
+    "location": {"name": "東京", "latitude": 35.6812, "longitude": 139.7671},
+    "timezone": "Asia/Tokyo",
+    "display": {"width": 1024, "height": 758, "rotate": 90},
+    "font_path": None,
+    "host": "0.0.0.0",
+    "port": 8080,
+    "refresh_minutes": {"weather": 10, "market": 5, "news": 15, "indoor": 5},
+    "news": {"url": "https://www.nhk.or.jp/rss/news/cat0.xml", "count": 7, "label": "NHKニュース"},
+    "market": {"symbols": [
+        {"symbol": "JPY=X", "label": "ドル円", "unit": "円", "decimals": 2},
+        {"symbol": "^N225", "label": "日経平均", "unit": "円", "decimals": 0},
+        {"symbol": "^DJI", "label": "NYダウ", "unit": "ドル", "decimals": 0},
+    ]},
+    "indoor": {"provider": "none", "device_id": ""},
+    "credits": "天気: Open-Meteo ／ 市況: Yahoo Finance",
+}
+
+
+def load_config(path: Path | None) -> dict:
+    cfg = json.loads(json.dumps(DEFAULT_CONFIG))
+    if path and path.exists():
+        for key, value in json.loads(path.read_text(encoding="utf-8")).items():
+            if isinstance(value, dict) and isinstance(cfg.get(key), dict):
+                cfg[key].update(value)
+            else:
+                cfg[key] = value
+    return cfg
+
+
+def build_store(cfg: dict, now: Callable[[], datetime], env=os.environ) -> DataStore:
+    store = DataStore()
+    ttl = {k: v * 60 for k, v in cfg["refresh_minutes"].items()}
+    store.add("weather", "天気", lambda: sources.fetch_weather(cfg, now()), ttl["weather"])
+    store.add("market", "市況", lambda: sources.fetch_market(cfg), ttl["market"])
+    store.add("news", "ニュース", lambda: sources.fetch_news(cfg), ttl["news"])
+    if (cfg.get("indoor") or {}).get("provider") == "switchbot":
+        store.add("indoor", "室内", lambda: sources.fetch_indoor(cfg, env), ttl["indoor"])
+    return store
+
+
+class Dashboard:
+    def __init__(self, cfg: dict, store: DataStore, fonts: Fonts, now: Callable[[], datetime]):
+        self.cfg, self.store, self.fonts, self.now = cfg, store, fonts, now
+        self._lock = threading.Lock()  # Pillow の描画はスレッドごとに分けず直列化する
+
+    def data(self) -> DashboardData:
+        dev = self.store.device
+        get = lambda name: self.store.get(name) if name in self.store.sources else None  # noqa: E731
+        return DashboardData(
+            now=self.now(),
+            weather=get("weather"),
+            quotes=get("market") or [],
+            news=get("news") or [],
+            indoor=get("indoor"),
+            battery=dev.battery,
+            charging=dev.charging,
+            failing=self.store.failing_labels(),
+            news_label=self.cfg["news"].get("label", ""),
+            credits=self.cfg.get("credits", ""),
+        )
+
+    def render_png(self, rotate: bool = True) -> bytes:
+        d = self.cfg["display"]
+        with self._lock:
+            img = render(self.data(), self.fonts, d["width"], d["height"])
+            img = to_kindle(img, d["rotate"] if rotate else 0)
+            return png_bytes(img)
+
+
+def make_handler(dash: Dashboard):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            url = urlparse(self.path)
+            if url.path in ("/", "/dash.png"):
+                q = parse_qs(url.query)
+                if "battery" in q:
+                    try:
+                        battery = int(q["battery"][0].rstrip("%"))
+                    except ValueError:
+                        battery = None
+                    charging = q.get("charging", ["0"])[0] in ("1", "true", "yes")
+                    dash.store.set_device(battery, charging)
+                self._send(200, "image/png", dash.render_png())
+            elif url.path == "/preview.png":
+                self._send(200, "image/png", dash.render_png(rotate=False))
+            elif url.path == "/health":
+                body = json.dumps(dash.store.status(), ensure_ascii=False, indent=2)
+                self._send(200, "application/json; charset=utf-8", body.encode())
+            else:
+                self._send(404, "text/plain; charset=utf-8", b"not found")
+
+        def _send(self, code: int, ctype: str, body: bytes):
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, fmt, *args):
+            log.info("%s %s", self.address_string(), fmt % args)
+
+    return Handler
+
+
+def make_server(dash: Dashboard, host: str, port: int) -> ThreadingHTTPServer:
+    return ThreadingHTTPServer((host, port), make_handler(dash))
+
+
+def clock(cfg: dict) -> Callable[[], datetime]:
+    tz = ZoneInfo(cfg["timezone"])
+    return lambda: datetime.now(tz)

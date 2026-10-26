@@ -1,0 +1,13 @@
+{
+	"items": [
+		{
+			"name": "Dashboard",
+			"priority": 0,
+			"items": [
+				{ "name": "Start", "priority": 1, "action": "sh", "params": "bin/start.sh", "exitmenu": true },
+				{ "name": "Stop", "priority": 2, "action": "sh", "params": "bin/stop.sh" },
+				{ "name": "Test (1回表示)", "priority": 3, "action": "sh", "params": "bin/test.sh", "exitmenu": true }
+			]
+		}
+	]
+}

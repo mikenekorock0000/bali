@@ -1,0 +1,9 @@
+{
+  "location": {"name": "東京", "latitude": 35.6812, "longitude": 139.7671},
+  "timezone": "Asia/Tokyo",
+  "display": {"width": 1024, "height": 758, "rotate": 90},
+  "port": 8080,
+  "refresh_minutes": {"weather": 10, "market": 5, "news": 15, "indoor": 5},
+  "news": {"url": "https://www.nhk.or.jp/rss/news/cat0.xml", "count": 7, "label": "NHKニュース"},
+  "indoor": {"provider": "none", "device_id": ""}
+}

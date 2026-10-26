@@ -14,4 +14,4 @@
 
 - アプリ: [madamis_app/](madamis_app/)
 - 設計書: [docs/DESIGN.md](docs/DESIGN.md)
-- Kindle ダッシュボード調査・手順: [docs/kindle-dashboard/README.md](docs/kindle-dashboard/README.md)
+- Kindle ダッシュボード: [kindle_dashboard/](kindle_dashboard/)（調査・脱獄手順: [docs/kindle-dashboard/](docs/kindle-dashboard/README.md)）
