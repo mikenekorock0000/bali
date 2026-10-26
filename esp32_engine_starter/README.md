@@ -152,6 +152,7 @@ Ottocast（中身は Android）に GPS が入っていれば、その位置を W
 - `test/` … 上記のテスト
 - `dashboard/` … ダッシュボード（ブラウザで開く 1 枚の HTML）。詳しくは [dashboard/README.md](dashboard/README.md)
 - `hardware/` … 基板（ガーバー・部品表・組み立て手順）。詳しくは [hardware/README.md](hardware/README.md)
+- `server/` … 状態・指示用の自前の ntfy サーバー（Docker・Cloudflare Tunnel）。詳しくは [server/README.md](server/README.md)
 - `obsidian/` … プロジェクト全体のまとめと履歴（Obsidian のノート。このフォルダを保管庫として開く）
 
 ## 確認したこと・していないこと

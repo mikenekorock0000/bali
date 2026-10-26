@@ -141,6 +141,7 @@ int lastFreezeDay = -1;
 RTC_DATA_ATTR int rtcFreezeDay = -1;
 
 void publishState(uint32_t now);  // 下で定義
+uint32_t trackStateMs() { return settings.selfHosted() ? TRACK_STATE_FAST_MS : TRACK_STATE_MS; }
 
 // 眠っている間 LOW に固定する出力（フォトカプラの LED とブザー）
 const gpio_num_t HOLD_PINS[] = {(gpio_num_t)PIN_OUT_LOCK, (gpio_num_t)PIN_OUT2, (gpio_num_t)PIN_OUT3,
@@ -514,7 +515,7 @@ String stateJson(uint32_t now) {
   d["fix"] = gps.hasFix(now);
   if (tracking) d["trk"] = true;
   if (lastCmdTs) d["cts"] = lastCmdTs;  // ダッシュボードは、これより後の時刻で署名する
-  d["si"] = tracking ? TRACK_STATE_MS / 1000 : stateEverySec;  // 状態を送る間隔（秒）
+  d["si"] = tracking ? trackStateMs() / 1000 : stateEverySec;  // 状態を送る間隔（秒）
   if (resetReason[0]) d["rst"] = resetReason;
   if (otaPending) d["ota"] = "verifying";
   if (gps.present()) d["gsrc"] = gps.source();
@@ -1056,7 +1057,7 @@ void loop() {
       notifier.send(Prio::High, "追跡中の位置", (gps.hasFix(now) ? String("測位中") : String("最後に測位した位置")) + mapLink(),
                     "round_pushpin");
     }
-    if (now - lastStateMs >= TRACK_STATE_MS) stateDirty = true;
+    if (now - lastStateMs >= trackStateMs()) stateDirty = true;
   }
 
   // ---- 点検の予定・凍結 ----
@@ -1080,10 +1081,11 @@ void loop() {
   // 起動して Wi-Fi につながったら、すぐ 1 回送る（そのあとは 5 分ごとと、出来事のたび）
   bool firstState = lastStateMs == 0 && !parkTimerWake && WiFi.status() == WL_CONNECTED;
   // ntfy.sh の 1 日の上限に近づいたら、状態の送信を 1 時間ごとに減らす（通知の分を残す）
-  bool slowState = notifier.sentLast24h(now) >= NTFY_DAILY_SOFT;
-  uint32_t stateEvery = slowState ? STATE_SLOW_MS : STATE_PUBLISH_MS;
+  // 自前のサーバーなら上限はないので、短い間隔で送る
+  bool slowState = !settings.selfHosted() && notifier.sentLast24h(now) >= NTFY_DAILY_SOFT;
+  uint32_t stateEvery = settings.selfHosted() ? STATE_FAST_MS : slowState ? STATE_SLOW_MS : STATE_PUBLISH_MS;
   stateEverySec = stateEvery / 1000;
-  uint32_t stateGap = slowState ? STATE_SLOW_MS : STATE_MIN_GAP_MS;
+  uint32_t stateGap = settings.selfHosted() ? STATE_FAST_GAP_MS : slowState ? STATE_SLOW_MS : STATE_MIN_GAP_MS;
   if (firstState || now - lastStateMs >= stateEvery || (stateDirty && now - lastStateMs >= stateGap) ||
       (parkTimerWake && lastStateMs == 0 && now - wakeMs >= PARK_KEY_SCAN_MS)) {
     publishState(now);

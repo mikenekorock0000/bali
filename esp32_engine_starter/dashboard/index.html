@@ -107,13 +107,15 @@ dialog .row button.primary{background:var(--acc);border-color:var(--acc);color:v
 <dialog id="dlg"><form method="dialog" id="cfgForm">
   <strong>接続の設定</strong>
   <p class="hint">ESP32 の設定画面で入力したものと同じ値を入れてください。この端末のブラウザにだけ保存されます。</p>
-  <label>ntfy のサーバー</label><input name="server" placeholder="https://ntfy.sh" required>
+  <label>ntfy のサーバー（状態・指示）</label><input name="server" placeholder="https://ntfy.sh" required>
   <label>状態のトピック</label><input name="state" required>
   <label>通知のトピック</label><input name="topic" required>
   <label>指示のトピック</label><input name="cmd" required>
   <label>指示の鍵（ESP32 の設定画面の「指示の鍵」。操作に使う）</label><input name="key" type="password" autocomplete="off" spellcheck="false">
   <label>暗証番号（鍵が無いときの予備。読むだけの指示と施錠だけ送れる）</label><input name="pin" type="password" inputmode="numeric">
-  <label>アクセストークン（ntfy のアカウントを使う場合だけ）</label><input name="token" type="password">
+  <label>アクセストークン（自前のサーバーか ntfy のアカウントを使う場合だけ）</label><input name="token" type="password">
+  <label>通知のサーバー（ESP32 の設定で「通知だけ送るサーバー」を入れたときだけ。例 https://ntfy.sh）</label><input name="nserver" placeholder="空なら上と同じ">
+  <label>そのサーバーのアクセストークン（使わなければ空）</label><input name="ntoken" type="password">
   <div class="row">
     <button type="button" id="linkBtn">別の端末用のリンクをコピー</button>
     <button value="cancel">閉じる</button>
@@ -144,26 +146,37 @@ function loadCfg() {
   try { c = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
   // #server=...&state=...&topic=...&cmd=... で開いたら取り込む（暗証番号は含めない）
   const h = new URLSearchParams(location.hash.slice(1));
-  for (const k of ["server", "state", "topic", "cmd"]) if (h.get(k)) c[k] = h.get(k);
+  for (const k of ["server", "state", "topic", "cmd", "nserver"]) if (h.get(k)) c[k] = h.get(k);
   if (location.hash) { saveCfg(c); history.replaceState(null, "", location.pathname + location.search); }
   c.server = (c.server || "https://ntfy.sh").replace(/\/+$/, "");
+  c.nserver = (c.nserver || "").replace(/\/+$/, "");
   return c;
 }
 function saveCfg(c) { try { localStorage.setItem(KEY, JSON.stringify(c)); } catch (e) {} }
 function ready() { return demo || (cfg.server && cfg.state && cfg.topic && cfg.cmd); }
-function headers() { return cfg.token ? { Authorization: "Bearer " + cfg.token } : {}; }
+// アクセストークンは URL の auth に入れる（Authorization ヘッダーは、別のサイトからだとブラウザの確認で止まることがあるため）
+function authQS(token) {
+  if (!token) return "";
+  // ntfy の決まり：Authorization ヘッダーの値を、普通の base64 にして末尾の = を取る（+ と / は URL 用に % で書く）
+  return "auth=" + encodeURIComponent(btoa("Bearer " + token).replace(/=+$/, ""));
+}
+function withAuth(url, token) { const q = authQS(token); return q ? url + (url.includes("?") ? "&" : "?") + q : url; }
+// 通知を読むサーバー（設定が無ければ状態・指示と同じ）
+function notifyBase() { return cfg.nserver || cfg.server; }
+function notifyToken() { return cfg.nserver ? cfg.ntoken : cfg.token; }
 
 $("#setBtn").onclick = openCfg;
 function openCfg() {
   const f = $("#cfgForm");
-  for (const k of ["server", "state", "topic", "cmd", "key", "pin", "token"]) f.elements[k].value = cfg[k] || "";
+  for (const k of ["server", "state", "topic", "cmd", "key", "pin", "token", "nserver", "ntoken"]) f.elements[k].value = cfg[k] || "";
   $("#dlg").showModal();
 }
 $("#dlg").addEventListener("close", () => {
   if ($("#dlg").returnValue !== "ok") return;
   const f = $("#cfgForm");
-  for (const k of ["server", "state", "topic", "cmd", "key", "pin", "token"]) cfg[k] = f.elements[k].value.trim();
+  for (const k of ["server", "state", "topic", "cmd", "key", "pin", "token", "nserver", "ntoken"]) cfg[k] = f.elements[k].value.trim();
   cfg.server = (cfg.server || "https://ntfy.sh").replace(/\/+$/, "");
+  cfg.nserver = cfg.nserver.replace(/\/+$/, "");
   saveCfg(cfg);
   demo = false;
   refresh();
@@ -171,7 +184,7 @@ $("#dlg").addEventListener("close", () => {
 $("#linkBtn").onclick = async () => {
   const f = $("#cfgForm");
   const p = new URLSearchParams();
-  for (const k of ["server", "state", "topic", "cmd"]) p.set(k, f.elements[k].value.trim());
+  for (const k of ["server", "state", "topic", "cmd", "nserver"]) if (f.elements[k].value.trim()) p.set(k, f.elements[k].value.trim());
   const url = location.origin + location.pathname + "#" + p.toString();
   try { await navigator.clipboard.writeText(url); toast("リンクをコピーしました"); }
   catch (e) { prompt("このリンクを別の端末で開いてください", url); }
@@ -190,8 +203,8 @@ $("#themeBtn").onclick = () => {
 };
 
 // ---------- 通信 ----------
-async function poll(topic, since) {
-  const r = await fetch(`${cfg.server}/${encodeURIComponent(topic)}/json?poll=1&since=${since}`, { headers: headers(), cache: "no-store" });
+async function poll(base, token, topic, since) {
+  const r = await fetch(withAuth(`${base}/${encodeURIComponent(topic)}/json?poll=1&since=${since}`, token), { cache: "no-store" });
   if (!r.ok) throw new Error("HTTP " + r.status);
   const text = await r.text();
   return text.split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch (e) { return null; } })
@@ -202,13 +215,16 @@ async function refresh() {
   if (!ready()) { setConn("bad", "未設定"); renderEmpty(); if (!$("#dlg").open) openCfg(); return; }
   if (demo) { loadDemo(); render(); return; }
   try {
-    const [st, ev] = await Promise.all([poll(cfg.state, "24h"), poll(cfg.topic, "24h")]);
-    const last = st[st.length - 1];
+    // 状態と通知は別のサーバーのことがあるので、片方が読めなくても、もう片方は表示する
+    const [st, ev] = await Promise.allSettled([poll(cfg.server, cfg.token, cfg.state, "24h"), poll(notifyBase(), notifyToken(), cfg.topic, "24h")]);
+    if (st.status === "rejected") throw st.reason;
+    const last = st.value[st.value.length - 1];
     if (last) {
       try { state = JSON.parse(last.message); stateAt = last.time; } catch (e) {}
     }
-    events = ev.slice(-30).reverse();
+    if (ev.status === "fulfilled") events = ev.value.slice(-30).reverse();
     render();
+    if (ev.status === "rejected") toast("通知の履歴を読めませんでした（" + ev.reason.message + "）。通知のサーバーを確認してください");
   } catch (e) {
     setConn("bad", "読み込めません");
     if (!state) renderEmpty("ntfy から読み込めませんでした（" + e.message + "）。設定のサーバーとトピックを確認してください。");
@@ -274,7 +290,7 @@ async function send(cmd) {
   if (!body && cfg.pin && PLAIN_OK.includes(cmd.split(" ")[0])) body = cfg.pin + " " + cmd;
   if (!body) { toast("設定で「指示の鍵」を入れてください（ESP32 の設定画面に表示されます）"); openCfg(); return; }
   try {
-    const r = await fetch(`${cfg.server}/${encodeURIComponent(cfg.cmd)}`, { method: "POST", headers: headers(), body });
+    const r = await fetch(withAuth(`${cfg.server}/${encodeURIComponent(cfg.cmd)}`, cfg.token), { method: "POST", body });
     if (!r.ok) throw new Error("HTTP " + r.status);
     toast(state && state.sleep ? "送りました。休止中なので、次に起きたとき（最大 15 分後）に実行されます" : "送りました。30 秒ほどで反映されます");
     setTimeout(refresh, 35000);
@@ -386,9 +402,9 @@ async function sendFirmware(file) {
   toast("送っています…");
   const sha = hex(sha256(buf));
   try {
-    const r = await fetch(`${cfg.server}/${encodeURIComponent(cfg.cmd)}`, {
+    const r = await fetch(withAuth(`${cfg.server}/${encodeURIComponent(cfg.cmd)}`, cfg.token), {
       method: "PUT", body: buf,
-      headers: { ...headers(), "Filename": "firmware.bin", "X-Message": signedBody("ota " + sha) },
+      headers: { "Filename": "firmware.bin", "X-Message": signedBody("ota " + sha) },
     });
     if (!r.ok) throw new Error("HTTP " + r.status);
     toast("送りました。書き込みが終わると「ファームウェアを更新しました」と通知が届きます");

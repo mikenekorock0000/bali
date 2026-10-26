@@ -14,6 +14,8 @@ struct Settings {
   String cmdTopic;    // スマホ・ダッシュボードからの指示
   String stateTopic;  // ダッシュボード用の状態（スマホのアプリでは購読しない）
   String token;       // ntfy のアクセストークン（使わなければ空）
+  String notifyServer;  // 通知だけ別のサーバーに送るとき（例：状態・指示は自前のサーバー、通知は iPhone にすぐ届く ntfy.sh）。空なら ntfyServer
+  String notifyToken;   // そのサーバーのアクセストークン（使わなければ空）
   String pin;         // 指示の先頭に付ける暗証番号。設定画面で保存するときにも必要
   String otaPass;
   String hostname;
@@ -30,6 +32,10 @@ struct Settings {
   // Wi-Fi と通知先が決まっている（普段どおり動ける）
   bool configured() const { return ssid1.length() > 0 && topic.length() > 0 && cmdTopic.length() > 0; }
   int beaconCount() const;
+  const String& notifyBase() const { return notifyServer.length() ? notifyServer : ntfyServer; }
+  const String& notifyAuth() const { return notifyServer.length() ? notifyToken : token; }
+  // 状態・指示が ntfy.sh でない（自前のサーバー）。1 日の件数の上限を気にせず、短い間隔で送る
+  bool selfHosted() const { return ntfyServer.length() && ntfyServer != "https://ntfy.sh"; }
   // 鍵がなければ作って保存する。ESP32 の乱数は無線が動いているときに本当の乱数になるので、Wi-Fi・BLE の開始後に呼ぶ
   void ensureKey();
   static String newKey();  // 32 桁の 16 進の乱数

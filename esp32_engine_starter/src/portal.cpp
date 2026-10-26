@@ -68,12 +68,14 @@ ul{padding-left:18px;margin:6px 0}li{font-size:14px;cursor:pointer}
 <label>パスワード</label><input name="pass2" type="password" maxlength="63" placeholder="{{pass2ph}}">
 </fieldset>
 <fieldset><legend>通知（ntfy）</legend>
-<label>サーバー</label><input name="server" value="{{server}}" required>
+<label>サーバー（状態・指示。自前のサーバーなら https://ntfy.takuya.win など）</label><input name="server" value="{{server}}" required>
 <label>通知のトピック（スマホのアプリで購読）</label><input name="topic" value="{{topic}}" required>
 <label>指示のトピック</label><input name="cmdtopic" value="{{cmdtopic}}" required>
 <label>状態のトピック（ダッシュボード用。アプリでは購読しない）</label><input name="sttopic" value="{{sttopic}}" required>
 <p class="hint">トピック名は英数字・-・_ の 12〜64 文字。名前を知っている人は誰でも読めるので、推測されない長い文字列にしてください。</p>
-<label>アクセストークン（ntfy のアカウントを使う場合だけ）</label><input name="token" type="password" placeholder="{{tokenph}}">
+<label>アクセストークン（自前のサーバーか ntfy のアカウントを使う場合だけ）</label><input name="token" type="password" placeholder="{{tokenph}}">
+<label>通知だけ送るサーバー（空なら上と同じ。iPhone にすぐ届けるなら https://ntfy.sh）</label><input name="nserver" value="{{nserver}}">
+<label>そのサーバーのアクセストークン（使わなければ空）</label><input name="ntoken" type="password" placeholder="{{ntokenph}}">
 <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="tlsins" value="1" style="width:auto" {{tlsins}}>サーバーの証明書を確かめない（自己署名の自前サーバーの場合だけ）</label>
 </fieldset>
 <fieldset><legend>ダッシュボードの「指示の鍵」</legend>
@@ -142,6 +144,8 @@ String page(const String& reason, const String& ap) {
   h.replace("{{cmdtopic}}", esc(settings.cmdTopic));
   h.replace("{{sttopic}}", esc(settings.stateTopic));
   h.replace("{{tokenph}}", keepPh(settings.token));
+  h.replace("{{nserver}}", esc(settings.notifyServer));
+  h.replace("{{ntokenph}}", keepPh(settings.notifyToken));
   h.replace("{{beacons}}", esc(b));
   h.replace("{{maxb}}", String(MAX_BEACONS));
   h.replace("{{pinph}}", keepPh(settings.pin));
@@ -283,7 +287,7 @@ void SetupPortal::handleKey() {
     return;
   }
   // ダッシュボードの設定に入れるものをまとめて返す
-  String t = "サーバー: " + settings.ntfyServer + "\n状態のトピック: " + settings.stateTopic + "\n通知のトピック: " +
+  String t = "サーバー: " + settings.ntfyServer + "\n通知のサーバー: " + settings.notifyBase() + "\n状態のトピック: " + settings.stateTopic + "\n通知のトピック: " +
              settings.topic + "\n指示のトピック: " + settings.cmdTopic + "\n鍵: " + settings.cmdKey;
   server.send(200, "text/plain; charset=utf-8", t);
 }
@@ -314,6 +318,10 @@ void SetupPortal::handleSave() {
   s.cmdTopic = server.arg("cmdtopic");
   s.stateTopic = server.arg("sttopic");
   s.token = keepOr(server.arg("token"), settings.token);
+  s.notifyServer = server.arg("nserver");
+  s.notifyServer.trim();
+  s.notifyToken = keepOr(server.arg("ntoken"), settings.notifyToken);
+  if (s.notifyServer.isEmpty()) s.notifyToken = "";
   s.pin = keepOr(server.arg("pin"), settings.pin);
   s.otaPass = keepOr(server.arg("otapass"), settings.otaPass);
   s.vbatCal = server.arg("vcal").toFloat();
@@ -345,6 +353,7 @@ void SetupPortal::handleSave() {
   if (!validWifiPass(s.pass1.c_str())) err += "Wi-Fi のパスワード（8〜63 文字）<br>";
   if (s.ssid2.length() && (!validSsid(s.ssid2.c_str()) || !validWifiPass(s.pass2.c_str()))) err += "予備の Wi-Fi<br>";
   if (!validServer(s.ntfyServer.c_str())) err += "サーバー（https:// で始まり、末尾に / を付けない）<br>";
+  if (s.notifyServer.length() && !validServer(s.notifyServer.c_str())) err += "通知だけ送るサーバー（https:// で始まり、末尾に / を付けない）<br>";
   if (!validTopic(s.topic.c_str()) || !validTopic(s.cmdTopic.c_str()) || !validTopic(s.stateTopic.c_str())) {
     err += "トピック名（英数字・-・_ の 12〜64 文字）<br>";
   }

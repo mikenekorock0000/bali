@@ -49,9 +49,9 @@ bool Notifier::post(const Msg& m) {
   secure(client);
   HTTPClient http;
   http.setTimeout(8000);
-  if (!http.begin(client, settings.ntfyServer + "/")) return false;
+  if (!http.begin(client, settings.notifyBase() + "/")) return false;
   http.addHeader("Content-Type", "application/json");
-  addAuth(http);
+  if (settings.notifyAuth().length()) http.addHeader("Authorization", "Bearer " + settings.notifyAuth());
   int code = http.POST(payload);
   http.end();
   return code >= 200 && code < 300;
@@ -136,7 +136,7 @@ void Notifier::loop(uint32_t nowMs) {
     }
     return;
   }
-  if (pollNow_ || nowMs - lastPollMs_ >= CMD_POLL_MS) {
+  if (pollNow_ || nowMs - lastPollMs_ >= (settings.selfHosted() ? CMD_POLL_FAST_MS : CMD_POLL_MS)) {
     pollNow_ = false;
     lastPollMs_ = nowMs;
     pollCommands();

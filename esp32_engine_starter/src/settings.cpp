@@ -58,6 +58,8 @@ void Settings::load() {
     cmdTopic = p.getString("cmdtopic", "");
     stateTopic = p.getString("sttopic", "");
     token = p.getString("token", "");
+    notifyServer = p.getString("nserver", "");
+    notifyToken = p.getString("ntoken", "");
     pin = p.getString("pin", "");
     otaPass = p.getString("otapass", "");
     hostname = p.getString("host", HOSTNAME);
@@ -103,6 +105,8 @@ void Settings::save() const {
   p.putString("cmdtopic", cmdTopic);
   p.putString("sttopic", stateTopic);
   p.putString("token", token);
+  p.putString("nserver", notifyServer);
+  p.putString("ntoken", notifyToken);
   p.putString("pin", pin);
   p.putString("otapass", otaPass);
   p.putString("host", hostname);

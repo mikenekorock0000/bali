@@ -29,6 +29,7 @@ aliases: [目次, ホーム]
 - [[部品表]]：秋月と AliExpress で買うもの
 - [[組み立て]]：はんだ付けの順番と向き、付ける前の確認
 - [[ケース]]：A1 mini で印刷するケース
+- [[サーバー]]：自前の ntfy（Docker・Cloudflare Tunnel）
 - [[ファームウェア]]：プログラムの構成と仕組み
 - [[書き込みと更新]]：VS Code・PlatformIO・Arduino IDE・git・遠隔更新
 - [[初期設定と使い方]]：ntfy、設定モード、指示の一覧
