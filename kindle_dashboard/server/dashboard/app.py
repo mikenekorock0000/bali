@@ -26,6 +26,8 @@ DEFAULT_CONFIG = {
     "timezone": "Asia/Tokyo",
     "display": {"width": 1024, "height": 758, "rotate": 90},
     "font_path": None,
+    # 時計の数字のフォント（fonts/ 内のファイル名と太さ）。候補は README 参照
+    "clock": {"font": "Outfit-VF.ttf", "weight": "Light"},
     "host": "0.0.0.0",
     "port": 8080,
     "refresh_minutes": {"weather": 10, "market": 5, "news": 15, "indoor": 5},

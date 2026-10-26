@@ -64,7 +64,7 @@ Python 3.9 以上が必要。
 ```bash
 cd kindle_dashboard/server
 pip install -r requirements.txt
-./fetch_fonts.sh                 # 日本語フォント（Noto Sans JP）を取得
+python fetch_fonts.py            # フォント（日本語 + 時計用）を取得
 cp config.example.json config.json
 # config.json の location（緯度・経度）を自宅に合わせる
 
@@ -76,18 +76,39 @@ python serve.py                  # 配信開始 → 表示された http://<IP>:
 - ブラウザで `http://<IP>:8080/preview.png`（横向き確認用）と `/health`（各データの取得状況・Kindle の電池）を開ける。
 - 常時起動は Raspberry Pi などで `kindle-dashboard.service`（systemd の設定例）を使う。
 - Windows で「ファイアウォールの許可」が出たらプライベートネットワークを許可。
-- フォントは `fetch_fonts.sh` が使えない環境では、`config.json` の `font_path` に手元の日本語フォント（例: `C:/Windows/Fonts/meiryo.ttc`）を指定してもよい（太さの切り替えは可変フォントのみ）。
+- フォントは `fetch_fonts.py` が使えない環境では、`config.json` の `font_path` に手元の日本語フォント（例: `C:/Windows/Fonts/meiryo.ttc`）を指定してもよい（太さの切り替えは可変フォントのみ）。
 
 ### config.json
 
 | 項目 | 内容 |
 |---|---|
 | `location` | 地名・緯度・経度（Google マップで右クリックすると表示） |
+| `clock` | 時計の数字のフォントと太さ（下記） |
 | `display.rotate` | Kindle 用画像の回転（時計回り 0/90/180/270）。表示が逆さなら 270 に |
 | `refresh_minutes` | データ源ごとの取得間隔（分） |
 | `news.url` | RSS の URL。NHK のカテゴリ別 RSS などに変更可 |
 | `market.symbols` | マーケット欄に出す 3 銘柄（下記） |
 | `indoor` | 室内センサー。SwitchBot を使うなら下記 |
+
+### 時計のフォント
+
+`config.json` に `"clock": {"font": "Outfit-VF.ttf", "weight": "Light"}` のように書く（既定は Outfit Light）。
+見本: [clock_candidates.png](../docs/kindle-dashboard/clock_candidates.png)
+
+| 見本 | `font` | `weight` | 雰囲気 |
+|---|---|---|---|
+| A | `Outfit-VF.ttf` | `Light`（既定）/ `Regular` | 細めで現代的・丸みあり |
+| B | `Outfit-VF.ttf` | `Medium` | A を太くした版。遠くからも読みやすい |
+| C | `Montserrat-VF.ttf` | `Light` | 幾何学的で上品 |
+| D | `JosefinSans-VF.ttf` | `Light` | 細く背が低い・クラシック |
+| E | `BebasNeue-Regular.ttf` | （なし） | 縦長で力強い |
+| F | `Oswald-VF.ttf` | `Light` | 縦長・すっきり |
+| H | `DMSerifDisplay-Regular.ttf` | （なし） | セリフ体・雑誌風 |
+| I | `SpaceGrotesk-VF.ttf` | `Light` | 個性的な「1」 |
+| J | `Urbanist-VF.ttf` | `Thin` | とても細い（E-ink では薄く見えることあり） |
+| K | `Lexend-VF.ttf` | `ExtraLight` | 細めで読みやすい |
+
+可変フォント（`-VF`）の `weight` は `Thin` `ExtraLight` `Light` `Regular` `Medium` `SemiBold` `Bold` などから選べる。
 
 ### マーケット欄（ドル円・eMAXIS Slim 米国株式(S&P500)・iFreeNEXT FANG+）
 

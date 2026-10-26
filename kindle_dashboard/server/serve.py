@@ -72,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     cfg = load_config(args.config)
-    fonts = Fonts(cfg.get("font_path"), SERVER_DIR)
+    fonts = Fonts(cfg.get("font_path"), SERVER_DIR, cfg.get("clock"))
 
     if args.cmd == "render":
         cmd_render(cfg, fonts, args.demo, args.out)

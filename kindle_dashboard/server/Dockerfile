@@ -9,8 +9,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 日本語フォント（Noto Sans JP 可変ウェイト版, SIL OFL）
-RUN mkdir fonts && python -c "import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf', 'fonts/NotoSansJP-VF.ttf')"
+# フォント（日本語の Noto Sans JP と時計用の欧文フォント, SIL OFL）
+COPY fetch_fonts.py .
+RUN python fetch_fonts.py
 
 COPY dashboard/ dashboard/
 COPY serve.py .

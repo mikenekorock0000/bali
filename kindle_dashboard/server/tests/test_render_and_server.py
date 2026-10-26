@@ -18,7 +18,7 @@ NOW = datetime(2026, 10, 26, 14, 19, tzinfo=ZoneInfo("Asia/Tokyo"))
 
 @pytest.fixture(scope="module")
 def fonts():
-    return Fonts(None, SERVER_DIR)
+    return Fonts(None, SERVER_DIR, DEFAULT_CONFIG["clock"])
 
 
 def test_render_demo_is_kindle_ready(fonts):
@@ -155,3 +155,10 @@ def test_umbrella_badge_only_on_rainy_days(fonts, tips, expect_badge):
     badge = img.crop((102, 246, 160, 300))
     dark = sum(1 for v in badge.getdata() if v < 64) / (badge.width * badge.height)
     assert (dark > 0.4) is expect_badge
+
+
+def test_clock_font_falls_back_when_missing():
+    fonts = Fonts(None, SERVER_DIR, {"font": "no-such-font.ttf", "weight": "Light"})
+    assert fonts.clock(40).path == fonts.get(40, "Bold").path
+    chosen = Fonts(None, SERVER_DIR, DEFAULT_CONFIG["clock"])
+    assert chosen.clock(40).path.endswith("Outfit-VF.ttf")

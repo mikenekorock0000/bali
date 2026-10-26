@@ -46,9 +46,15 @@ class DashboardData:
 class Fonts:
     """サイズ・太さごとのフォントをキャッシュする。可変フォントなら太さを切り替える。"""
 
-    def __init__(self, path: str | None = None, base_dir: Path | None = None):
+    def __init__(self, path: str | None = None, base_dir: Path | None = None,
+                 clock: dict | None = None):
         candidates = ([path] if path else []) + FONT_CANDIDATES
         base = base_dir or Path.cwd()
+        self._clock_path, self._clock_weight = None, (clock or {}).get("weight", "Regular")
+        if clock and clock.get("font"):
+            p = Path(clock["font"])
+            p = p if p.is_absolute() else base / "fonts" / p
+            self._clock_path = str(p) if p.exists() else None
         for c in candidates:
             p = Path(c) if Path(c).is_absolute() else base / c
             if p.exists():
@@ -56,7 +62,7 @@ class Fonts:
                 break
         else:
             raise FileNotFoundError(
-                "日本語フォントが見つかりません。server/fetch_fonts.sh を実行するか config の font_path を設定してください")
+                "日本語フォントが見つかりません。server/fetch_fonts.py を実行するか config の font_path を設定してください")
         self._cache: dict[tuple[int, str], ImageFont.FreeTypeFont] = {}
 
     def get(self, size: int, weight: str = "Regular") -> ImageFont.FreeTypeFont:
@@ -67,6 +73,20 @@ class Fonts:
                 font.set_variation_by_name(weight)
             except (OSError, ValueError):
                 pass  # 可変フォントでなければ太さは変えられない
+            self._cache[key] = font
+        return self._cache[key]
+
+    def clock(self, size: int) -> ImageFont.FreeTypeFont:
+        """時計の数字用。指定が無い・見つからないときは日本語フォントの Bold。"""
+        if not self._clock_path:
+            return self.get(size, "Bold")
+        key = (size, "clock")
+        if key not in self._cache:
+            font = ImageFont.truetype(self._clock_path, size)
+            try:
+                font.set_variation_by_name(self._clock_weight)
+            except (OSError, ValueError):
+                pass
             self._cache[key] = font
         return self._cache[key]
 
@@ -160,8 +180,10 @@ M = 22  # 左右の余白
 def draw_clock(c: Canvas, now: datetime):
     c.text(M, 26, f"{now.year}年{now.month}月{now.day}日（{WEEKDAYS[now.weekday()]}）", 28, "SemiBold")
     hm = now.strftime("%H:%M")
-    size = c.fit_size(hm, 176, "Bold", 436)
-    c.text(M - 4, 222, hm, size, "Bold", anchor="ls")
+    size = 176
+    while size > 60 and c.fonts.clock(round(size * c.s)).getlength(hm) / c.s > 436:
+        size -= 4
+    c.d.text(((M - 2) * c.s, 222 * c.s), hm, font=c.fonts.clock(round(size * c.s)), fill=BLACK, anchor="ls")
 
 
 def draw_outdoor(c: Canvas, w: Weather | None):
