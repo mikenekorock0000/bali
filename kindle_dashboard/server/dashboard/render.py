@@ -1,6 +1,6 @@
 """ダッシュボード画像の描画。
 
-横 1024 x 縦 758（Kindle Paperwhite 2 の横置き）で 2 倍解像度に描いてから縮小し、
+横 1024 x 縦 758 の論理座標でレイアウトし、画面サイズ（PW3 なら 1448 x 1072）の 2 倍で描いてから縮小し、
 16 階調のグレースケールに落として、Kindle の向きに合わせて回転する。
 """
 
@@ -102,13 +102,18 @@ class Fonts:
         return self._cache[key]
 
 
-class Canvas:
-    """論理座標（1024x758）で描き、内部では scale 倍の解像度で描画する。"""
+LAYOUT_W, LAYOUT_H = 1024, 758  # レイアウトの論理座標（横置き）
 
-    def __init__(self, width: int, height: int, fonts: Fonts, scale: int = 2):
-        self.w, self.h, self.s = width, height, scale
+
+class Canvas:
+    """論理座標（1024x758）で描き、出力サイズの 2 倍の解像度で描画してから縮小する。"""
+
+    def __init__(self, out_w: int, out_h: int, fonts: Fonts):
+        self.w, self.h = LAYOUT_W, LAYOUT_H
+        self.out = (out_w, out_h)
+        self.s = 2 * out_w / LAYOUT_W  # 論理座標 1 あたりの内部ピクセル数
         self.fonts = fonts
-        self.img = Image.new("L", (width * scale, height * scale), WHITE)
+        self.img = Image.new("L", (round(self.w * self.s), round(self.h * self.s)), WHITE)
         self.d = ImageDraw.Draw(self.img)
 
     def font(self, size: float, weight: str):
@@ -168,7 +173,7 @@ class Canvas:
         return w
 
     def finish(self) -> Image.Image:
-        return self.img.resize((self.w, self.h), Image.LANCZOS)
+        return self.img.resize(self.out, Image.LANCZOS)
 
 
 def _deg(v: float | None) -> str:
@@ -474,8 +479,11 @@ def draw_footer(c: Canvas, data: DashboardData):
     c.text(c.w - M, y, data.credits, 11, "Medium", fill=GRAY, anchor="rm")
 
 
-def render(data: DashboardData, fonts: Fonts, width: int = 1024, height: int = 758) -> Image.Image:
-    """横向きのダッシュボード画像（回転前・グレースケール）を返す。"""
+def render(data: DashboardData, fonts: Fonts, width: int = LAYOUT_W, height: int = LAYOUT_H) -> Image.Image:
+    """横向きのダッシュボード画像（回転前・グレースケール, width x height px）を返す。
+
+    レイアウトは 1024x758 で組み、出力サイズに合わせて拡大して描く（PW3 の 1448x1072 なら約 1.41 倍）。
+    """
     c = Canvas(width, height, fonts)
     draw_clock(c, data.now)
     c.line(478, 24, 478, 232, 2)

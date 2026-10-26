@@ -1,11 +1,11 @@
-# Kindle ダッシュボード（Kindle Paperwhite 2 / 第6世代向け）
+# Kindle ダッシュボード（Kindle Paperwhite 第7世代向け）
 
 古い Kindle を「時計・天気・室内環境・市況・ニュース」の E-ink ダッシュボードにする。
-調査・脱獄手順は [docs/kindle-dashboard/](../docs/kindle-dashboard/)（PW2 専用手順: [paperwhite2.md](../docs/kindle-dashboard/paperwhite2.md)）。
+調査・脱獄手順は [docs/kindle-dashboard/](../docs/kindle-dashboard/)（PW3 専用手順: [paperwhite3.md](../docs/kindle-dashboard/paperwhite3.md)）。
 
 ![preview](../docs/kindle-dashboard/preview.png)
 
-（ダミーデータで描画したプレビュー。実機では 90° 回転した 758×1024 の画像が表示される）
+（ダミーデータで描画したプレビュー。実機では 90° 回転した 1072×1448 の画像が表示される）
 
 ## 仕組み
 
@@ -84,6 +84,7 @@ python serve.py                  # 配信開始 → 表示された http://<IP>:
 |---|---|
 | `location` | 地名・緯度・経度（Google マップで右クリックすると表示） |
 | `clock` | 時計の数字のフォントと太さ（下記） |
+| `display` | 画面サイズ（横置き）。PW3 は `1448 x 1072`（既定）、PW2/Voyage 以前の 6 インチ機は `1024 x 758`、無印 Kindle は `800 x 600` |
 | `display.rotate` | Kindle 用画像の回転（時計回り 0/90/180/270）。表示が逆さなら 270 に |
 | `refresh_minutes` | データ源ごとの取得間隔（分） |
 | `news.url` | RSS の URL。NHK のカテゴリ別 RSS などに変更可 |
@@ -194,7 +195,7 @@ tenki.jp の服装指数を参考にした**独自の目安**（tenki.jp の値�
 
 ## 2. Kindle に入れる
 
-前提: 脱獄済み・KUAL 導入済み（[paperwhite2.md](../docs/kindle-dashboard/paperwhite2.md)）、Wi-Fi 設定済み・機内モード OFF。
+前提: 脱獄済み・KUAL 導入済み（[paperwhite3.md](../docs/kindle-dashboard/paperwhite3.md)）、Wi-Fi 設定済み・機内モード OFF。
 
 1. USB で接続し、`kindle/extensions/dashboard` フォルダを Kindle の `extensions/` にコピー。
 2. `extensions/dashboard/config.sh` の `SERVER_URL` を、サーバー起動時に表示された URL に書き換える。
@@ -234,4 +235,4 @@ Kindle 側スクリプトは `lipc-*`・`eips` などをスタブにすれば PC
 - ✅ Docker: イメージのビルド、コンテナ起動、`/dash.png`・`/health` の応答、ヘルスチェック、非 root 実行、`/config` の設定読み込み。
 - ✅ Kindle 側: コマンドをスタブにした PC 上のシミュレーションで、取得 → 全面/部分リフレッシュ → 停止で UI 復帰までを確認。
 - ⚠️ 実 API（Open-Meteo / Yahoo Finance / 三菱UFJアセット / 投資信託協会 / NHK RSS / SwitchBot / Google カレンダー）は開発環境から接続できず未確認。応答形式は公開仕様・公開事例に合わせてある。NAS で起動後に `/health` で取得結果が確認できる。
-- ⚠️ Kindle 実機（PW2, FW 5.12.2.2）では未検証。特に `STOP_MODE`、電源ボタンでの終了、FBInk のパスは実機で確認が必要。
+- ⚠️ Kindle 実機（PW3, FW 5.15.1）では未検証。特に `STOP_MODE`、電源ボタンでの終了、FBInk のパスは実機で確認が必要。

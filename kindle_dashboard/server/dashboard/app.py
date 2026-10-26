@@ -24,7 +24,8 @@ SERVER_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = {
     "location": {"name": "東京", "latitude": 35.6812, "longitude": 139.7671},
     "timezone": "Asia/Tokyo",
-    "display": {"width": 1024, "height": 758, "rotate": 90},
+    # 横置きの画面サイズ（Kindle Paperwhite 第7世代 = 1448x1072）。rotate で縦の画面向きに回す
+    "display": {"width": 1448, "height": 1072, "rotate": 90},
     "font_path": None,
     # 時計の数字のフォント（fonts/ 内のファイル名と太さ）。候補は README 参照
     "clock": {"font": "DMSerifDisplay-Regular.ttf"},

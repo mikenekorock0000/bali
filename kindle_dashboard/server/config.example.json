@@ -6,8 +6,8 @@
   },
   "timezone": "Asia/Tokyo",
   "display": {
-    "width": 1024,
-    "height": 758,
+    "width": 1448,
+    "height": 1072,
     "rotate": 90
   },
   "port": 8080,

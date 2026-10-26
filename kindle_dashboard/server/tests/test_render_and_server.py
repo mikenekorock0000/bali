@@ -114,11 +114,11 @@ def test_http_server_serves_png_and_records_battery(fonts):
         with opener.open(f"{base}/dash.png?battery=96&charging=1") as res:
             assert res.headers["Content-Type"] == "image/png"
             img = Image.open(io.BytesIO(res.read()))
-            assert img.size == (758, 1024)
+            assert img.size == (1072, 1448)  # Paperwhite 第7世代の縦向き
         assert store.device.battery == 96 and store.device.charging is True
 
         with opener.open(f"{base}/preview.png") as res:
-            assert Image.open(io.BytesIO(res.read())).size == (1024, 758)
+            assert Image.open(io.BytesIO(res.read())).size == (1448, 1072)
 
         with opener.open(f"{base}/health") as res:
             assert json.load(res)["device"]["battery"] == 96
@@ -188,3 +188,13 @@ def test_render_month_panel_week_counts(fonts, month):
     data.events = demo_events(now)
     data.week_start = "monday"
     assert render(data, fonts).size == (1024, 758)
+
+
+@pytest.mark.parametrize("size", [(1448, 1072), (1024, 758), (800, 600)])
+def test_render_scales_layout_to_screen(fonts, size):
+    img = render(demo_data(NOW), fonts, *size)
+    assert img.size == size
+    # 拡大しても右端（ニュース欄の下線）まで描かれ、はみ出していない
+    w, h = size
+    col = img.crop((round(w * 0.97), 0, w, h))
+    assert col.getextrema()[0] < 128
