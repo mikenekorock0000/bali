@@ -312,39 +312,52 @@ def draw_heading(c: Canvas, x0, x1, y, title, sub=""):
     c.line(x0, y + 32, x1, y + 32, 1.5)
 
 
+# 下段左列の縦の割り付け: 見出し(38) + 3 行 + 間(24) + 見出し(38) + 3 行 = 418〜722
+LOWER_TOP = 418
+HEADING_H = 38
+ROW_H = 34
+SECTION_GAP = 24
+LEFT_X0, LEFT_X1 = M, 470
+
+
 def draw_daily(c: Canvas, w: Weather | None):
-    x0, x1, y = M, 470, 418
+    x0, x1, y = LEFT_X0, LEFT_X1, LOWER_TOP
     draw_heading(c, x0, x1, y, "この先の天気")
     for i, d in enumerate(w.daily if w else []):
-        top = y + 38 + i * 36
-        mid = top + 17
-        c.text(x0 + 6, mid, f"{d.date.month}/{d.date.day}({WEEKDAYS[d.date.weekday()]})", 19, "Medium", anchor="lm")
-        c.weather_icon(d.code, x0 + 160, mid, 32)
-        c.text(x0 + 192, mid, f"{_deg(d.t_max)} / {_deg(d.t_min)}", 20, "SemiBold", anchor="lm")
-        c.text(x1 - 4, mid, _pct(d.precip_prob), 17, "Medium", anchor="rm")
+        mid = y + HEADING_H + i * ROW_H + ROW_H / 2
+        c.text(x0 + 6, mid, f"{d.date.month}/{d.date.day}({WEEKDAYS[d.date.weekday()]})", 18, "Medium", anchor="lm")
+        c.weather_icon(d.code, x0 + 150, mid, 30)
+        c.text(x0 + 236, mid, _deg(d.t_max), 20, "Bold", anchor="rm")
+        c.text(x0 + 246, mid, "/", 18, "Medium", fill=GRAY, anchor="mm")
+        c.text(x0 + 256, mid, _deg(d.t_min), 20, "Medium", fill=DARK, anchor="lm")
+        if d.precip_prob is not None:
+            label = f"{d.precip_prob}%"
+            c.text(x1 - 4, mid, label, 17, "Medium", anchor="rm")
+            c.umbrella(x1 - 4 - c.text_width(label, 17, "Medium") - 11, mid, 13)
 
 
 def draw_market(c: Canvas, quotes: list[Quote | str]):
     """quotes の要素が str のときは、まだ取得できていない銘柄のラベル。"""
-    x0, x1, y = M, 470, 570
+    x0, x1 = LEFT_X0, LEFT_X1
+    y = LOWER_TOP + HEADING_H + 3 * ROW_H + SECTION_GAP
     times = [q.time for q in quotes if isinstance(q, Quote) and q.time]
     t = max(times) if times else None
     sub = f"{t.month}/{t.day} {t:%H:%M}時点" if t else ""
     draw_heading(c, x0, x1, y, "マーケット", sub)
+    value_right = x0 + 214  # 数値は右揃えで桁を合わせる
     for i, q in enumerate(quotes[:3]):
-        top = y + 38 + i * 39
-        mid = top + 19
+        mid = y + HEADING_H + i * ROW_H + ROW_H / 2
         if isinstance(q, str):
             c.text(x0 + 6, mid, q, 16, "Medium", anchor="lm")
-            c.text(x0 + 96, mid, "—", 25, "Bold", anchor="lm")
+            c.text(value_right, mid, "—", 24, "Bold", anchor="rm")
             continue
         if q.as_of:  # 投資信託は基準日をラベルの下に出す
-            c.text(x0 + 6, mid - 7, q.label, 16, "Medium", anchor="lm")
-            c.text(x0 + 6, mid + 11, f"{q.as_of.month}/{q.as_of.day}基準", 11, "Medium", fill=GRAY, anchor="lm")
+            c.text(x0 + 6, mid - 6, q.label, 16, "Medium", anchor="lm")
+            c.text(x0 + 6, mid + 10, f"{q.as_of.month}/{q.as_of.day}基準", 11, "Medium", fill=GRAY, anchor="lm")
         else:
             c.text(x0 + 6, mid, q.label, 16, "Medium", anchor="lm")
-        vw = c.text(x0 + 96, mid, _num(q.price, q.decimals), 25, "Bold", anchor="lm")
-        c.text(x0 + 100 + vw, mid + 4, q.unit, 13, "Medium", anchor="lm")
+        c.text(value_right, mid, _num(q.price, q.decimals), 24, "Bold", anchor="rm")
+        c.text(value_right + 4, mid + 4, q.unit, 13, "Medium", anchor="lm")
         mark = "▲" if q.change > 0 else "▼" if q.change < 0 else "±"
         change = f"{mark}{_num(abs(q.change), q.decimals)} ({q.change_pct:+.2f}%)"
         c.text(x1 - 4, mid, change, 15, "SemiBold", anchor="rm")
