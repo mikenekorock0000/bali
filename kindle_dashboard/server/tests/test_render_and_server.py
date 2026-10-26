@@ -143,3 +143,15 @@ def test_render_temp_chart_with_few_or_flat_hours(fonts, hours):
     for p in data.weather.day_hours:
         p.temperature = 15.0  # 平らでもゼロ除算しない
     assert render(data, fonts).size == (1024, 758)
+
+
+@pytest.mark.parametrize("tips,expect_badge", [(["傘を持って", "寒暖差 8℃"], True), (["寒暖差 8℃"], False)])
+def test_umbrella_badge_only_on_rainy_days(fonts, tips, expect_badge):
+    from dashboard.clothing import Clothing
+    data = demo_data(NOW)
+    data.weather.clothing = Clothing(60, "長袖シャツで快適", "今日", tips)
+    img = render(data, fonts)
+    # 傘のバッジの位置（服のイラストの右）が黒地になっているか
+    badge = img.crop((102, 246, 160, 300))
+    dark = sum(1 for v in badge.getdata() if v < 64) / (badge.width * badge.height)
+    assert (dark > 0.4) is expect_badge

@@ -218,3 +218,24 @@ def garment(draw, kind: str, x: float, y: float, s: float, fg=BLACK, bg=WHITE, s
         if kind == "down_scarf":
             draw.rounded_rectangle(P([(0.3, 0.08), (0.7, 0.22)]), radius=s * 0.05, fill=fg)
             draw.polygon(P([(0.54, 0.2), (0.66, 0.2), (0.7, 0.56), (0.58, 0.58)]), fill=fg)
+
+
+def umbrella_badge(draw, x: float, y: float, s: float, fg=BLACK, bg=WHITE) -> None:
+    """雨の日に服の隣へ出す大きな傘（黒地に白抜き）。(x, y) を左上とする一辺 s。"""
+    def P(px, py):
+        return x + px * s, y + py * s
+
+    draw.rounded_rectangle((x, y, x + s, y + s), radius=s * 0.16, fill=fg)
+    w = max(2, round(s * 0.06))
+    # 傘の布: 半楕円を白で塗り、裾を 3 か所丸く切り欠く
+    draw.pieslice((*P(0.1, 0.14), *P(0.9, 0.7)), 180, 360, fill=bg)
+    for cx in (0.233, 0.5, 0.767):  # 裾の浅い波
+        draw.ellipse((*P(cx - 0.133, 0.4), *P(cx + 0.133, 0.46)), fill=fg)
+    for ex in (0.367, 0.633):  # 骨
+        draw.line((*P(0.5, 0.15), *P(ex, 0.41)), fill=fg, width=max(1, w // 2))
+    # 柄と持ち手
+    draw.line((*P(0.5, 0.16), *P(0.5, 0.78)), fill=bg, width=w)
+    draw.arc((*P(0.36, 0.7), *P(0.52, 0.88)), 0, 180, fill=bg, width=w)
+    # 雨粒
+    for px, py in ((0.2, 0.58), (0.8, 0.58), (0.27, 0.74), (0.73, 0.74)):
+        draw.line((*P(px, py), *P(px - 0.04, py + 0.1)), fill=bg, width=w)

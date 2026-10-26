@@ -123,6 +123,9 @@ class Canvas:
         if kind:
             icons.garment(self.d, kind, x * self.s, y * self.s, size * self.s, fg, bg, shade)
 
+    def umbrella_badge(self, x, y, size):
+        icons.umbrella_badge(self.d, x * self.s, y * self.s, size * self.s, fg=BLACK, bg=WHITE)
+
     def battery(self, x, y, w, h, level):
         icons.battery(self.d, x * self.s, y * self.s, w * self.s, h * self.s, level)
 
@@ -210,26 +213,28 @@ def draw_indoor(c: Canvas, ind: Indoor | None):
 
 
 def draw_clothing(c: Canvas, w: Weather | None):
-    """時計・天気の下の帯の左側: 服のイラスト、おすすめの服装、ひとこと。"""
+    """時計・天気の下の帯の左側: 服のイラスト（雨の日は大きな傘も）、おすすめの服装、ひとこと。"""
     cl = w.clothing if w else None
     if cl is None:
         return
     top = 238
     c.garment(cl.index, M + 4, top + 4, 62)
+    rain = any(t.startswith("傘") for t in cl.tips)
     x = M + 84
+    if rain:
+        c.umbrella_badge(x - 6, top + 4, 62)
+        x += 70
     c.text(x, top + 12, f"{cl.day_label}の服装", 13, "Medium", fill=GRAY, anchor="lm")
     c.text(x, top + 36, cl.phrase, 24, "Bold", anchor="lm")
 
-    # ひとこと（傘には傘の絵）。入りきらないものは後ろから省く
+    # ひとこと（傘は太字で先頭に）。入りきらないものは後ろから省く
     x1, y = CHART_X0 - 28, top + 61
     for tip in cl.tips:
-        icon = 15 if tip.startswith("傘") else 0
-        width = icon + (4 if icon else 0) + c.text_width(tip, 15, "Medium")
+        weight = "Bold" if tip.startswith("傘") else "Medium"
+        width = c.text_width(tip, 16, weight)
         if x + width > x1:
             break
-        if icon:
-            c.umbrella(x + icon / 2, y, icon)
-        c.text(x + width, y, tip, 15, "Medium", anchor="rm")
+        c.text(x, y, tip, 16, weight, anchor="lm")
         x += width + 18
 
 
