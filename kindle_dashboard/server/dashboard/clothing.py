@@ -76,11 +76,11 @@ def clothing_advice(points: list[HourPoint], now: datetime) -> Clothing | None:
     tips = []
     pops = [p.precip_prob for p in window if p.precip_prob is not None]
     if pops and max(pops) >= UMBRELLA_PROB:
-        tips.append(f"傘を持って（降水{max(pops)}%）")
+        tips.append("傘を持って")
     temps = [p.temperature for p in window]
     if max(temps) - min(temps) >= TEMP_SWING:
-        tips.append(f"寒暖差に注意（{round(max(temps) - min(temps))}℃）")
+        tips.append(f"寒暖差 {round(max(temps) - min(temps))}℃")
     winds = [p.wind_speed for p in window if p.wind_speed is not None]
     if winds and max(winds) >= STRONG_WIND:
-        tips.append(f"風が強い（{round(max(winds))}m/s）")
+        tips.append(f"風が強い {round(max(winds))}m/s")
     return Clothing(index, phrase, label, tips)

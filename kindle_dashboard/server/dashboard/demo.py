@@ -38,7 +38,7 @@ def demo_data(now: datetime) -> DashboardData:
         current=Current(temperature=19.6, apparent=21.0, humidity=93, code=61,
                         wind_speed=2.1, wind_direction=22, is_day=True),
         today_max=20, today_min=19, precip_prob=100, hourly=hourly, daily=daily,
-        clothing=Clothing(60, "長袖シャツで快適", "今日", ["傘を持って（降水100%）", "寒暖差に注意（11℃）"]),
+        clothing=Clothing(60, "長袖シャツで快適", "今日", ["傘を持って", "寒暖差 8℃"]),
         day_hours=demo_day_hours(now),
     )
     market_time = now.replace(second=0, microsecond=0) - timedelta(minutes=4)

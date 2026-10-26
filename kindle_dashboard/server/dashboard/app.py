@@ -40,7 +40,7 @@ DEFAULT_CONFIG = {
          "unit": "円", "decimals": 0, "refresh_minutes": 60},  # iFreeNEXT FANG+インデックス
     ]},
     "indoor": {"provider": "none", "device_id": ""},
-    "credits": "天気: Open-Meteo ／ 為替: Yahoo Finance ／ 投信: 三菱UFJアセット・投資信託協会",
+    "credits": "Open-Meteo・Yahoo Finance・三菱UFJアセット・投資信託協会",
 }
 
 

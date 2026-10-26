@@ -40,7 +40,7 @@ class DashboardData:
     charging: bool = False
     failing: list[str] = field(default_factory=list)
     news_label: str = "NHKニュース"
-    credits: str = "天気: Open-Meteo ／ 為替: Yahoo Finance ／ 投信: 三菱UFJアセット・投資信託協会"
+    credits: str = "Open-Meteo・Yahoo Finance・三菱UFJアセット・投資信託協会"
 
 
 class Fonts:
@@ -210,34 +210,30 @@ def draw_indoor(c: Canvas, ind: Indoor | None):
 
 
 def draw_clothing(c: Canvas, w: Weather | None):
-    """時計・天気の下の帯。左に服のイラスト、右に服装指数とひとこと。"""
+    """時計・天気の下の帯の左側: 服のイラスト、おすすめの服装、ひとこと。"""
     cl = w.clothing if w else None
     if cl is None:
         return
     top = 238
-    c.garment(cl.index, M, top + 2, 66)
+    c.garment(cl.index, M + 4, top + 4, 62)
+    x = M + 84
+    c.text(x, top + 12, f"{cl.day_label}の服装", 13, "Medium", fill=GRAY, anchor="lm")
+    c.text(x, top + 36, cl.phrase, 24, "Bold", anchor="lm")
 
-    x = M + 82
-    y = top + 19
-    x += c.label_box(x, y - 13, f"{cl.day_label}の服装") + 12
-    x += c.text(x, y + 1, str(cl.index), 28, "Bold", anchor="lm") + 12
-    c.text(x, y, cl.phrase, 25, "Bold", anchor="lm")
-
-    # 2 行目: ひとこと（傘には傘の絵）。入りきらないものは後ろから省く
-    x1 = CHART_X0 - 96
-    x, y = M + 84, top + 52
+    # ひとこと（傘には傘の絵）。入りきらないものは後ろから省く
+    x1, y = CHART_X0 - 28, top + 61
     for tip in cl.tips:
-        icon = 18 if tip.startswith("傘") else 0
-        width = icon + c.text_width(tip, 17, "Medium")
+        icon = 15 if tip.startswith("傘") else 0
+        width = icon + (4 if icon else 0) + c.text_width(tip, 15, "Medium")
         if x + width > x1:
             break
         if icon:
             c.umbrella(x + icon / 2, y, icon)
-        c.text(x + icon + (4 if icon else 0), y, tip, 17, "Medium", anchor="lm")
-        x += width + 24
+        c.text(x + width, y, tip, 15, "Medium", anchor="rm")
+        x += width + 18
 
 
-CHART_X0 = 640  # 気温グラフの左端（帯の右側。左に凡例）
+CHART_X0 = 494  # 気温グラフの左端（屋外欄・ニュース欄と揃える）
 
 
 def draw_temp_chart(c: Canvas, w: Weather | None, now: datetime):
@@ -245,13 +241,12 @@ def draw_temp_chart(c: Canvas, w: Weather | None, now: datetime):
     hours = w.day_hours if w else []
     if len(hours) < 2:
         return
-    x0, x1, y0, y1 = CHART_X0, c.w - M - 4, 250, 284  # 折れ線の範囲（y0 が上）
+    x0, x1, y0, y1 = CHART_X0, c.w - M - 4, 264, 290  # 折れ線の範囲（y0 が上）
     base = y1 + 5  # 降水確率の棒の底・目盛りの線
     temps = [p.temperature for p in hours]
-    lx = x0 - 80  # 左の凡例: 対象日と最高・最低
-    c.text(lx, 251, f"{w.day_label}の気温", 12, "Medium", fill=GRAY, anchor="lm")
-    c.text(lx, 270, f"最高 {round(max(temps))}°", 14, "Bold", anchor="lm")
-    c.text(lx, 288, f"最低 {round(min(temps))}°", 14, "Bold", anchor="lm")
+    cw = c.text(x0, 250, f"{w.day_label}の気温", 13, "Medium", fill=GRAY, anchor="lm")
+    c.text(x0 + cw + 8, 250, f"{round(min(temps))}〜{round(max(temps))}°", 14, "SemiBold", anchor="lm")
+    c.text(x1 + 4, 250, "■ 降水確率", 11, "Medium", fill=LIGHT, anchor="rm")
 
     lo, hi = min(temps), max(temps)
     pad = max(0.0, 4 - (hi - lo)) / 2  # 変化が小さい日も平らに見えすぎないように
@@ -270,8 +265,8 @@ def draw_temp_chart(c: Canvas, w: Weather | None, now: datetime):
             c.rect(px(p.time.hour) - bar / 2, base - h, px(p.time.hour) + bar / 2, base, fill=LIGHT)
     c.line(x0, base, x1, base, 1, fill=GRAY)
     for h in (0, 6, 12, 18):
-        c.text(px(h), base + 9, str(h), 11, "Medium", fill=GRAY, anchor="mm")
-    c.text(x1 + 4, base + 9, "24時", 11, "Medium", fill=GRAY, anchor="rm")
+        c.text(px(h), base + 8, str(h), 10, "Medium", fill=GRAY, anchor="mm")
+    c.text(x1 + 4, base + 8, "24時", 10, "Medium", fill=GRAY, anchor="rm")
 
     if w.day_label == "今日":  # 現在時刻の縦線
         nx = px(now.hour + now.minute / 60)
@@ -282,7 +277,7 @@ def draw_temp_chart(c: Canvas, w: Weather | None, now: datetime):
     for a, b in zip(pts, pts[1:]):
         c.line(*a, *b, 2.5)
 
-    # 最高・最低の位置に点（値は左の凡例）
+    # 最高・最低の位置に点
     for i in (temps.index(max(temps)), temps.index(min(temps))):
         x, y = pts[i]
         c.d.ellipse(((x - 3.5) * c.s, (y - 3.5) * c.s, (x + 3.5) * c.s, (y + 3.5) * c.s), fill=BLACK)
@@ -290,15 +285,13 @@ def draw_temp_chart(c: Canvas, w: Weather | None, now: datetime):
 
 def draw_hourly(c: Canvas, w: Weather | None):
     top, bottom = 312, 408
-    c.line(M, top, c.w - M, top, 3)
-    c.line(M, bottom, c.w - M, bottom, 3)
+    c.line(M, top, c.w - M, top, 2)
+    c.line(M, bottom, c.w - M, bottom, 2)
     slots = w.hourly if w else []
     n = 8
     cw = (c.w - 2 * M) / n
     for i in range(n):
         x0 = M + i * cw
-        if i:
-            c.line(x0, top + 6, x0, bottom - 6, 1, fill=LIGHT)
         if i >= len(slots):
             continue
         s, cx = slots[i], x0 + cw / 2
@@ -316,7 +309,7 @@ def draw_heading(c: Canvas, x0, x1, y, title, sub=""):
     tw = c.text(x0 + 4, y, title, 20, "Bold")
     if sub:
         c.text(x0 + 4 + tw + 10, y + 7, sub, 13, "Medium", fill=GRAY)
-    c.line(x0, y + 32, x1, y + 32, 2)
+    c.line(x0, y + 32, x1, y + 32, 1.5)
 
 
 def draw_daily(c: Canvas, w: Weather | None):
@@ -329,7 +322,6 @@ def draw_daily(c: Canvas, w: Weather | None):
         c.weather_icon(d.code, x0 + 160, mid, 32)
         c.text(x0 + 192, mid, f"{_deg(d.t_max)} / {_deg(d.t_min)}", 20, "SemiBold", anchor="lm")
         c.text(x1 - 4, mid, _pct(d.precip_prob), 17, "Medium", anchor="rm")
-        c.line(x0, top + 35, x1, top + 35, 1, fill=LIGHT)
 
 
 def draw_market(c: Canvas, quotes: list[Quote | str]):
@@ -342,8 +334,6 @@ def draw_market(c: Canvas, quotes: list[Quote | str]):
     for i, q in enumerate(quotes[:3]):
         top = y + 38 + i * 39
         mid = top + 19
-        if i < 2:
-            c.line(x0, top + 38, x1, top + 38, 1, fill=LIGHT)
         if isinstance(q, str):
             c.text(x0 + 6, mid, q, 16, "Medium", anchor="lm")
             c.text(x0 + 96, mid, "—", 25, "Bold", anchor="lm")
@@ -368,9 +358,8 @@ def draw_news(c: Canvas, news: list[str], label: str):
     for i, title in enumerate(news[:7]):
         top = y + 38 + i * 38
         mid = top + 18
-        c.rect(x0 + 6, mid - 4, x0 + 13, mid + 3, fill=BLACK)
-        c.text(x0 + 22, mid, c.fit(title, 17, "Medium", x1 - x0 - 26), 17, "Medium", anchor="lm")
-        c.line(x0, top + 37, x1, top + 37, 1, fill=LIGHT)
+        c.rect(x0 + 6, mid - 3, x0 + 11, mid + 2, fill=GRAY)
+        c.text(x0 + 20, mid, c.fit(title, 17, "Medium", x1 - x0 - 24), 17, "Medium", anchor="lm")
 
 
 def draw_footer(c: Canvas, data: DashboardData):
@@ -382,7 +371,7 @@ def draw_footer(c: Canvas, data: DashboardData):
     if data.failing:
         status += "　※取得失敗: " + "・".join(data.failing)
     c.text(M + 36, y, status, 14, "Medium", anchor="lm")
-    c.text(c.w - M, y, data.credits, 13, "Medium", fill=GRAY, anchor="rm")
+    c.text(c.w - M, y, data.credits, 11, "Medium", fill=GRAY, anchor="rm")
 
 
 def render(data: DashboardData, fonts: Fonts, width: int = 1024, height: int = 758) -> Image.Image:

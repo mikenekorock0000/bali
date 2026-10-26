@@ -49,7 +49,7 @@ def test_tips_for_rain_swing_and_wind():
     pops = [0] * 10 + [70] + [0] * 5
     winds = [3.0] * 15 + [9.4]
     c = clothing_advice(day_points(now, temps, pops=pops, winds=winds), now)
-    assert c.tips == ["傘を持って（降水70%）", "寒暖差に注意（11℃）", "風が強い（9m/s）"]
+    assert c.tips == ["傘を持って", "寒暖差 11℃", "風が強い 9m/s"]
 
 
 def test_no_data_for_the_day():
