@@ -3,6 +3,8 @@
 古い Kindle を「時計・天気・室内環境・市況・ニュース」の E-ink ダッシュボードにする。
 調査・脱獄手順は [docs/kindle-dashboard/](../docs/kindle-dashboard/)（PW3 専用手順: [paperwhite3.md](../docs/kindle-dashboard/paperwhite3.md)）。
 
+**このあとやること・引き継ぎ**: [NEXT_STEPS.md](NEXT_STEPS.md)
+
 **NAS に置くファイル**: [dist/kindle-dashboard-nas.zip](dist/kindle-dashboard-nas.zip)（サーバー）と
 [dist/kindle-dashboard-kindle.zip](dist/kindle-dashboard-kindle.zip)（Kindle 側）。手順は [NAS_SETUP.md](NAS_SETUP.md)。
 作り直しは `python kindle_dashboard/tool/package.py`。
