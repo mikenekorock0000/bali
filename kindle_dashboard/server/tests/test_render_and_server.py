@@ -124,3 +124,13 @@ def test_http_server_serves_png_and_records_battery(fonts):
             assert json.load(res)["device"]["battery"] == 96
     finally:
         server.shutdown()
+
+
+@pytest.mark.parametrize("index", [10, 20, 30, 40, 50, 60, 70, 80, 90])
+def test_render_every_clothing_level(fonts, index):
+    from dashboard.clothing import Clothing
+    from dashboard.icons import GARMENTS
+    assert index in GARMENTS
+    data = demo_data(NOW)
+    data.weather.clothing = Clothing(index, "テスト", "明日", ["傘を持って（降水80%）", "風が強い（9m/s）"])
+    assert render(data, fonts).size == (1024, 758)

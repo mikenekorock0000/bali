@@ -124,3 +124,97 @@ def battery(draw, x: float, y: float, w: float, h: float, level: int | None,
         inner = (w - nub - 2 * pad) * max(0, min(level, 100)) / 100
         if inner > 0:
             draw.rectangle((x + pad, y + pad, x + pad + inner, y + h - pad), fill=fg)
+
+
+# ---------------------------------------------------------------- 服装のイラスト
+
+def _body(sleeve: str, neck_dip: float, hem: float = 0.92, flare: float = 0.0):
+    """服の外形（左半分を作って左右反転）。座標は 0〜1 の正方形内。"""
+    left = [(0.38, 0.1), (0.18, 0.17)]
+    if sleeve == "short":
+        left += [(0.02, 0.4), (0.14, 0.48), (0.25, 0.38)]
+    else:  # long
+        left += [(0.03, 0.84), (0.15, 0.87), (0.26, 0.4)]
+    left += [(0.25 - flare, hem)]
+    right = [(1 - x, y) for x, y in reversed(left)]
+    return left + right + [(0.5, neck_dip)]
+
+
+def _tank():
+    return [(0.3, 0.06), (0.4, 0.06), (0.5, 0.28), (0.6, 0.06), (0.7, 0.06),
+            (0.78, 0.4), (0.78, 0.92), (0.22, 0.92), (0.22, 0.4)]
+
+
+GARMENTS = {90: "tank", 80: "tshirt", 70: "cardigan", 60: "shirt", 50: "sweater",
+            40: "jacket", 30: "coat", 20: "down", 10: "down_scarf"}
+
+
+def garment(draw, kind: str, x: float, y: float, s: float, fg=BLACK, bg=WHITE, shade=187) -> None:
+    """(x, y) を左上とする一辺 s の枠に服のイラストを描く。"""
+    w = max(2, round(s * 0.05))
+
+    def P(pts):
+        return [(x + px * s, y + py * s) for px, py in pts]
+
+    def line(*pts):
+        draw.line(P(pts), fill=fg, width=w, joint="curve")
+
+    def dot(px, py, r=0.025):
+        draw.ellipse((x + (px - r) * s, y + (py - r) * s, x + (px + r) * s, y + (py + r) * s), fill=fg)
+
+    def outline(pts, fill=bg):
+        draw.polygon(P(pts), fill=fill)
+        draw.line(P(pts + pts[:1]), fill=fg, width=w, joint="curve")
+
+    if kind == "tank":
+        outline(_tank())
+    elif kind == "tshirt":
+        outline(_body("short", 0.18))
+    elif kind == "cardigan":
+        outline(_body("long", 0.55))
+        draw.polygon(P([(0.38, 0.1), (0.62, 0.1), (0.5, 0.55)]), fill=shade)  # 中に着た T シャツ
+        line((0.5, 0.55), (0.5, 0.92))
+        for py in (0.62, 0.72, 0.82):
+            dot(0.44, py)
+    elif kind == "shirt":
+        outline(_body("long", 0.18))
+        outline([(0.38, 0.1), (0.5, 0.2), (0.4, 0.26)])  # 襟
+        outline([(0.62, 0.1), (0.5, 0.2), (0.6, 0.26)])
+        line((0.5, 0.2), (0.5, 0.92))
+        for py in (0.36, 0.52, 0.68, 0.84):
+            dot(0.55, py, 0.02)
+    elif kind == "sweater":
+        outline(_body("long", 0.17))
+        line((0.25, 0.82), (0.75, 0.82))  # 裾のリブ
+        line((0.07, 0.76), (0.18, 0.79))  # 袖口
+        line((0.93, 0.76), (0.82, 0.79))
+        line((0.3, 0.45), (0.38, 0.38), (0.46, 0.45), (0.54, 0.38), (0.62, 0.45), (0.7, 0.38))  # 柄
+    elif kind in ("jacket", "coat"):
+        coat = kind == "coat"
+        hem = 1.0 if coat else 0.92
+        outline(_body("long", 0.5, hem, 0.04 if coat else 0.0))
+        draw.polygon(P([(0.38, 0.1), (0.62, 0.1), (0.5, 0.5)]), fill=shade)
+        outline([(0.38, 0.1), (0.31, 0.3), (0.5, 0.5)])  # 襟（ラペル）
+        outline([(0.62, 0.1), (0.69, 0.3), (0.5, 0.5)])
+        line((0.5, 0.5), (0.5, hem))
+        if coat:
+            for px in (0.42, 0.58):
+                for py in (0.58, 0.74):
+                    dot(px, py)
+            line((0.25, 0.66), (0.75, 0.66))  # ベルト
+        else:
+            dot(0.45, 0.6)
+            dot(0.45, 0.75)
+            line((0.29, 0.74), (0.4, 0.74))  # ポケット
+            line((0.6, 0.74), (0.71, 0.74))
+    elif kind in ("down", "down_scarf"):
+        outline(_body("long", 0.12, 0.9))
+        outline([(0.36, 0.02), (0.64, 0.02), (0.64, 0.14), (0.36, 0.14)])  # 高い襟
+        for py in (0.34, 0.52, 0.7):  # キルティング
+            line((0.27, py), (0.73, py))
+            line((0.1, py + 0.12), (0.22, py + 0.08))
+            line((0.9, py + 0.12), (0.78, py + 0.08))
+        line((0.5, 0.14), (0.5, 0.9))  # ファスナー
+        if kind == "down_scarf":
+            draw.rounded_rectangle(P([(0.3, 0.08), (0.7, 0.22)]), radius=s * 0.05, fill=fg)
+            draw.polygon(P([(0.54, 0.2), (0.66, 0.2), (0.7, 0.56), (0.58, 0.58)]), fill=fg)

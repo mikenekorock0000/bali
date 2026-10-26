@@ -118,6 +118,11 @@ class Canvas:
     def umbrella(self, cx, cy, size):
         icons.umbrella(self.d, cx * self.s, cy * self.s, size * self.s)
 
+    def garment(self, index, x, y, size, fg=BLACK, bg=WHITE, shade=LIGHT):
+        kind = icons.GARMENTS.get(index)
+        if kind:
+            icons.garment(self.d, kind, x * self.s, y * self.s, size * self.s, fg, bg, shade)
+
     def battery(self, x, y, w, h, level):
         icons.battery(self.d, x * self.s, y * self.s, w * self.s, h * self.s, level)
 
@@ -205,23 +210,48 @@ def draw_indoor(c: Canvas, ind: Indoor | None):
 
 
 def draw_clothing(c: Canvas, w: Weather | None):
-    """時計・天気の下の帯: [今日の服装] 60 長袖シャツで快適　傘を持って（降水80%）・…"""
+    """時計・天気の下の帯。左に服のイラスト、右に服装指数とひとこと。"""
     cl = w.clothing if w else None
     if cl is None:
         return
-    y, x1 = 256, c.w - M
-    x = M + c.label_box(M, y - 13, f"{cl.day_label}の服装") + 10
-    x += c.text(x, y, str(cl.index), 24, "Bold", anchor="lm") + 10
-    x += c.text(x, y, cl.phrase, 21, "Bold", anchor="lm") + 18
-    tips = list(cl.tips)
-    while tips and c.text_width("・".join(tips), 17, "Medium") > x1 - x:
-        tips.pop()  # 入りきらないひとことは後ろから省く
-    if tips:
-        c.text(x, y, "・".join(tips), 17, "Medium", anchor="lm")
+    top, x1 = 238, c.w - M
+    c.garment(cl.index, M, top + 2, 66)
+
+    x = M + 82
+    y = top + 19
+    x += c.label_box(x, y - 13, f"{cl.day_label}の服装") + 12
+    x += c.text(x, y + 1, str(cl.index), 28, "Bold", anchor="lm") + 12
+    c.text(x, y, cl.phrase, 25, "Bold", anchor="lm")
+
+    # 右側: 寒い（10）〜暑い（90）の 9 段階を並べ、今日の段階を反転表示する
+    step, size = 50, 40
+    gx0 = x1 - 9 * step + (step - size) / 2
+    for i, index in enumerate(sorted(icons.GARMENTS)):
+        gx = gx0 + i * step
+        if index == cl.index:
+            c.rect(gx - 5, top + 2, gx + size + 5, top + size + 12, fill=DARK)
+            c.garment(index, gx, top + 7, size, fg=WHITE, bg=DARK, shade=GRAY)
+        else:
+            c.garment(index, gx, top + 7, size, fg=GRAY, bg=WHITE, shade=WHITE)
+    c.text(gx0 - 4, top + 62, "寒い", 12, "Medium", fill=GRAY, anchor="lm")
+    c.text(x1, top + 62, "暑い", 12, "Medium", fill=GRAY, anchor="rm")
+
+    # 2 行目: ひとこと（傘には傘の絵）。入りきらないものは後ろから省く
+    x1 = gx0 - 16
+    x, y = M + 84, top + 52
+    for tip in cl.tips:
+        icon = 18 if tip.startswith("傘") else 0
+        width = icon + c.text_width(tip, 17, "Medium")
+        if x + width > x1:
+            break
+        if icon:
+            c.umbrella(x + icon / 2, y, icon)
+        c.text(x + icon + (4 if icon else 0), y, tip, 17, "Medium", anchor="lm")
+        x += width + 24
 
 
 def draw_hourly(c: Canvas, w: Weather | None):
-    top, bottom = 276, 396
+    top, bottom = 312, 408
     c.line(M, top, c.w - M, top, 3)
     c.line(M, bottom, c.w - M, bottom, 3)
     slots = w.hourly if w else []
@@ -234,14 +264,14 @@ def draw_hourly(c: Canvas, w: Weather | None):
         if i >= len(slots):
             continue
         s, cx = slots[i], x0 + cw / 2
-        c.text(cx, 282, f"{s.time.hour}時", 18, "SemiBold", anchor="ma")
-        c.weather_icon(s.code, cx, 329, 40, s.is_day)
-        c.text(cx, 349, _deg(s.temperature), 23, "Bold", anchor="ma")
+        c.text(cx, 315, f"{s.time.hour}時", 17, "SemiBold", anchor="ma")
+        c.weather_icon(s.code, cx, 352, 30, s.is_day)
+        c.text(cx, 366, _deg(s.temperature), 20, "Bold", anchor="ma")
         if s.precip_prob is not None:
             label = f"{s.precip_prob}%"
-            tw = c.text_width(label, 14, "Medium")
-            c.umbrella(cx - tw / 2 - 4, 386, 12)
-            c.text(cx - tw / 2 + 6, 386, label, 14, "Medium", anchor="lm")
+            tw = c.text_width(label, 13, "Medium")
+            c.umbrella(cx - tw / 2 - 4, 397, 11)
+            c.text(cx - tw / 2 + 5, 397, label, 13, "Medium", anchor="lm")
 
 
 def draw_heading(c: Canvas, x0, x1, y, title, sub=""):
@@ -252,7 +282,7 @@ def draw_heading(c: Canvas, x0, x1, y, title, sub=""):
 
 
 def draw_daily(c: Canvas, w: Weather | None):
-    x0, x1, y = M, 470, 410
+    x0, x1, y = M, 470, 418
     draw_heading(c, x0, x1, y, "この先の天気")
     for i, d in enumerate(w.daily if w else []):
         top = y + 38 + i * 36
@@ -266,7 +296,7 @@ def draw_daily(c: Canvas, w: Weather | None):
 
 def draw_market(c: Canvas, quotes: list[Quote | str]):
     """quotes の要素が str のときは、まだ取得できていない銘柄のラベル。"""
-    x0, x1, y = M, 470, 562
+    x0, x1, y = M, 470, 570
     times = [q.time for q in quotes if isinstance(q, Quote) and q.time]
     t = max(times) if times else None
     sub = f"{t.month}/{t.day} {t:%H:%M}時点" if t else ""
@@ -293,7 +323,7 @@ def draw_market(c: Canvas, quotes: list[Quote | str]):
 
 
 def draw_news(c: Canvas, news: list[str], label: str):
-    x0, x1, y = 490, c.w - M, 410
+    x0, x1, y = 490, c.w - M, 418
     draw_heading(c, x0, x1, y, "主要ニュース", label)
     if not news:
         c.text(x0 + 8, y + 56, "ニュースを取得できません", 18, "Medium", fill=GRAY, anchor="lm")
