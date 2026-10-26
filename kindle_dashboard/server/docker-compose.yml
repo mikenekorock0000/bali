@@ -11,5 +11,7 @@ services:
       # SwitchBot（室内の温湿度・CO2）を使う場合は .env に書く
       - SWITCHBOT_TOKEN=${SWITCHBOT_TOKEN:-}
       - SWITCHBOT_SECRET=${SWITCHBOT_SECRET:-}
+      # Google カレンダーの「iCal 形式の非公開 URL」（複数ならカンマ区切り）
+      - CALENDAR_ICS_URLS=${CALENDAR_ICS_URLS:-}
     volumes:
       - ./config:/config:ro  # config/config.json を置く

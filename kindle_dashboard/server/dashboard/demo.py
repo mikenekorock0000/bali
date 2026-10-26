@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from .clothing import Clothing, HourPoint
+from .gcal import Event
 from .render import DashboardData
 from .sources import Current, DaySlot, HourSlot, Indoor, Quote, Weather
 
@@ -17,6 +18,23 @@ def demo_day_hours(now: datetime) -> list[HourPoint]:
             100, 100, 100, 98, 98, 98, 98, 95]
     return [HourPoint(midnight + timedelta(hours=h), t, t + 1, p, 2.0)
             for h, (t, p) in enumerate(zip(temps, pops))]
+
+
+def demo_events(now: datetime) -> list[Event]:
+    day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    def at(h, m=0):
+        return day + timedelta(hours=h, minutes=m)
+
+    return [
+        Event("燃えるゴミの日", day, day + timedelta(days=1), True),
+        Event("朝ラン", at(6), at(6, 45), False),
+        Event("子ども 遠足（お弁当）", at(7, 30), at(8), False),
+        Event("チーム定例", at(10), at(11), False),
+        Event("歯医者", at(13, 30), at(14, 30), False),
+        Event("○○さんと打ち合わせ（オンライン）", at(16), at(17), False),
+        Event("ジム", at(19), at(20), False),
+    ]
 
 
 def demo_data(now: datetime) -> DashboardData:
@@ -57,5 +75,6 @@ def demo_data(now: datetime) -> DashboardData:
         "福岡 北九州 冠水した道路で車1台が立往生 けが人なし",
         "政府 相次ぐ不正アクセス受け今夜関係閣僚会議開催へ",
     ]
-    return DashboardData(now=now, weather=weather, quotes=quotes, news=news,
+    events = demo_events(now) if 3 <= now.hour < 9 else None  # 既定の時間帯は予定を出す
+    return DashboardData(now=now, weather=weather, quotes=quotes, news=news, events=events,
                          indoor=Indoor(24.5, 67, 623), battery=96)

@@ -13,7 +13,7 @@ from typing import Callable
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
-from . import sources
+from . import gcal, sources
 from .render import DashboardData, Fonts, png_bytes, render, to_kindle
 from .store import DataStore
 
@@ -30,7 +30,7 @@ DEFAULT_CONFIG = {
     "clock": {"font": "DMSerifDisplay-Regular.ttf"},
     "host": "0.0.0.0",
     "port": 8080,
-    "refresh_minutes": {"weather": 10, "market": 5, "news": 15, "indoor": 5},
+    "refresh_minutes": {"weather": 10, "market": 5, "news": 15, "indoor": 5, "calendar": 15},
     "news": {"url": "https://www.nhk.or.jp/rss/news/cat0.xml", "count": 7, "label": "NHKニュース"},
     # source: yahoo（為替・指数, symbol）/ mufg（三菱UFJアセットの投信, code=協会コード）
     #         / toushin（投信協会 CSV・全ファンド対応, isin と code=協会コード）
@@ -42,6 +42,9 @@ DEFAULT_CONFIG = {
          "unit": "円", "decimals": 0, "refresh_minutes": 60},  # iFreeNEXT FANG+インデックス
     ]},
     "indoor": {"provider": "none", "device_id": ""},
+    # Google カレンダー: window の時間帯だけニュース欄を今日の予定に替える。
+    # ics_urls は「iCal 形式の非公開 URL」（環境変数 CALENDAR_ICS_URLS でも可）
+    "calendar": {"ics_urls": [], "window": ["03:00", "09:00"], "label": "今日の予定"},
     "credits": "Open-Meteo・Yahoo Finance・三菱UFJアセット・投資信託協会",
 }
 
@@ -68,6 +71,9 @@ def build_store(cfg: dict, now: Callable[[], datetime], env=os.environ) -> DataS
     store.add("news", "ニュース", lambda: sources.fetch_news(cfg), ttl["news"])
     if (cfg.get("indoor") or {}).get("provider") == "switchbot":
         store.add("indoor", "室内", lambda: sources.fetch_indoor(cfg, env), ttl["indoor"])
+    urls = gcal.calendar_urls(cfg, env)
+    if urls:
+        store.add("calendar", "予定", lambda: gcal.fetch_events(urls, now()), ttl["calendar"])
     return store
 
 
@@ -79,8 +85,14 @@ class Dashboard:
     def data(self) -> DashboardData:
         dev = self.store.device
         get = lambda name: self.store.get(name) if name in self.store.sources else None  # noqa: E731
+        now = self.now()
+        cal = self.cfg["calendar"]
+        # 時間帯内で予定が取得できていればニュースの代わりに出す（取得失敗中はニュースのまま）
+        events = get("calendar") if gcal.in_window(now, cal["window"]) else None
         return DashboardData(
-            now=self.now(),
+            now=now,
+            events=events,
+            events_label=cal.get("label", "今日の予定"),
             weather=get("weather"),
             quotes=[src.value or src.label for n, src in self.store.sources.items() if n.startswith("market")],
             news=get("news") or [],

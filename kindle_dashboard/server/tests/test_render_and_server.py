@@ -170,3 +170,12 @@ def test_clock_font_axes():
     assert f.path.endswith("Archivo-VF.ttf")
     narrow = Fonts(None, SERVER_DIR, {"font": "Archivo-VF.ttf", "axes": {"Weight": 900, "Width": 62}}).clock(40)
     assert f.getlength("14:19") > narrow.getlength("14:19")
+
+
+@pytest.mark.parametrize("count", [0, 3, 12])
+def test_render_events_panel(fonts, count):
+    from dashboard.demo import demo_events
+    events = (demo_events(NOW) * 2)[:count]
+    data = demo_data(NOW)
+    data.events = events
+    assert render(data, fonts).size == (1024, 758)

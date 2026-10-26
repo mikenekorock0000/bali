@@ -1,2 +1,4 @@
 Pillow>=10.1
+icalendar>=6
+recurring-ical-events>=3
 tzdata; sys_platform == "win32"

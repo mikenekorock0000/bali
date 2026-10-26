@@ -41,8 +41,12 @@ def cmd_serve(cfg: dict, fonts: Fonts) -> None:
         pass
 
 
-def cmd_render(cfg: dict, fonts: Fonts, demo: bool, out: Path) -> None:
+def cmd_render(cfg: dict, fonts: Fonts, demo: bool, out: Path, at: str | None = None) -> None:
     now = clock(cfg)
+    if at:  # 表示の確認用に時刻を固定する（例 --at 07:30）
+        h, m = map(int, at.split(":"))
+        fixed = now().replace(hour=h, minute=m, second=0, microsecond=0)
+        now = lambda: fixed  # noqa: E731
     if demo:
         data = demo_data(now())
     else:
@@ -68,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     r = sub.add_parser("render", help="画像を1枚書き出す")
     r.add_argument("--demo", action="store_true", help="ダミーデータで描画")
     r.add_argument("--out", type=Path, default=SERVER_DIR / "out")
+    r.add_argument("--at", metavar="HH:MM", help="この時刻として描画する（予定の表示確認など）")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -75,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     fonts = Fonts(cfg.get("font_path"), SERVER_DIR, cfg.get("clock"))
 
     if args.cmd == "render":
-        cmd_render(cfg, fonts, args.demo, args.out)
+        cmd_render(cfg, fonts, args.demo, args.out, args.at)
     else:
         cmd_serve(cfg, fonts)
     return 0
