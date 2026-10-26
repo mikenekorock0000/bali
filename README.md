@@ -14,4 +14,4 @@
 
 - アプリ: [madamis_app/](madamis_app/)
 - 設計書: [docs/DESIGN.md](docs/DESIGN.md)
-- Kindle ダッシュボード: [kindle_dashboard/](kindle_dashboard/)（調査・脱獄手順: [docs/kindle-dashboard/](docs/kindle-dashboard/README.md)）
+- Kindle ダッシュボード: [kindle_dashboard/](kindle_dashboard/)（NAS 設置: [NAS_SETUP.md](kindle_dashboard/NAS_SETUP.md)・[dist/](kindle_dashboard/dist/)）（調査・脱獄手順: [docs/kindle-dashboard/](docs/kindle-dashboard/README.md)）
