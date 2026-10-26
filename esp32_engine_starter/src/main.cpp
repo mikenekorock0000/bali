@@ -1077,7 +1077,11 @@ void loop() {
   if (battery.valid()) recordHistory(battery.volts());
   // 起動して Wi-Fi につながったら、すぐ 1 回送る（そのあとは 5 分ごとと、出来事のたび）
   bool firstState = lastStateMs == 0 && !parkTimerWake && WiFi.status() == WL_CONNECTED;
-  if (firstState || now - lastStateMs >= STATE_PUBLISH_MS || (stateDirty && now - lastStateMs >= STATE_MIN_GAP_MS) ||
+  // ntfy.sh の 1 日の上限に近づいたら、状態の送信を 1 時間ごとに減らす（通知の分を残す）
+  bool slowState = notifier.sentLast24h(now) >= NTFY_DAILY_SOFT;
+  uint32_t stateEvery = slowState ? STATE_SLOW_MS : STATE_PUBLISH_MS;
+  uint32_t stateGap = slowState ? STATE_SLOW_MS : STATE_MIN_GAP_MS;
+  if (firstState || now - lastStateMs >= stateEvery || (stateDirty && now - lastStateMs >= stateGap) ||
       (parkTimerWake && lastStateMs == 0 && now - wakeMs >= PARK_KEY_SCAN_MS)) {
     publishState(now);
   }

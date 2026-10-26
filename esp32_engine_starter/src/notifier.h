@@ -20,6 +20,7 @@ class Notifier {
   void pollSoon() { pollNow_ = true; }
   uint32_t pollCount() const { return polls_; }  // 指示用トピックを読めた回数
   uint32_t sentCount() const { return sent_; }   // 送れた通知・状態の数
+  int sentLast24h(uint32_t nowMs);                // 直近 24 時間に送った件数（ntfy.sh の 1 日の上限の目安）
   // スリープをまたいで「どこまで読んだか」を引き継ぐ（空ならまだ読んでいない）
   String since() const { return since_; }
   void resumeFrom(const String& since) {
@@ -53,6 +54,9 @@ class Notifier {
   bool pollNow_ = false;
   uint32_t polls_ = 0;
   uint32_t sent_ = 0;
+  uint32_t dayStartMs_ = 0;
+  int dayCount_ = 0;
+  void countPost(uint32_t nowMs);
   String state_;
   String cmds_[4];
   String urls_[4];

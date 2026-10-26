@@ -85,9 +85,12 @@ constexpr uint32_t WIFI_FAIL_SETUP_MS = 3 * 60000UL; // ACC ON のままこの�
 constexpr uint32_t WIFI_SWITCH_MS = 20000;           // つながらないとき、予備の Wi-Fi と交互に試す間隔
 
 // ---- ダッシュボード（状態のトピックに JSON を送る） ----
-#define FW_VERSION "1.2.1"
-constexpr uint32_t STATE_PUBLISH_MS = 5 * 60000UL;   // 起きている間に状態を送る間隔
-constexpr uint32_t STATE_MIN_GAP_MS = 10000;         // 出来事のたびに送るときの最短間隔
+#define FW_VERSION "1.2.2"
+// ntfy.sh の無料の範囲は 1 日 250 件（送り元の IP ごと）。通知を優先し、状態の送信はその内に収める
+constexpr uint32_t STATE_PUBLISH_MS = 15 * 60000UL;  // 起きている間に状態を送る間隔（1 日 96 件）
+constexpr uint32_t STATE_MIN_GAP_MS = 60000;         // 出来事のたびに送るときの最短間隔
+constexpr int NTFY_DAILY_SOFT = 180;                 // 24 時間にこの件数を送ったら、状態の送信を減らす
+constexpr uint32_t STATE_SLOW_MS = 60 * 60000UL;     // そのときの状態の送信間隔
 constexpr uint32_t HIST_INTERVAL_SEC = 15 * 60;      // 電圧・温度の履歴を記録する間隔
 constexpr int HIST_POINTS = 96;                      // 履歴の点数（15 分 × 96 ＝ 24 時間）
 
@@ -102,7 +105,7 @@ constexpr uint32_t CMD_MAX_FUTURE_SEC = 5 * 60;      // 時計のずれの許容
 
 // ---- 盗難の検知 ----
 constexpr uint32_t ACC_NO_KEY_GRACE_MS = 30000;      // ACC ON からこの時間キーが見つからなければ盗難の疑い
-constexpr uint32_t TRACK_STATE_MS = 30000;           // 追跡中に状態（位置）を送る間隔
+constexpr uint32_t TRACK_STATE_MS = 3 * 60000UL;    // 追跡中に状態（位置）を送る間隔（30 秒ごとでは ntfy.sh の 1 日の上限を 2 時間で使い切る）
 constexpr uint32_t TRACK_NOTIFY_MS = 3 * 60000UL;    // 追跡中に位置を通知する間隔
 constexpr bool PARK_GPS_CHECK = true;                // 駐車モードで起きるたびに GPS（J8 のもの）で位置を確かめる
 constexpr uint32_t PARK_GPS_WAIT_MS = 45000;         // そのとき測位を待つ最長時間

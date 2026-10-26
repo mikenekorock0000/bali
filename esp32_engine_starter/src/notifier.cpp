@@ -74,6 +74,7 @@ bool Notifier::postState(const String& json) {
   int code = http.POST(json);
   http.end();
   Serial.printf("[state] 送信 %d\n", code);
+  if (code == 429) Serial.println("[ntfy] 送信の上限に達しました（ntfy.sh の無料の範囲は 1 日 250 件）");
   return code >= 200 && code < 300;
 }
 
@@ -115,6 +116,7 @@ void Notifier::loop(uint32_t nowMs) {
   if (count_ > 0 && static_cast<int32_t>(nowMs - nextTryMs_) >= 0) {
     if (post(q_[head_])) {
       ++sent_;
+      countPost(nowMs);
       head_ = (head_ + 1) % QUEUE;
       --count_;
       nextTryMs_ = nowMs + 500;
@@ -126,6 +128,7 @@ void Notifier::loop(uint32_t nowMs) {
   if (state_.length() && static_cast<int32_t>(nowMs - nextTryMs_) >= 0) {
     if (postState(state_)) {
       ++sent_;
+      countPost(nowMs);
       state_ = "";
       nextTryMs_ = nowMs + 500;
     } else {
@@ -138,6 +141,20 @@ void Notifier::loop(uint32_t nowMs) {
     lastPollMs_ = nowMs;
     pollCommands();
   }
+}
+
+void Notifier::countPost(uint32_t nowMs) {
+  sentLast24h(nowMs);
+  ++dayCount_;
+}
+
+int Notifier::sentLast24h(uint32_t nowMs) {
+  // 24 時間ごとに数え直す（正確な移動窓ではなく目安）
+  if (nowMs - dayStartMs_ >= 24 * 3600000UL) {
+    dayStartMs_ = nowMs;
+    dayCount_ = 0;
+  }
+  return dayCount_;
 }
 
 bool Notifier::takeCommand(String& cmd, String& url) {
