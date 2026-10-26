@@ -123,6 +123,11 @@ USB で書き込むときは、基板の 12V（J1）を外すこと。
 
 指示は「指示の鍵」で署名し、ファイルの SHA-256 も署名に含めるので、他人が別のファイルを書き込ませることはできない。
 
+### push で自動更新する
+
+`src/config.h` の `FW_VERSION` を変えて push すると、GitHub Actions（`/.github/workflows/hijet-ota.yml`）がテスト・ビルドして、上と同じ遠隔更新を送る。
+GitHub の Secrets に `HIJET_CMD_KEY`・`HIJET_NTFY_SERVER`・`HIJET_CMD_TOPIC`（自前のサーバーなら `HIJET_NTFY_TOKEN` も）を入れておく。
+
 ### 書き込み方：PlatformIO
 
 `pio run -e esp32dev -t upload`（ボード・パーティション・ライブラリの版は `platformio.ini` で決めてある）。

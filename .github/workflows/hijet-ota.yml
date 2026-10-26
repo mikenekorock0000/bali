@@ -1,0 +1,84 @@
+# HIJET MONITOR：ファームウェアの版（FW_VERSION）が変わった push で、ビルドして車の ESP32 に遠隔更新を送る。
+# 版が変わらない push（ノートだけの変更など）では送らない。手動でも「Run workflow」から送れる。
+# 必要な Secrets（Settings → Secrets and variables → Actions）：
+#   HIJET_CMD_KEY       ESP32 の設定画面の「指示の鍵」（32 桁）
+#   HIJET_NTFY_SERVER   指示のサーバー（例 https://ntfy.takuya.win。ntfy.sh なら https://ntfy.sh）
+#   HIJET_CMD_TOPIC     指示のトピック
+#   HIJET_NTFY_TOKEN    そのサーバーのアクセストークン（ntfy.sh で使わないなら作らなくてよい）
+name: HIJET OTA
+
+on:
+  push:
+    branches: [claude/esp32-engine-starter-oy9iav, main]
+    paths:
+      - esp32_engine_starter/src/**
+      - esp32_engine_starter/platformio.ini
+  workflow_dispatch:
+
+# 続けて push しても、更新は 1 つずつ順に送る（古い版が後から届かないように、途中のものは取り消す）
+concurrency:
+  group: hijet-ota
+  cancel-in-progress: true
+
+jobs:
+  ota:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: esp32_engine_starter
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 版が変わったか
+        id: ver
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          now=$(grep -oP 'FW_VERSION "\K[^"]+' src/config.h)
+          echo "version=$now" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "send=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          prev=""
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            prev=$(git show "$BEFORE:esp32_engine_starter/src/config.h" 2>/dev/null | grep -oP 'FW_VERSION "\K[^"]+' || true)
+          fi
+          echo "前の版=$prev 今の版=$now"
+          if [ -n "$prev" ] && [ "$prev" != "$now" ]; then echo "send=true" >> "$GITHUB_OUTPUT"; else echo "send=false" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/setup-python@v5
+        if: steps.ver.outputs.send == 'true'
+        with:
+          python-version: "3.12"
+
+      - name: PlatformIO を入れる
+        if: steps.ver.outputs.send == 'true'
+        run: pip install platformio==6.1.16
+
+      - name: テスト
+        if: steps.ver.outputs.send == 'true'
+        run: pio test -e native
+
+      - name: ビルド
+        if: steps.ver.outputs.send == 'true'
+        run: pio run -e esp32dev
+
+      - name: 車の ESP32 に送る
+        if: steps.ver.outputs.send == 'true'
+        env:
+          HIJET_CMD_KEY: ${{ secrets.HIJET_CMD_KEY }}
+          HIJET_NTFY_SERVER: ${{ secrets.HIJET_NTFY_SERVER }}
+          HIJET_CMD_TOPIC: ${{ secrets.HIJET_CMD_TOPIC }}
+          HIJET_NTFY_TOKEN: ${{ secrets.HIJET_NTFY_TOKEN }}
+        run: python3 tools/ota_send.py .pio/build/esp32dev/firmware.bin
+
+      - name: ファームウェアを残す
+        if: steps.ver.outputs.send == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ steps.ver.outputs.version }}
+          path: esp32_engine_starter/.pio/build/esp32dev/firmware.bin
+          retention-days: 30
