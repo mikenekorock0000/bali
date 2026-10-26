@@ -111,6 +111,7 @@ uint32_t wifiTryMs = 0;
 bool wifiOnSecond = false;
 uint32_t wifiDownSince = 0;  // ACC ON で Wi-Fi が切れている時間を測る（0 なら測っていない）
 uint32_t lastStateMs = 0;
+uint32_t stateEverySec = STATE_PUBLISH_MS / 1000;  // 状態を送る間隔（ダッシュボードが「応答なし」を判断するのに使う）
 bool stateDirty = true;       // 出来事があったので状態を送りたい
 bool sleepingSoon = false;    // これから眠る（状態に入れて、ダッシュボードに休止中と出す）
 uint32_t setupBtnSince = 0;
@@ -513,6 +514,7 @@ String stateJson(uint32_t now) {
   d["fix"] = gps.hasFix(now);
   if (tracking) d["trk"] = true;
   if (lastCmdTs) d["cts"] = lastCmdTs;  // ダッシュボードは、これより後の時刻で署名する
+  d["si"] = tracking ? TRACK_STATE_MS / 1000 : stateEverySec;  // 状態を送る間隔（秒）
   if (resetReason[0]) d["rst"] = resetReason;
   if (otaPending) d["ota"] = "verifying";
   if (gps.present()) d["gsrc"] = gps.source();
@@ -1080,6 +1082,7 @@ void loop() {
   // ntfy.sh の 1 日の上限に近づいたら、状態の送信を 1 時間ごとに減らす（通知の分を残す）
   bool slowState = notifier.sentLast24h(now) >= NTFY_DAILY_SOFT;
   uint32_t stateEvery = slowState ? STATE_SLOW_MS : STATE_PUBLISH_MS;
+  stateEverySec = stateEvery / 1000;
   uint32_t stateGap = slowState ? STATE_SLOW_MS : STATE_MIN_GAP_MS;
   if (firstState || now - lastStateMs >= stateEvery || (stateDirty && now - lastStateMs >= stateGap) ||
       (parkTimerWake && lastStateMs == 0 && now - wakeMs >= PARK_KEY_SCAN_MS)) {

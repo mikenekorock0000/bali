@@ -323,7 +323,7 @@ function render() {
   const s = state, now = Date.now() / 1000;
   const age = now - (stateAt || s.t || now);
   // 接続の状態：休止中なら「最大 15 分 + 余裕」までは正常
-  const expect = s.sleep ? (s.wake || 900) + 300 : 600;
+  const expect = s.sleep ? (s.wake || 900) + 300 : (s.si || 900) + 300;
   if (age <= expect) setConn(s.sleep ? "warn" : "ok", (s.sleep ? "駐車モードで休止中" : "動作中") + "・" + ago(age));
   else setConn("bad", "応答なし・最終 " + ago(age));
 

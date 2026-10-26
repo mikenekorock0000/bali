@@ -85,7 +85,7 @@ constexpr uint32_t WIFI_FAIL_SETUP_MS = 3 * 60000UL; // ACC ON のままこの�
 constexpr uint32_t WIFI_SWITCH_MS = 20000;           // つながらないとき、予備の Wi-Fi と交互に試す間隔
 
 // ---- ダッシュボード（状態のトピックに JSON を送る） ----
-#define FW_VERSION "1.2.2"
+#define FW_VERSION "1.2.3"
 // ntfy.sh の無料の範囲は 1 日 250 件（送り元の IP ごと）。通知を優先し、状態の送信はその内に収める
 constexpr uint32_t STATE_PUBLISH_MS = 15 * 60000UL;  // 起きている間に状態を送る間隔（1 日 96 件）
 constexpr uint32_t STATE_MIN_GAP_MS = 60000;         // 出来事のたびに送るときの最短間隔
