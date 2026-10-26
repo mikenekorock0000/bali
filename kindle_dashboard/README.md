@@ -92,21 +92,32 @@ python serve.py                  # 配信開始 → 表示された http://<IP>:
 
 ### 時計のフォント
 
-`config.json` に `"clock": {"font": "Outfit-VF.ttf", "weight": "Light"}` のように書く（既定は Outfit Light）。
-見本: [clock_candidates.png](../docs/kindle-dashboard/clock_candidates.png)
+`config.json` に `"clock": {"font": "ZenDots-Regular.ttf"}` のように書く（既定は DM Serif Display）。
+見本: [clock_candidates.png](../docs/kindle-dashboard/clock_candidates.png)、
+横長の太字（左から DM Serif / Zen Dots / Unbounded Black）: [clock_wide_candidates.png](../docs/kindle-dashboard/clock_wide_candidates.png)
 
 | 見本 | `font` | `weight` | 雰囲気 |
 |---|---|---|---|
-| A | `Outfit-VF.ttf` | `Light`（既定）/ `Regular` | 細めで現代的・丸みあり |
+| A | `Outfit-VF.ttf` | `Light` / `Regular` | 細めで現代的・丸みあり |
 | B | `Outfit-VF.ttf` | `Medium` | A を太くした版。遠くからも読みやすい |
 | C | `Montserrat-VF.ttf` | `Light` | 幾何学的で上品 |
 | D | `JosefinSans-VF.ttf` | `Light` | 細く背が低い・クラシック |
 | E | `BebasNeue-Regular.ttf` | （なし） | 縦長で力強い |
 | F | `Oswald-VF.ttf` | `Light` | 縦長・すっきり |
-| H | `DMSerifDisplay-Regular.ttf` | （なし） | セリフ体・雑誌風 |
+| H | `DMSerifDisplay-Regular.ttf` | （なし） | セリフ体・雑誌風（既定） |
 | I | `SpaceGrotesk-VF.ttf` | `Light` | 個性的な「1」 |
 | J | `Urbanist-VF.ttf` | `Thin` | とても細い（E-ink では薄く見えることあり） |
 | K | `Lexend-VF.ttf` | `ExtraLight` | 細めで読みやすい |
+| L | `ZenDots-Regular.ttf` | （なし） | 横長の太字・Horizon 風（0 に斜線） |
+| M | `Unbounded-VF.ttf` | `Black` / `Bold` | 横長の太字・Horizon 風 |
+| N | `KronaOne-Regular.ttf` | （なし） | 横長の太字 |
+| O | `Orbitron-VF.ttf` | `Black` | 横長・SF 風 |
+| P | `Archivo-VF.ttf` | `"axes": {"Weight": 900, "Width": 125}` | 横長の極太（幅も指定） |
+
+- 太さだけでなく幅なども変えられるフォントは `weight` の代わりに `"axes": {"Weight": 900, "Width": 125}` のように数値で指定できる。
+- 手持ちのフォント（例: Horizon）を使うときは、Docker なら `config` フォルダに置いて `"font": "/config/Horizon.otf"`
+  のように絶対パスで指定する（Google Fonts にない有料・個人配布フォントは同梱していない。ライセンスは各自で確認）。
+- 数字は日付の下の空間で上下中央に置くので、横長のフォントでも間延びしない。
 
 可変フォント（`-VF`）の `weight` は `Thin` `ExtraLight` `Light` `Regular` `Medium` `SemiBold` `Bold` などから選べる。
 

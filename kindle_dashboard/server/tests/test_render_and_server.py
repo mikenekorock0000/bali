@@ -161,4 +161,12 @@ def test_clock_font_falls_back_when_missing():
     fonts = Fonts(None, SERVER_DIR, {"font": "no-such-font.ttf", "weight": "Light"})
     assert fonts.clock(40).path == fonts.get(40, "Bold").path
     chosen = Fonts(None, SERVER_DIR, DEFAULT_CONFIG["clock"])
-    assert chosen.clock(40).path.endswith("Outfit-VF.ttf")
+    assert chosen.clock(40).path.endswith("DMSerifDisplay-Regular.ttf")
+
+
+def test_clock_font_axes():
+    fonts = Fonts(None, SERVER_DIR, {"font": "Archivo-VF.ttf", "axes": {"Weight": 900, "Width": 125}})
+    f = fonts.clock(40)
+    assert f.path.endswith("Archivo-VF.ttf")
+    narrow = Fonts(None, SERVER_DIR, {"font": "Archivo-VF.ttf", "axes": {"Weight": 900, "Width": 62}}).clock(40)
+    assert f.getlength("14:19") > narrow.getlength("14:19")

@@ -50,7 +50,9 @@ class Fonts:
                  clock: dict | None = None):
         candidates = ([path] if path else []) + FONT_CANDIDATES
         base = base_dir or Path.cwd()
-        self._clock_path, self._clock_weight = None, (clock or {}).get("weight", "Regular")
+        self._clock_path = None
+        self._clock_weight = (clock or {}).get("weight", "Regular")
+        self._clock_axes = (clock or {}).get("axes")  # 例 {"Weight": 900, "Width": 125}
         if clock and clock.get("font"):
             p = Path(clock["font"])
             p = p if p.is_absolute() else base / "fonts" / p
@@ -84,9 +86,14 @@ class Fonts:
         if key not in self._cache:
             font = ImageFont.truetype(self._clock_path, size)
             try:
-                font.set_variation_by_name(self._clock_weight)
+                if self._clock_axes:
+                    axes = font.get_variation_axes()
+                    font.set_variation_by_axes(
+                        [self._clock_axes.get(a["name"].decode(), a["default"]) for a in axes])
+                else:
+                    font.set_variation_by_name(self._clock_weight)
             except (OSError, ValueError):
-                pass
+                pass  # 可変フォントでなければそのまま
             self._cache[key] = font
         return self._cache[key]
 
@@ -183,7 +190,11 @@ def draw_clock(c: Canvas, now: datetime):
     size = 176
     while size > 60 and c.fonts.clock(round(size * c.s)).getlength(hm) / c.s > 436:
         size -= 4
-    c.d.text(((M - 2) * c.s, 222 * c.s), hm, font=c.fonts.clock(round(size * c.s)), fill=BLACK, anchor="ls")
+    # 字形の上下の範囲で、日付の下（70〜224）の中央に置く（横長のフォントでも間延びしない）
+    font = c.fonts.clock(round(size * c.s))
+    _, top, _, bottom = font.getbbox(hm, anchor="ls")
+    baseline = (70 + 224) / 2 * c.s - (top + bottom) / 2
+    c.d.text(((M - 2) * c.s, baseline), hm, font=font, fill=BLACK, anchor="ls")
 
 
 def draw_outdoor(c: Canvas, w: Weather | None):

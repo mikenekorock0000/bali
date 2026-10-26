@@ -23,6 +23,12 @@ FONTS = {
     "SpaceGrotesk-VF.ttf": "spacegrotesk/SpaceGrotesk%5Bwght%5D.ttf",
     "Urbanist-VF.ttf": "urbanist/Urbanist%5Bwght%5D.ttf",
     "Lexend-VF.ttf": "lexend/Lexend%5Bwght%5D.ttf",
+    # 横に広い太字（Horizon 風）
+    "ZenDots-Regular.ttf": "zendots/ZenDots-Regular.ttf",
+    "Unbounded-VF.ttf": "unbounded/Unbounded%5Bwght%5D.ttf",
+    "KronaOne-Regular.ttf": "kronaone/KronaOne-Regular.ttf",
+    "Orbitron-VF.ttf": "orbitron/Orbitron%5Bwght%5D.ttf",
+    "Archivo-VF.ttf": "archivo/Archivo%5Bwdth,wght%5D.ttf",
 }
 
 
