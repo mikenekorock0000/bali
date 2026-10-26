@@ -289,7 +289,7 @@ done
 
 ## 7. おすすめの進め方（このプロジェクトでの TODO）
 
-1. [x] 機種: **Kindle Paperwhite 第7世代（PW3）・FW 5.15.1** → 専用手順 [paperwhite3.md](paperwhite3.md)（WinterBreak が第一候補）
+1. [x] 機種: **Kindle Paperwhite 第7世代（PW3）・FW 5.16.2.1.1** → 専用手順 [paperwhite3.md](paperwhite3.md)（WinterBreak が第一候補）
 2. [ ] 機内モードで脱獄 → Hotfix → KUAL/MRPI → OTA 無効化 → USBNetwork(SSH) → FBInk
 3. [ ] サーバー側: 写真のレイアウトを HTML で作成し、Open-Meteo / Yahoo Finance / NHK RSS / SwitchBot からデータ取得
 4. [ ] Playwright でスクショ → グレースケール PNG（機種解像度・回転）に変換 → HTTP 配信（Raspberry Pi 常駐 or GitHub Actions + Pages）

@@ -1,7 +1,7 @@
 # Kindle Paperwhite 第7世代（PW3）でダッシュボードを作る具体手順
 
 > 調査日: 2026-10-26。全体像・一般論は [README.md](README.md)。
-> 対象: **Kindle Paperwhite（第7世代・2015年, 通称 PW3）／ファームウェア 5.15.1**（Wi-Fi + 3G モデル）。
+> 対象: **Kindle Paperwhite（第7世代・2015年, 通称 PW3）／ファームウェア 5.16.2.1.1**（Wi-Fi + 3G モデル）。
 > ⚠️ 脱獄は自己責任（保証外・文鎮化リスクあり）。
 
 ## 0. この端末の前提
@@ -10,7 +10,7 @@
 |---|---|
 | 機種 | Kindle Paperwhite 第7世代（設定 → 端末オプション → 端末情報 に「第7世代」と表示） |
 | 画面 | 6インチ **1072 × 1448 px**（300ppi）、16 階調。横置きなら **1448 × 1072** で作って 90° 回転 |
-| ファームウェア | **5.15.1**（2026-10-26 に自動アップデートが始まった。PW3 の最終版は **5.16.2.1.1**） |
+| ファームウェア | **5.16.2.1.1**（PW3 の最終版。2026-10-26 に 5.15.1 から自動アップデートされた。これ以上は上がらない） |
 | 通信 | Wi-Fi（2.4GHz・WPA2 まで）。3G は国内の 3G 停波で使えないが、ダッシュボードには関係ない |
 | Amazon のサポート | 2026/5 のストア対応終了は「2012年以前の機種」が対象。PW3（2015年）は対象外 |
 
@@ -23,7 +23,7 @@
 - 空き容量は 750MB 程度あれば十分（KUAL/MRPI の導入に約 220MB 必要）。
 - まず **[KindleModding の Jailbreak Wizard](https://kindlemodding.org/jailbreak-wizard.html)** に機種とファームウェアを入れ、出てきた方法を確認する（一次情報が正）。
 
-## 2. 使える脱獄方法（5.15.1 / 5.16.2.1.1 の場合）
+## 2. 使える脱獄方法（5.16.2.1.1 の場合）
 
 > **自動アップデートについて**: Wi-Fi に繋いでいると Amazon から更新が自動で入る。PW3 の最終ファームウェアは
 > **5.16.2.1.1**（2023年）で、これ以上新しい版は出ていないため、更新されても下の 2 つの方法の範囲内に収まる。
@@ -34,7 +34,7 @@
 | **WinterBreak** | 5.18.1 より前（Paperwhite 2 以降の機種） | **第一候補**。Kindle ストア（Mesquito）経由 |
 | **LanguageBreak** | 5.16.2.1.1 以下 | WinterBreak がうまくいかないときの代替。デモモードと言語選択を使う |
 
-※ 5.15.1・5.16.2.1.1 とも両方の範囲内（5.16.2.1.1 は LanguageBreak の上限ちょうど）。WinterBreak は Kindle ストアを開く必要があるので、**端末が Amazon アカウントに登録済み**であること。
+※ 5.16.2.1.1 は両方の範囲内（LanguageBreak の上限ちょうど）。WinterBreak は Kindle ストアを開く必要があるので、**端末が Amazon アカウントに登録済み**であること。
 
 ### WinterBreak の手順
 
@@ -77,7 +77,7 @@ PW3 向けのポイント:
 ## 参考
 
 - [KindleModding – Jailbreak Wizard](https://kindlemodding.org/jailbreak-wizard.html) / [WinterBreak](https://kindlemodding.org/jailbreaking/WinterBreak/) / [LanguageBreak](https://kindlemodding.org/jailbreaking/Legacy/LanguageBreak.html)
-- [MobileRead: Introducing WinterBreak](https://www.mobileread.com/forums/showthread.php?p=4512798)（5.16.3 で不具合報告あり。5.15.1 は対応範囲内）
+- [MobileRead: Introducing WinterBreak](https://www.mobileread.com/forums/showthread.php?p=4512798)（5.16.3 で不具合報告あり。5.16.2.1.1 は対応範囲内）
 - [MobileRead: LanguageBreak](https://www.mobileread.com/forums/showthread.php?t=356872)
 - [Android Police: WinterBreak（2013年以降の機種に対応）](https://www.androidpolice.com/new-kindle-jailbreak-2025-winterbreak/)
 - [endoflife.date – Kindle（PW3 の最終版 5.16.2.1.1）](https://endoflife.date/kindle) / [LanguageBreak は 5.16.2.1.1 以下に対応（Liliputing）](https://liliputing.com/languagebreak-jailbreak-released-for-recent-kindle-devices-running-software-versions-5-16-2-1-1-or-lower/)

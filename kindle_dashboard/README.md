@@ -241,4 +241,4 @@ Kindle 側スクリプトは `lipc-*`・`eips` などをスタブにすれば PC
 - ✅ Docker: イメージのビルド、コンテナ起動、`/dash.png`・`/health` の応答、ヘルスチェック、非 root 実行、`/config` の設定読み込み。
 - ✅ Kindle 側: コマンドをスタブにした PC 上のシミュレーションで、取得 → 全面/部分リフレッシュ → 停止で UI 復帰までを確認。
 - ⚠️ 実 API（Open-Meteo / Yahoo Finance / 三菱UFJアセット / 投資信託協会 / NHK RSS / SwitchBot / Google カレンダー）は開発環境から接続できず未確認。応答形式は公開仕様・公開事例に合わせてある。NAS で起動後に `/health` で取得結果が確認できる。
-- ⚠️ Kindle 実機（PW3, FW 5.15.1）では未検証。特に `STOP_MODE`、電源ボタンでの終了、FBInk のパスは実機で確認が必要。
+- ⚠️ Kindle 実機（PW3, FW 5.16.2.1.1）では未検証。特に `STOP_MODE`、電源ボタンでの終了、FBInk のパスは実機で確認が必要。
