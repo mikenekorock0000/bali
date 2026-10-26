@@ -3,6 +3,6 @@
 set -e
 cd "$(dirname "$0")"
 mkdir -p fonts
-curl -fL -o "fonts/NotoSansJP[wght].ttf" \
+curl -fL -o "fonts/NotoSansJP-VF.ttf" \
   "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf"
-echo "fonts/NotoSansJP[wght].ttf を保存しました"
+echo "fonts/NotoSansJP-VF.ttf を保存しました"

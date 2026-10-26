@@ -6,9 +6,12 @@
 from __future__ import annotations
 
 import base64
+import csv
 import hashlib
 import hmac
+import io
 import json
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -187,7 +190,7 @@ def fetch_weather(cfg: dict, now: datetime) -> Weather:
     return parse_open_meteo(http_get_json(url), now)
 
 
-# ---------------------------------------------------------------- 市況 (Yahoo Finance 非公式 API)
+# ---------------------------------------------------------------- 市況（為替・株価指数・投資信託）
 
 @dataclass
 class Quote:
@@ -197,7 +200,8 @@ class Quote:
     price: float
     change: float
     change_pct: float
-    time: datetime | None
+    time: datetime | None = None  # 取引中の価格の時刻（為替・指数）
+    as_of: date | None = None  # 基準日（投資信託の基準価額）
 
 
 def yahoo_chart_url(symbol: str) -> str:
@@ -223,13 +227,66 @@ def parse_yahoo_chart(data: dict, label: str, unit: str, decimals: int, tz: Zone
     )
 
 
-def fetch_market(cfg: dict) -> list[Quote]:
-    tz = ZoneInfo(cfg["timezone"])
-    return [
-        parse_yahoo_chart(http_get_json(yahoo_chart_url(s["symbol"])),
-                          s["label"], s.get("unit", ""), s.get("decimals", 0), tz)
-        for s in cfg["market"]["symbols"]
-    ]
+def mufg_fund_url(association_code: str) -> str:
+    """三菱UFJアセットマネジメントの投信情報 API（eMAXIS シリーズなど同社のファンド）。"""
+    return ("https://developer.am.mufg.jp/fund_information_latest/association_fund_cd/"
+            + urllib.parse.quote(association_code))
+
+
+def parse_mufg_fund(data: dict, label: str, unit: str, decimals: int) -> Quote:
+    result = data.get("result") or {}
+    if result.get("status") != 200 or not data.get("datasets"):
+        raise ValueError(f"MUFG API error: {result.get('status')} {result.get('errmsg')}")
+    d = data["datasets"][0]
+    return Quote(
+        label=label,
+        unit=unit,
+        decimals=decimals,
+        price=float(d["nav"]),
+        change=float(str(d["cmp_prev_day"]).replace(",", "")),
+        change_pct=float(d["percentage_change"]),
+        as_of=datetime.strptime(str(d["base_date"]), "%Y%m%d").date(),
+    )
+
+
+def toushin_csv_url(isin: str, association_code: str) -> str:
+    """投資信託協会「投信総合検索ライブラリー」の基準価額 CSV（全ファンド対応）。"""
+    return ("https://toushin-lib.fwg.ne.jp/FdsWeb/FDST030000/csv-file-download?"
+            + urllib.parse.urlencode({"isinCd": isin, "associFundCd": association_code}))
+
+
+def parse_toushin_csv(raw: bytes, label: str, unit: str, decimals: int) -> Quote:
+    """1 列目が「2026年10月23日」、2 列目が基準価額の CSV から最新 2 日分で前日比を出す。"""
+    rows = []
+    for row in csv.reader(io.StringIO(raw.decode("cp932", errors="replace"))):
+        m = re.match(r"(\d{4})年(\d{1,2})月(\d{1,2})日", row[0].strip()) if len(row) >= 2 else None
+        if not m:
+            continue
+        try:
+            nav = float(row[1].replace(",", ""))
+        except ValueError:
+            continue
+        rows.append((date(*map(int, m.groups())), nav))
+    if len(rows) < 2:
+        raise ValueError("基準価額の CSV にデータがありません")
+    rows.sort()
+    (_, prev), (as_of, nav) = rows[-2], rows[-1]
+    change = nav - prev
+    return Quote(label, unit, decimals, nav, change, change / prev * 100 if prev else 0.0, as_of=as_of)
+
+
+def fetch_quote(symbol: dict, tz: ZoneInfo) -> Quote:
+    label, unit, decimals = symbol["label"], symbol.get("unit", ""), symbol.get("decimals", 0)
+    source = symbol.get("source", "yahoo")
+    if source == "mufg":
+        return parse_mufg_fund(http_get_json(mufg_fund_url(symbol["code"])), label, unit, decimals)
+    if source == "toushin":
+        raw = http_get(toushin_csv_url(symbol["isin"], symbol["code"]), timeout=30)
+        return parse_toushin_csv(raw, label, unit, decimals)
+    if source == "yahoo":
+        data = http_get_json(yahoo_chart_url(symbol["symbol"]))
+        return parse_yahoo_chart(data, label, unit, decimals, tz)
+    raise ValueError(f"未対応の source: {source}")
 
 
 # ---------------------------------------------------------------- ニュース (RSS)

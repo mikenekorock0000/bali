@@ -1,0 +1,15 @@
+services:
+  kindle-dashboard:
+    build: .
+    image: kindle-dashboard:latest
+    container_name: kindle-dashboard
+    restart: unless-stopped
+    ports:
+      - "8080:8080"  # 左側を変えれば NAS 側のポートを変更できる
+    environment:
+      - TZ=Asia/Tokyo
+      # SwitchBot（室内の温湿度・CO2）を使う場合は .env に書く
+      - SWITCHBOT_TOKEN=${SWITCHBOT_TOKEN:-}
+      - SWITCHBOT_SECRET=${SWITCHBOT_SECRET:-}
+    volumes:
+      - ./config:/config:ro  # config/config.json を置く

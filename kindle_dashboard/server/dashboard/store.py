@@ -54,7 +54,7 @@ class DataStore:
             try:
                 value = src.fetch()
             except Exception as e:  # noqa: BLE001 - どの失敗でも前回値で描画を続ける
-                log.warning("%s の取得に失敗: %s", name, e)
+                log.warning("%s の取得に失敗: %s", src.label, e)
                 with self._lock:
                     src.ok, src.error = False, str(e)
                     src.next_at = now + min(src.ttl, RETRY_AFTER_FAILURE)

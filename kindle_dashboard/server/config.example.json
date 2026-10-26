@@ -1,9 +1,57 @@
 {
-  "location": {"name": "東京", "latitude": 35.6812, "longitude": 139.7671},
+  "location": {
+    "name": "東京",
+    "latitude": 35.6812,
+    "longitude": 139.7671
+  },
   "timezone": "Asia/Tokyo",
-  "display": {"width": 1024, "height": 758, "rotate": 90},
+  "display": {
+    "width": 1024,
+    "height": 758,
+    "rotate": 90
+  },
   "port": 8080,
-  "refresh_minutes": {"weather": 10, "market": 5, "news": 15, "indoor": 5},
-  "news": {"url": "https://www.nhk.or.jp/rss/news/cat0.xml", "count": 7, "label": "NHKニュース"},
-  "indoor": {"provider": "none", "device_id": ""}
+  "refresh_minutes": {
+    "weather": 10,
+    "market": 5,
+    "news": 15,
+    "indoor": 5
+  },
+  "news": {
+    "url": "https://www.nhk.or.jp/rss/news/cat0.xml",
+    "count": 7,
+    "label": "NHKニュース"
+  },
+  "indoor": {
+    "provider": "none",
+    "device_id": ""
+  },
+  "market": {
+    "symbols": [
+      {
+        "label": "ドル円",
+        "source": "yahoo",
+        "symbol": "JPY=X",
+        "unit": "円",
+        "decimals": 2
+      },
+      {
+        "label": "S&P500",
+        "source": "mufg",
+        "code": "03311187",
+        "unit": "円",
+        "decimals": 0,
+        "refresh_minutes": 60
+      },
+      {
+        "label": "FANG+",
+        "source": "toushin",
+        "isin": "JP90C000FZD4",
+        "code": "04311181",
+        "unit": "円",
+        "decimals": 0,
+        "refresh_minutes": 60
+      }
+    ]
+  }
 }

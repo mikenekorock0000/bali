@@ -1,5 +1,7 @@
 fonts/
 out/
 config.json
+config/
+.env
 __pycache__/
 .pytest_cache/

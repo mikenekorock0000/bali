@@ -135,3 +135,48 @@ def test_fetch_indoor_disabled_returns_none():
 def test_fetch_indoor_requires_credentials():
     with pytest.raises(ValueError):
         sources.fetch_indoor({"indoor": {"provider": "switchbot", "device_id": "X"}}, {})
+
+
+def test_parse_mufg_fund():
+    # 三菱UFJアセット 投信情報 API の応答例（eMAXIS Slim 米国株式（S&P500））
+    data = {
+        "result": {"status": 200, "retcount": 1, "errcd": None, "errmsg": None},
+        "datasets": [{"fund_cd": "253266", "isin_cd": "JP90C000GKC6", "association_fund_cd": "03311187",
+                      "base_date": "20261020", "fund_name": "ｅＭＡＸＩＳ Ｓｌｉｍ 米国株式（Ｓ＆Ｐ５００）",
+                      "nav": 44943, "cmp_prev_day": "-369", "percentage_change": "-0.81"}],
+    }
+    q = sources.parse_mufg_fund(data, "S&P500", "円", 0)
+    assert (q.price, q.change, q.change_pct) == (44943, -369, -0.81)
+    assert q.as_of == date(2026, 10, 20) and q.time is None
+
+
+def test_parse_mufg_fund_not_found():
+    with pytest.raises(ValueError):
+        sources.parse_mufg_fund({"result": {"status": 404, "errmsg": "not found"}}, "x", "円", 0)
+
+
+def test_parse_toushin_csv():
+    csv_text = ("年月日,基準価額(円),純資産総額（百万円）,分配金,決算期\r\n"
+                "2026年10月21日,100256,1460000,,\r\n"
+                "2026年10月22日,100256,1460000,,\r\n"
+                "2026年10月23日,96061,1400000,,\r\n")
+    q = sources.parse_toushin_csv(csv_text.encode("cp932"), "FANG+", "円", 0)
+    assert q.price == 96061 and q.change == -4195
+    assert q.change_pct == pytest.approx(-4.184, abs=1e-3)
+    assert q.as_of == date(2026, 10, 23)
+
+
+def test_parse_toushin_csv_without_rows():
+    with pytest.raises(ValueError):
+        sources.parse_toushin_csv("年月日,基準価額(円)\r\n".encode("cp932"), "x", "円", 0)
+
+
+def test_fund_urls():
+    assert sources.mufg_fund_url("03311187").endswith("/association_fund_cd/03311187")
+    assert sources.toushin_csv_url("JP90C000FZD4", "04311181").endswith(
+        "csv-file-download?isinCd=JP90C000FZD4&associFundCd=04311181")
+
+
+def test_fetch_quote_rejects_unknown_source():
+    with pytest.raises(ValueError):
+        sources.fetch_quote({"label": "x", "source": "nope"}, TZ)

@@ -20,7 +20,7 @@ BLACK, DARK, GRAY, LIGHT, WHITE = 0, 68, 119, 187, 255
 WEEKDAYS = "月火水木金土日"
 
 FONT_CANDIDATES = [
-    "fonts/NotoSansJP[wght].ttf",
+    "fonts/NotoSansJP-VF.ttf",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf",
     "/usr/share/fonts/truetype/fonts-japanese-gothic.ttf",
@@ -33,14 +33,14 @@ FONT_CANDIDATES = [
 class DashboardData:
     now: datetime
     weather: Weather | None = None
-    quotes: list[Quote] = field(default_factory=list)
+    quotes: list[Quote | str] = field(default_factory=list)  # str は未取得の銘柄名
     news: list[str] = field(default_factory=list)
     indoor: Indoor | None = None
     battery: int | None = None
     charging: bool = False
     failing: list[str] = field(default_factory=list)
     news_label: str = "NHKニュース"
-    credits: str = "天気: Open-Meteo ／ 市況: Yahoo Finance"
+    credits: str = "天気: Open-Meteo ／ 為替: Yahoo Finance ／ 投信: 三菱UFJアセット・投資信託協会"
 
 
 class Fonts:
@@ -246,23 +246,32 @@ def draw_daily(c: Canvas, w: Weather | None):
         c.line(x0, top + 35, x1, top + 35, 1, fill=LIGHT)
 
 
-def draw_market(c: Canvas, quotes: list[Quote]):
+def draw_market(c: Canvas, quotes: list[Quote | str]):
+    """quotes の要素が str のときは、まだ取得できていない銘柄のラベル。"""
     x0, x1, y = M, 470, 562
-    times = [q.time for q in quotes if q.time]
+    times = [q.time for q in quotes if isinstance(q, Quote) and q.time]
     t = max(times) if times else None
     sub = f"{t.month}/{t.day} {t:%H:%M}時点" if t else ""
     draw_heading(c, x0, x1, y, "マーケット", sub)
     for i, q in enumerate(quotes[:3]):
         top = y + 38 + i * 39
         mid = top + 19
-        c.text(x0 + 6, mid, q.label, 16, "Medium", anchor="lm")
+        if i < 2:
+            c.line(x0, top + 38, x1, top + 38, 1, fill=LIGHT)
+        if isinstance(q, str):
+            c.text(x0 + 6, mid, q, 16, "Medium", anchor="lm")
+            c.text(x0 + 96, mid, "—", 25, "Bold", anchor="lm")
+            continue
+        if q.as_of:  # 投資信託は基準日をラベルの下に出す
+            c.text(x0 + 6, mid - 7, q.label, 16, "Medium", anchor="lm")
+            c.text(x0 + 6, mid + 11, f"{q.as_of.month}/{q.as_of.day}基準", 11, "Medium", fill=GRAY, anchor="lm")
+        else:
+            c.text(x0 + 6, mid, q.label, 16, "Medium", anchor="lm")
         vw = c.text(x0 + 96, mid, _num(q.price, q.decimals), 25, "Bold", anchor="lm")
         c.text(x0 + 100 + vw, mid + 4, q.unit, 13, "Medium", anchor="lm")
         mark = "▲" if q.change > 0 else "▼" if q.change < 0 else "±"
         change = f"{mark}{_num(abs(q.change), q.decimals)} ({q.change_pct:+.2f}%)"
         c.text(x1 - 4, mid, change, 15, "SemiBold", anchor="rm")
-        if i < 2:
-            c.line(x0, top + 38, x1, top + 38, 1, fill=LIGHT)
 
 
 def draw_news(c: Canvas, news: list[str], label: str):

@@ -42,6 +42,28 @@ def test_render_without_any_data(fonts):
     assert img.size == (1024, 758)
 
 
+def test_render_with_unfetched_quotes(fonts):
+    data = demo_data(NOW)
+    data.quotes = [data.quotes[0], "S&P500", "FANG+"]
+    assert render(data, fonts).size == (1024, 758)
+
+
+def test_market_sources_are_registered_per_symbol():
+    from dashboard.app import build_store
+    cfg = load_config(None)
+    store = build_store(cfg, lambda: NOW)
+    labels = [s.label for n, s in store.sources.items() if n.startswith("market")]
+    assert labels == ["ドル円", "S&P500", "FANG+"]
+    assert store.sources["market1"].ttl == 3600
+    dash = Dashboard(cfg, store, None, lambda: NOW)
+    assert dash.data().quotes == ["ドル円", "S&P500", "FANG+"]  # 未取得ならラベルだけ
+
+
+def test_load_config_ignores_directory(tmp_path):
+    # docker で config.json が無いままマウントするとディレクトリになる
+    assert load_config(tmp_path)["port"] == DEFAULT_CONFIG["port"]
+
+
 def test_load_config_merges_nested(tmp_path):
     p = tmp_path / "config.json"
     p.write_text(json.dumps({"location": {"name": "札幌"}, "port": 9000}), encoding="utf-8")

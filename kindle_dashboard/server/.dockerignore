@@ -1,0 +1,8 @@
+fonts/
+out/
+config/
+config.json
+tests/
+__pycache__/
+.pytest_cache/
+*.service

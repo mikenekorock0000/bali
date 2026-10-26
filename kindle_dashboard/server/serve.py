@@ -33,7 +33,8 @@ def cmd_serve(cfg: dict, fonts: Fonts) -> None:
     store = build_store(cfg, now)
     store.run_forever()
     server = make_server(Dashboard(cfg, store, fonts, now), cfg["host"], cfg["port"])
-    print(f"配信中: http://{lan_ip()}:{cfg['port']}/dash.png  （確認用: /preview.png, /health）")
+    host = "<NASのIP>" if Path("/.dockerenv").exists() else lan_ip()  # コンテナ内の IP は外から使えない
+    print(f"配信中: http://{host}:{cfg['port']}/dash.png  （確認用: /preview.png, /health）")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

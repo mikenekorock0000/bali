@@ -29,10 +29,11 @@ def demo_data(now: datetime) -> DashboardData:
         today_max=20, today_min=19, precip_prob=100, hourly=hourly, daily=daily,
     )
     market_time = now.replace(second=0, microsecond=0) - timedelta(minutes=4)
+    fund_date = (now - timedelta(days=3)).date()
     quotes = [
-        Quote("ドル円", "円", 2, 156.95, 0.46, 0.29, market_time),
-        Quote("日経平均", "円", 0, 62568, -125, -0.20, market_time),
-        Quote("NYダウ", "ドル", 0, 52215, -653, -1.23, market_time),
+        Quote("ドル円", "円", 2, 156.95, 0.46, 0.29, time=market_time),
+        Quote("S&P500", "円", 0, 44943, 369, 0.83, as_of=fund_date),
+        Quote("FANG+", "円", 0, 96061, -4195, -4.18, as_of=fund_date),
     ]
     news = [
         "福田康夫元首相が死去 90歳",

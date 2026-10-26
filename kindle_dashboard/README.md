@@ -25,6 +25,40 @@ server/ (PC・Raspberry Pi)                         kindle/ (脱獄済み Kindle
 
 ## 1. サーバーを動かす
 
+### A. NAS の Docker で動かす（おすすめ）
+
+NAS に Docker（Synology の Container Manager、QNAP の Container Station など）が入っていれば、
+`server/` フォルダだけで動く。フォントはイメージ作成時に自動で取得する（NAS からインターネットへの接続が必要）。
+
+1. **NAS にファイルを置く**: `kindle_dashboard/server` フォルダの中身を NAS の共有フォルダへコピー
+   （例: Synology なら File Station で `/docker/kindle-dashboard/` を作ってそこへ。`git clone` してもよい）。
+2. **設定ファイルを作る**: 同じ場所に `config` フォルダを作り、`config.example.json` を
+   `config/config.json` という名前でコピーして、`location`（緯度・経度）を自宅に合わせる。
+   （`config/config.json` が無くても東京の設定で起動する）
+3. **起動する**
+   - **Synology (DSM 7.2 以降)**: Container Manager → プロジェクト → 作成 →
+     パスに手順 1 のフォルダを指定 →「既存の docker-compose.yml を使用」→ 次へ → 完了。
+     イメージのビルドと起動が自動で行われる。
+   - **QNAP / その他**: NAS に SSH でログインして
+     ```bash
+     cd /share/Container/kindle-dashboard   # 手順 1 のフォルダ
+     docker compose up -d --build           # 古い環境では docker-compose up -d --build
+     ```
+4. **確認**: PC のブラウザで `http://<NASのIP>:8080/preview.png` を開く。
+   `http://<NASのIP>:8080/health` で各データの取得状況（`ok: true/false`）が見られる。
+5. Kindle の `config.sh` の `SERVER_URL` を `http://<NASのIP>:8080/dash.png` にする。
+   **NAS の IP はルーターで固定**しておくと安心。
+
+その他:
+- 設定を変えたら Container Manager でプロジェクトを再起動（SSH なら `docker compose restart`）。
+- プログラムを更新したら、ファイルを差し替えて再ビルド（SSH なら `docker compose up -d --build`）。
+- ポート 8080 が使用中なら `docker-compose.yml` の `"8080:8080"` の左側を変える（例 `"8090:8080"`）。
+- NAS のファイアウォールを有効にしている場合は、そのポートを LAN 内に許可する。
+- SwitchBot を使うなら `.env.example` を `.env` にコピーしてトークンとシークレットを書く。
+- ログ: Container Manager のコンテナ詳細 →「ログ」、または `docker logs kindle-dashboard`。
+
+### B. PC / Raspberry Pi で直接動かす
+
 Python 3.9 以上が必要。
 
 ```bash
@@ -52,8 +86,23 @@ python serve.py                  # 配信開始 → 表示された http://<IP>:
 | `display.rotate` | Kindle 用画像の回転（時計回り 0/90/180/270）。表示が逆さなら 270 に |
 | `refresh_minutes` | データ源ごとの取得間隔（分） |
 | `news.url` | RSS の URL。NHK のカテゴリ別 RSS などに変更可 |
-| `market.symbols` | Yahoo Finance のシンボル（`JPY=X`, `^N225`, `^DJI` など） |
+| `market.symbols` | マーケット欄に出す 3 銘柄（下記） |
 | `indoor` | 室内センサー。SwitchBot を使うなら下記 |
+
+### マーケット欄（ドル円・eMAXIS Slim 米国株式(S&P500)・iFreeNEXT FANG+）
+
+既定では次の 3 つを表示する。投資信託は 1 日 1 回（営業日の夜）更新される基準価額で、ラベルの下に基準日を出す。
+
+| 表示 | 中身 | 取得元 (`source`) |
+|---|---|---|
+| ドル円 | USD/JPY（ほぼリアルタイム） | `yahoo`: Yahoo Finance（非公式 API）`"symbol": "JPY=X"` |
+| S&P500 | eMAXIS Slim 米国株式（S&P500）の基準価額 | `mufg`: 三菱UFJアセットマネジメント公式「投信情報 API」`"code": "03311187"`（協会コード） |
+| FANG+ | iFreeNEXT FANG+インデックスの基準価額 | `toushin`: 投資信託協会「投信総合検索ライブラリー」の CSV `"isin": "JP90C000FZD4", "code": "04311181"` |
+
+- 他の投資信託に替えるときは `toushin` を使えば運用会社を問わず取得できる。ISIN と協会コード（8 桁）は
+  [投信総合検索ライブラリー](https://toushin-lib.fwg.ne.jp/FdsWeb/) や Yahoo!ファイナンスのファンドページで調べられる。
+- 投資信託ではなく NYSE FANG+ 指数そのものを出したい場合は `{"label": "FANG+", "source": "yahoo", "symbol": "^NYFANG", "unit": "pt", "decimals": 0}` に替える。
+- `refresh_minutes` を銘柄ごとに指定できる（投資信託は 60 分）。
 
 ### 室内センサー（任意: SwitchBot）
 
@@ -102,6 +151,7 @@ Kindle 側スクリプトは `lipc-*`・`eips` などをスタブにすれば PC
 ## 検証状況
 
 - ✅ サーバー: 単体テスト（API 応答の解析、描画、回転、16 階調化、HTTP 配信、電池残量の受け取り）とダミーデータでの描画。
+- ✅ Docker: イメージのビルド、コンテナ起動、`/dash.png`・`/health` の応答、ヘルスチェック、非 root 実行、`/config` の設定読み込み。
 - ✅ Kindle 側: コマンドをスタブにした PC 上のシミュレーションで、取得 → 全面/部分リフレッシュ → 停止で UI 復帰までを確認。
-- ⚠️ 実 API（Open-Meteo / Yahoo Finance / NHK RSS / SwitchBot）は開発環境から接続できず未確認。応答形式は公開仕様に合わせてある。`python serve.py render` で取得結果が確認できる。
+- ⚠️ 実 API（Open-Meteo / Yahoo Finance / 三菱UFJアセット / 投資信託協会 / NHK RSS / SwitchBot）は開発環境から接続できず未確認。応答形式は公開仕様・公開事例に合わせてある。NAS で起動後に `/health` で取得結果が確認できる。
 - ⚠️ Kindle 実機（PW2, FW 5.12.2.2）では未検証。特に `STOP_MODE`、電源ボタンでの終了、FBInk のパスは実機で確認が必要。

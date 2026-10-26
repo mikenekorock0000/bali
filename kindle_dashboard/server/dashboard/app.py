@@ -30,19 +30,23 @@ DEFAULT_CONFIG = {
     "port": 8080,
     "refresh_minutes": {"weather": 10, "market": 5, "news": 15, "indoor": 5},
     "news": {"url": "https://www.nhk.or.jp/rss/news/cat0.xml", "count": 7, "label": "NHKニュース"},
+    # source: yahoo（為替・指数, symbol）/ mufg（三菱UFJアセットの投信, code=協会コード）
+    #         / toushin（投信協会 CSV・全ファンド対応, isin と code=協会コード）
     "market": {"symbols": [
-        {"symbol": "JPY=X", "label": "ドル円", "unit": "円", "decimals": 2},
-        {"symbol": "^N225", "label": "日経平均", "unit": "円", "decimals": 0},
-        {"symbol": "^DJI", "label": "NYダウ", "unit": "ドル", "decimals": 0},
+        {"label": "ドル円", "source": "yahoo", "symbol": "JPY=X", "unit": "円", "decimals": 2},
+        {"label": "S&P500", "source": "mufg", "code": "03311187", "unit": "円", "decimals": 0,
+         "refresh_minutes": 60},  # eMAXIS Slim 米国株式（S&P500）
+        {"label": "FANG+", "source": "toushin", "isin": "JP90C000FZD4", "code": "04311181",
+         "unit": "円", "decimals": 0, "refresh_minutes": 60},  # iFreeNEXT FANG+インデックス
     ]},
     "indoor": {"provider": "none", "device_id": ""},
-    "credits": "天気: Open-Meteo ／ 市況: Yahoo Finance",
+    "credits": "天気: Open-Meteo ／ 為替: Yahoo Finance ／ 投信: 三菱UFJアセット・投資信託協会",
 }
 
 
 def load_config(path: Path | None) -> dict:
     cfg = json.loads(json.dumps(DEFAULT_CONFIG))
-    if path and path.exists():
+    if path and path.is_file():
         for key, value in json.loads(path.read_text(encoding="utf-8")).items():
             if isinstance(value, dict) and isinstance(cfg.get(key), dict):
                 cfg[key].update(value)
@@ -55,7 +59,10 @@ def build_store(cfg: dict, now: Callable[[], datetime], env=os.environ) -> DataS
     store = DataStore()
     ttl = {k: v * 60 for k, v in cfg["refresh_minutes"].items()}
     store.add("weather", "天気", lambda: sources.fetch_weather(cfg, now()), ttl["weather"])
-    store.add("market", "市況", lambda: sources.fetch_market(cfg), ttl["market"])
+    tz = ZoneInfo(cfg["timezone"])
+    for i, sym in enumerate(cfg["market"]["symbols"]):
+        minutes = sym.get("refresh_minutes", cfg["refresh_minutes"]["market"])
+        store.add(f"market{i}", sym["label"], lambda sym=sym: sources.fetch_quote(sym, tz), minutes * 60)
     store.add("news", "ニュース", lambda: sources.fetch_news(cfg), ttl["news"])
     if (cfg.get("indoor") or {}).get("provider") == "switchbot":
         store.add("indoor", "室内", lambda: sources.fetch_indoor(cfg, env), ttl["indoor"])
@@ -73,7 +80,7 @@ class Dashboard:
         return DashboardData(
             now=self.now(),
             weather=get("weather"),
-            quotes=get("market") or [],
+            quotes=[src.value or src.label for n, src in self.store.sources.items() if n.startswith("market")],
             news=get("news") or [],
             indoor=get("indoor"),
             battery=dev.battery,
