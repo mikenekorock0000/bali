@@ -214,7 +214,7 @@ def draw_clothing(c: Canvas, w: Weather | None):
     cl = w.clothing if w else None
     if cl is None:
         return
-    top, x1 = 238, c.w - M
+    top = 238
     c.garment(cl.index, M, top + 2, 66)
 
     x = M + 82
@@ -223,21 +223,8 @@ def draw_clothing(c: Canvas, w: Weather | None):
     x += c.text(x, y + 1, str(cl.index), 28, "Bold", anchor="lm") + 12
     c.text(x, y, cl.phrase, 25, "Bold", anchor="lm")
 
-    # 右側: 寒い（10）〜暑い（90）の 9 段階を並べ、今日の段階を反転表示する
-    step, size = 50, 40
-    gx0 = x1 - 9 * step + (step - size) / 2
-    for i, index in enumerate(sorted(icons.GARMENTS)):
-        gx = gx0 + i * step
-        if index == cl.index:
-            c.rect(gx - 5, top + 2, gx + size + 5, top + size + 12, fill=DARK)
-            c.garment(index, gx, top + 7, size, fg=WHITE, bg=DARK, shade=GRAY)
-        else:
-            c.garment(index, gx, top + 7, size, fg=GRAY, bg=WHITE, shade=WHITE)
-    c.text(gx0 - 4, top + 62, "寒い", 12, "Medium", fill=GRAY, anchor="lm")
-    c.text(x1, top + 62, "暑い", 12, "Medium", fill=GRAY, anchor="rm")
-
     # 2 行目: ひとこと（傘には傘の絵）。入りきらないものは後ろから省く
-    x1 = gx0 - 16
+    x1 = CHART_X0 - 96
     x, y = M + 84, top + 52
     for tip in cl.tips:
         icon = 18 if tip.startswith("傘") else 0
@@ -248,6 +235,57 @@ def draw_clothing(c: Canvas, w: Weather | None):
             c.umbrella(x + icon / 2, y, icon)
         c.text(x + icon + (4 if icon else 0), y, tip, 17, "Medium", anchor="lm")
         x += width + 24
+
+
+CHART_X0 = 640  # 気温グラフの左端（帯の右側。左に凡例）
+
+
+def draw_temp_chart(c: Canvas, w: Weather | None, now: datetime):
+    """帯の右側: 対象日の 1 時間ごとの気温の折れ線。背景の棒は降水確率。"""
+    hours = w.day_hours if w else []
+    if len(hours) < 2:
+        return
+    x0, x1, y0, y1 = CHART_X0, c.w - M - 4, 250, 284  # 折れ線の範囲（y0 が上）
+    base = y1 + 5  # 降水確率の棒の底・目盛りの線
+    temps = [p.temperature for p in hours]
+    lx = x0 - 80  # 左の凡例: 対象日と最高・最低
+    c.text(lx, 251, f"{w.day_label}の気温", 12, "Medium", fill=GRAY, anchor="lm")
+    c.text(lx, 270, f"最高 {round(max(temps))}°", 14, "Bold", anchor="lm")
+    c.text(lx, 288, f"最低 {round(min(temps))}°", 14, "Bold", anchor="lm")
+
+    lo, hi = min(temps), max(temps)
+    pad = max(0.0, 4 - (hi - lo)) / 2  # 変化が小さい日も平らに見えすぎないように
+    lo, hi = lo - pad, hi + pad
+
+    def px(h: float) -> float:
+        return x0 + (x1 - x0) * h / 23
+
+    def py(t: float) -> float:
+        return y1 - (y1 - y0) * (t - lo) / (hi - lo)
+
+    bar = (x1 - x0) / 23 * 0.7
+    for p in hours:
+        if p.precip_prob:
+            h = (base - y0) * p.precip_prob / 100
+            c.rect(px(p.time.hour) - bar / 2, base - h, px(p.time.hour) + bar / 2, base, fill=LIGHT)
+    c.line(x0, base, x1, base, 1, fill=GRAY)
+    for h in (0, 6, 12, 18):
+        c.text(px(h), base + 9, str(h), 11, "Medium", fill=GRAY, anchor="mm")
+    c.text(x1 + 4, base + 9, "24時", 11, "Medium", fill=GRAY, anchor="rm")
+
+    if w.day_label == "今日":  # 現在時刻の縦線
+        nx = px(now.hour + now.minute / 60)
+        for yy in range(int(y0) - 6, int(base), 6):
+            c.line(nx, yy, nx, yy + 3, 1, fill=DARK)
+
+    pts = [(px(p.time.hour), py(p.temperature)) for p in hours]
+    for a, b in zip(pts, pts[1:]):
+        c.line(*a, *b, 2.5)
+
+    # 最高・最低の位置に点（値は左の凡例）
+    for i in (temps.index(max(temps)), temps.index(min(temps))):
+        x, y = pts[i]
+        c.d.ellipse(((x - 3.5) * c.s, (y - 3.5) * c.s, (x + 3.5) * c.s, (y + 3.5) * c.s), fill=BLACK)
 
 
 def draw_hourly(c: Canvas, w: Weather | None):
@@ -356,6 +394,7 @@ def render(data: DashboardData, fonts: Fonts, width: int = 1024, height: int = 7
     c.line(806, 24, 806, 232, 2)
     draw_indoor(c, data.indoor)
     draw_clothing(c, data.weather)
+    draw_temp_chart(c, data.weather, data.now)
     draw_hourly(c, data.weather)
     draw_daily(c, data.weather)
     draw_market(c, data.quotes)

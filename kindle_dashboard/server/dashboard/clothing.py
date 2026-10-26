@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 DAY_START, DAY_END = 6, 21  # 外出する時間帯
 SWITCH_TO_TOMORROW = 18  # この時刻以降は明日の服装を出す
@@ -54,11 +54,16 @@ def level_for(feels_like: float) -> tuple[int, str]:
     return COLDEST
 
 
-def clothing_advice(points: list[HourPoint], now: datetime) -> Clothing | None:
+def target_day(now: datetime) -> tuple[date, str]:
+    """服装と気温グラフの対象日。夕方以降は明日。"""
     if now.hour >= SWITCH_TO_TOMORROW:
-        day, label, start = (now + timedelta(days=1)).date(), "明日", DAY_START
-    else:
-        day, label, start = now.date(), "今日", max(DAY_START, now.hour)
+        return (now + timedelta(days=1)).date(), "明日"
+    return now.date(), "今日"
+
+
+def clothing_advice(points: list[HourPoint], now: datetime) -> Clothing | None:
+    day, label = target_day(now)
+    start = max(DAY_START, now.hour) if label == "今日" else DAY_START
     window = [p for p in points if p.time.date() == day and start <= p.time.hour <= DAY_END]
     if not window:
         return None

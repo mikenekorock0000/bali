@@ -51,6 +51,17 @@ def test_parse_open_meteo_picks_next_three_hour_slots():
     assert (w.clothing.day_label, w.clothing.index) == ("今日", 60)
 
 
+def test_parse_open_meteo_day_hours_for_chart():
+    w = sources.parse_open_meteo(open_meteo_fixture(), datetime(2026, 10, 26, 9, 0, tzinfo=TZ))
+    assert w.day_label == "今日"
+    assert [p.time.hour for p in w.day_hours] == list(range(24))
+    assert {p.time.day for p in w.day_hours} == {26}
+
+    evening = sources.parse_open_meteo(open_meteo_fixture(), datetime(2026, 10, 26, 19, 0, tzinfo=TZ))
+    assert evening.day_label == "明日"
+    assert {p.time.day for p in evening.day_hours} == {27}
+
+
 def test_parse_open_meteo_skips_current_slot_exactly_on_the_hour():
     now = datetime(2026, 10, 26, 15, 0, tzinfo=TZ)
     w = sources.parse_open_meteo(open_meteo_fixture(), now)

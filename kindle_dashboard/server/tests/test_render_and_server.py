@@ -134,3 +134,12 @@ def test_render_every_clothing_level(fonts, index):
     data = demo_data(NOW)
     data.weather.clothing = Clothing(index, "テスト", "明日", ["傘を持って（降水80%）", "風が強い（9m/s）"])
     assert render(data, fonts).size == (1024, 758)
+
+
+@pytest.mark.parametrize("hours", [0, 1, 24])
+def test_render_temp_chart_with_few_or_flat_hours(fonts, hours):
+    data = demo_data(NOW)
+    data.weather.day_hours = [p for p in data.weather.day_hours[:hours]]
+    for p in data.weather.day_hours:
+        p.temperature = 15.0  # 平らでもゼロ除算しない
+    assert render(data, fonts).size == (1024, 758)

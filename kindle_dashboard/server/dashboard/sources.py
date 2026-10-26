@@ -17,11 +17,11 @@ import urllib.parse
 import urllib.request
 import uuid
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from .clothing import Clothing, HourPoint, clothing_advice
+from .clothing import Clothing, HourPoint, clothing_advice, target_day
 
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) kindle-dashboard/1.0"
 
@@ -120,6 +120,8 @@ class Weather:
     hourly: list[HourSlot]
     daily: list[DaySlot]
     clothing: Clothing | None = None
+    day_label: str = "今日"
+    day_hours: list[HourPoint] = field(default_factory=list)  # グラフ用: 対象日の 0〜23 時
 
 
 def open_meteo_url(latitude: float, longitude: float, timezone: str) -> str:
@@ -184,6 +186,7 @@ def parse_open_meteo(data: dict, now: datetime, hourly_count: int = 8,
         if days[i] > today
     ][:daily_count]
 
+    day, day_label = target_day(now)
     return Weather(
         current=current,
         today_max=d["temperature_2m_max"][today_idx],
@@ -192,6 +195,8 @@ def parse_open_meteo(data: dict, now: datetime, hourly_count: int = 8,
         hourly=hourly,
         daily=daily,
         clothing=clothing_advice(points, now),
+        day_label=day_label,
+        day_hours=[p for p in points if p.time.date() == day],
     )
 
 

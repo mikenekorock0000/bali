@@ -4,9 +4,19 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from .clothing import Clothing
+from .clothing import Clothing, HourPoint
 from .render import DashboardData
 from .sources import Current, DaySlot, HourSlot, Indoor, Quote, Weather
+
+
+def demo_day_hours(now: datetime) -> list[HourPoint]:
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    temps = [14, 14, 13, 13, 12, 12, 13, 14, 16, 18, 19, 20, 20, 20, 20, 19,
+             19, 19, 19, 19, 19, 19, 19, 19]
+    pops = [0, 0, 0, 0, 5, 10, 20, 30, 40, 60, 80, 90, 100, 100, 100, 100,
+            100, 100, 100, 98, 98, 98, 98, 95]
+    return [HourPoint(midnight + timedelta(hours=h), t, t + 1, p, 2.0)
+            for h, (t, p) in enumerate(zip(temps, pops))]
 
 
 def demo_data(now: datetime) -> DashboardData:
@@ -29,6 +39,7 @@ def demo_data(now: datetime) -> DashboardData:
                         wind_speed=2.1, wind_direction=22, is_day=True),
         today_max=20, today_min=19, precip_prob=100, hourly=hourly, daily=daily,
         clothing=Clothing(60, "長袖シャツで快適", "今日", ["傘を持って（降水100%）", "寒暖差に注意（11℃）"]),
+        day_hours=demo_day_hours(now),
     )
     market_time = now.replace(second=0, microsecond=0) - timedelta(minutes=4)
     fund_date = (now - timedelta(days=3)).date()
