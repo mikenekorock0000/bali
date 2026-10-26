@@ -42,9 +42,9 @@ DEFAULT_CONFIG = {
          "unit": "円", "decimals": 0, "refresh_minutes": 60},  # iFreeNEXT FANG+インデックス
     ]},
     "indoor": {"provider": "none", "device_id": ""},
-    # Google カレンダー: window の時間帯だけニュース欄を今日の予定に替える。
+    # Google カレンダー: window の時間帯だけニュース欄を今月のカレンダーに替える。
     # ics_urls は「iCal 形式の非公開 URL」（環境変数 CALENDAR_ICS_URLS でも可）
-    "calendar": {"ics_urls": [], "window": ["03:00", "09:00"], "label": "今日の予定"},
+    "calendar": {"ics_urls": [], "window": ["03:00", "09:00"], "week_start": "sunday"},
     "credits": "Open-Meteo・Yahoo Finance・三菱UFJアセット・投資信託協会",
 }
 
@@ -73,7 +73,8 @@ def build_store(cfg: dict, now: Callable[[], datetime], env=os.environ) -> DataS
         store.add("indoor", "室内", lambda: sources.fetch_indoor(cfg, env), ttl["indoor"])
     urls = gcal.calendar_urls(cfg, env)
     if urls:
-        store.add("calendar", "予定", lambda: gcal.fetch_events(urls, now()), ttl["calendar"])
+        week_start = cfg["calendar"].get("week_start", "sunday")
+        store.add("calendar", "予定", lambda: gcal.fetch_events(urls, now(), week_start), ttl["calendar"])
     return store
 
 
@@ -87,12 +88,12 @@ class Dashboard:
         get = lambda name: self.store.get(name) if name in self.store.sources else None  # noqa: E731
         now = self.now()
         cal = self.cfg["calendar"]
-        # 時間帯内で予定が取得できていればニュースの代わりに出す（取得失敗中はニュースのまま）
+        # 時間帯内で予定が取得できていればニュースの代わりに月表示（取得失敗中はニュースのまま）
         events = get("calendar") if gcal.in_window(now, cal["window"]) else None
         return DashboardData(
             now=now,
             events=events,
-            events_label=cal.get("label", "今日の予定"),
+            week_start=cal.get("week_start", "sunday"),
             weather=get("weather"),
             quotes=[src.value or src.label for n, src in self.store.sources.items() if n.startswith("market")],
             news=get("news") or [],

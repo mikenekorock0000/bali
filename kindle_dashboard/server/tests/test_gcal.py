@@ -60,17 +60,43 @@ END:VCALENDAR
 """.encode()
 
 
-def test_parse_events_expands_recurrence_and_sorts():
-    events = gcal.parse_events([ICS, OTHER], date(2026, 10, 26), TZ)
-    assert [e.title for e in events] == ["燃えるゴミの日", "朝ラン", "家族カレンダーの予定", "チーム定例"]
-    assert events[0].all_day
-    assert events[1].start == datetime(2026, 10, 26, 6, 30, tzinfo=TZ)  # UTC → 日本時間
-    assert events[3].start.hour == 10
+def test_parse_events_expands_recurrence_over_month():
+    events = gcal.parse_events([ICS, OTHER], date(2026, 9, 27), date(2026, 10, 31), TZ)
+    weekly = [e.start.day for e in events if e.title == "チーム定例"]
+    assert weekly == [5, 12, 19, 26]  # 毎週月曜
+    assert "中止" not in [e.title for e in events]
 
 
-def test_parse_events_other_weekday_has_no_weekly_event():
-    titles = [e.title for e in gcal.parse_events([ICS], date(2026, 10, 27), TZ)]
-    assert titles == ["明日の予定"]
+def test_events_on_day_sorted_and_utc_converted():
+    events = gcal.parse_events([ICS, OTHER], date(2026, 9, 27), date(2026, 10, 31), TZ)
+    day = gcal.events_on(events, date(2026, 10, 26))
+    assert [e.title for e in day] == ["燃えるゴミの日", "朝ラン", "家族カレンダーの予定", "チーム定例"]
+    assert day[1].start == datetime(2026, 10, 26, 6, 30, tzinfo=TZ)  # UTC → 日本時間
+    assert [e.title for e in gcal.events_on(events, date(2026, 10, 27))] == ["明日の予定"]
+
+
+def test_multi_day_all_day_event_appears_on_each_day():
+    ev = gcal.Event("旅行", datetime(2026, 10, 3, tzinfo=TZ), datetime(2026, 10, 5, tzinfo=TZ), True)
+    assert [bool(gcal.events_on([ev], date(2026, 10, d))) for d in (2, 3, 4, 5)] == [False, True, True, False]
+
+
+def test_holidays_come_first():
+    hol = gcal.holidays(date(2026, 10, 1), date(2026, 10, 31), TZ)
+    assert [(e.start.day, e.title) for e in hol] == [(12, "スポーツの日")]
+    ev = gcal.Event("朝の予定", datetime(2026, 10, 12, 7, tzinfo=TZ), datetime(2026, 10, 12, 8, tzinfo=TZ), False)
+    assert [e.title for e in gcal.events_on([ev] + hol, date(2026, 10, 12))] == ["スポーツの日", "朝の予定"]
+
+
+@pytest.mark.parametrize("day,week_start,weeks,first,last", [
+    (date(2026, 10, 26), "sunday", 5, date(2026, 9, 27), date(2026, 10, 31)),
+    (date(2026, 2, 10), "sunday", 4, date(2026, 2, 1), date(2026, 2, 28)),
+    (date(2026, 8, 1), "sunday", 6, date(2026, 7, 26), date(2026, 9, 5)),
+    (date(2026, 10, 26), "monday", 5, date(2026, 9, 28), date(2026, 11, 1)),
+])
+def test_month_grid(day, week_start, weeks, first, last):
+    grid = gcal.month_grid(day, week_start)
+    assert len(grid) == weeks and grid[0][0] == first and grid[-1][-1] == last
+    assert all(len(w) == 7 for w in grid)
 
 
 @pytest.mark.parametrize("hhmm,expected", [("02:59", False), ("03:00", True), ("08:59", True), ("09:00", False)])
@@ -100,7 +126,7 @@ def _dash(hour, value):
 
 
 def test_dashboard_shows_events_only_in_window():
-    events = gcal.parse_events([ICS], date(2026, 10, 26), TZ)
+    events = gcal.parse_events([ICS], date(2026, 9, 27), date(2026, 10, 31), TZ)
     assert _dash(7, events).events == events
     assert _dash(10, events).events is None  # 時間帯外はニュース
 

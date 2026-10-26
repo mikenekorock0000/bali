@@ -21,20 +21,28 @@ def demo_day_hours(now: datetime) -> list[HourPoint]:
 
 
 def demo_events(now: datetime) -> list[Event]:
-    day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    """今月のあちこちに散らした予定。"""
+    first = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    def at(h, m=0):
-        return day + timedelta(hours=h, minutes=m)
+    def at(day, h=0, m=0, hours=1, all_day=False, title=""):
+        s = first + timedelta(days=day - 1, hours=h, minutes=m)
+        e = s + (timedelta(days=hours) if all_day else timedelta(hours=hours))
+        return Event(title, s, e, all_day)
 
-    return [
-        Event("燃えるゴミの日", day, day + timedelta(days=1), True),
-        Event("朝ラン", at(6), at(6, 45), False),
-        Event("子ども 遠足（お弁当）", at(7, 30), at(8), False),
-        Event("チーム定例", at(10), at(11), False),
-        Event("歯医者", at(13, 30), at(14, 30), False),
-        Event("○○さんと打ち合わせ（オンライン）", at(16), at(17), False),
-        Event("ジム", at(19), at(20), False),
+    events = [
+        at(3, all_day=True, hours=2, title="家族旅行"),
+        at(9, 15, title="歯医者"),
+        at(14, 19, title="飲み会"),
+        at(17, all_day=True, title="運動会"),
+        at(21, 10, title="健康診断"),
+        at(28, 18, 30, title="○○さん誕生日会"),
     ]
+    for day in (5, 12, 19, 26):  # 毎週月曜の定例（日付は目安）
+        events.append(at(day, 10, title="チーム定例"))
+    today = now.day
+    events += [at(today, all_day=True, title="燃えるゴミ"), at(today, 7, 30, title="遠足"),
+               at(today, 13, 30, title="打ち合わせ")]
+    return events
 
 
 def demo_data(now: datetime) -> DashboardData:

@@ -1,4 +1,4 @@
-"""Google カレンダー（iCal 形式の非公開 URL）から今日の予定を読む。
+"""Google カレンダー（iCal 形式の非公開 URL）から今月の予定を読む。
 
 Google カレンダー → 設定 → 対象のカレンダー →「カレンダーの統合」→「iCal 形式の非公開 URL」
 をコピーして使う。OAuth の設定は不要。繰り返し予定も展開する。
@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+import jpholiday
 import recurring_ical_events
 from icalendar import Calendar
 
@@ -22,6 +23,7 @@ class Event:
     start: datetime  # 終日予定はその日の 0:00
     end: datetime
     all_day: bool
+    holiday: bool = False  # 祝日（カレンダーではなく jpholiday から）
 
 
 def _to_datetime(value, tz: ZoneInfo) -> tuple[datetime, bool]:
@@ -32,10 +34,10 @@ def _to_datetime(value, tz: ZoneInfo) -> tuple[datetime, bool]:
     return datetime.combine(value, time(), tz), True
 
 
-def parse_events(ics_list: list[bytes], day: date, tz: ZoneInfo) -> list[Event]:
-    """その日にかかる予定を、終日 → 開始時刻順に並べて返す。"""
-    start = datetime.combine(day, time(), tz)
-    end = start + timedelta(days=1)
+def parse_events(ics_list: list[bytes], first: date, last: date, tz: ZoneInfo) -> list[Event]:
+    """first〜last（両端含む）にかかる予定を、終日 → 開始時刻順に並べて返す。"""
+    start = datetime.combine(first, time(), tz)
+    end = datetime.combine(last + timedelta(days=1), time(), tz)
     events = []
     for ics in ics_list:
         cal = Calendar.from_ical(ics)
@@ -52,8 +54,37 @@ def parse_events(ics_list: list[bytes], day: date, tz: ZoneInfo) -> list[Event]:
     return sorted(events, key=lambda ev: (not ev.all_day, ev.start, ev.title))
 
 
-def fetch_events(urls: list[str], now: datetime) -> list[Event]:
-    return parse_events([http_get(u, timeout=30) for u in urls], now.date(), now.tzinfo)
+def month_grid(day: date, week_start: str = "sunday") -> list[list[date]]:
+    """day を含む月のカレンダー（週ごとの日付。前後の月の日も含む）。"""
+    first = day.replace(day=1)
+    offset = (first.weekday() + (1 if week_start == "sunday" else 0)) % 7
+    d = first - timedelta(days=offset)
+    weeks = []
+    while not weeks or d.month == day.month:
+        weeks.append([d + timedelta(days=i) for i in range(7)])
+        d += timedelta(days=7)
+    return weeks
+
+
+def holidays(first: date, last: date, tz: ZoneInfo) -> list[Event]:
+    return [Event(name, datetime.combine(d, time(), tz), datetime.combine(d + timedelta(days=1), time(), tz),
+                  True, holiday=True)
+            for d, name in jpholiday.between(first, last)]
+
+
+def events_on(events: list[Event], day: date) -> list[Event]:
+    """その日にかかる予定（祝日 → 終日 → 時刻順）。"""
+    tz = events[0].start.tzinfo if events else None
+    start = datetime.combine(day, time(), tz)
+    end = start + timedelta(days=1)
+    hits = [e for e in events if e.start < end and (e.end > start or (e.end == e.start and e.start >= start))]
+    return sorted(hits, key=lambda e: (not e.holiday, not e.all_day, e.start, e.title))
+
+
+def fetch_events(urls: list[str], now: datetime, week_start: str = "sunday") -> list[Event]:
+    """今月のカレンダーに表示する範囲（前後の週の端数を含む）の予定。"""
+    grid = month_grid(now.date(), week_start)
+    return parse_events([http_get(u, timeout=30) for u in urls], grid[0][0], grid[-1][-1], now.tzinfo)
 
 
 def calendar_urls(cfg: dict, env: dict[str, str]) -> list[str]:

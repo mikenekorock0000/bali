@@ -172,10 +172,19 @@ def test_clock_font_axes():
     assert f.getlength("14:19") > narrow.getlength("14:19")
 
 
-@pytest.mark.parametrize("count", [0, 3, 12])
-def test_render_events_panel(fonts, count):
+@pytest.mark.parametrize("count", [0, 3, 40])
+def test_render_month_panel(fonts, count):
     from dashboard.demo import demo_events
-    events = (demo_events(NOW) * 2)[:count]
     data = demo_data(NOW)
-    data.events = events
+    data.events = (demo_events(NOW) * 4)[:count]
+    assert render(data, fonts).size == (1024, 758)
+
+
+@pytest.mark.parametrize("month", [2, 8])  # 4 週・6 週の月
+def test_render_month_panel_week_counts(fonts, month):
+    from dashboard.demo import demo_events
+    now = NOW.replace(month=month, day=10)
+    data = demo_data(now)
+    data.events = demo_events(now)
+    data.week_start = "monday"
     assert render(data, fonts).size == (1024, 758)

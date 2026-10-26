@@ -14,6 +14,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from . import icons
+from . import gcal
 from .gcal import Event
 from .sources import Indoor, Quote, Weather, co2_level, icon_kind, weather_label, wind_direction_ja
 
@@ -41,8 +42,8 @@ class DashboardData:
     charging: bool = False
     failing: list[str] = field(default_factory=list)
     news_label: str = "NHKニュース"
-    events: list[Event] | None = None  # None ならニュース、リストなら今日の予定を出す
-    events_label: str = "今日の予定"
+    events: list[Event] | None = None  # None ならニュース、リストなら今月のカレンダーを出す
+    week_start: str = "sunday"
     credits: str = "Open-Meteo・Yahoo Finance・三菱UFJアセット・投資信託協会"
 
 
@@ -416,30 +417,49 @@ def draw_news(c: Canvas, news: list[str], label: str):
         c.text(x0 + 20, mid, c.fit(title, 17, "Medium", x1 - x0 - 24), 17, "Medium", anchor="lm")
 
 
-def draw_events(c: Canvas, events: list[Event], now: datetime, label: str):
-    """ニュース欄の代わりに今日の予定。左に時刻（終日は枠付き）、終わった予定は灰色。"""
+def draw_month(c: Canvas, events: list[Event], now: datetime, week_start: str = "sunday"):
+    """ニュース欄の代わりに今月のカレンダー。祝日・終日予定は灰色の帯、今日は日付を白黒反転。"""
     x0, x1, y = 490, c.w - M, LOWER_TOP
-    day = f"{now.month}/{now.day}({WEEKDAYS[now.weekday()]})・Googleカレンダー"
-    draw_heading(c, x0, x1, y, label, day)
-    if not events:
-        c.text(x0 + 8, y + 56, "予定はありません", 18, "Medium", fill=GRAY, anchor="lm")
-        return
-    rows = 7
-    shown = events if len(events) <= rows else events[:rows - 1]
-    for i, ev in enumerate(shown):
-        mid = y + 38 + i * 38 + 18
-        color = GRAY if ev.end <= now else BLACK
-        if ev.all_day:
-            c.rect(x0 + 6, mid - 11, x0 + 56, mid + 11, outline=color, width=1.5)
-            c.text(x0 + 31, mid, "終日", 14, "Bold", fill=color, anchor="mm")
-        else:
-            start = ev.start if ev.start.date() == now.date() else None
-            text = f"{start.hour}:{start:%M}" if start else "〜"
-            c.text(x0 + 56, mid, text, 18, "Bold", fill=color, anchor="rm")
-        c.text(x0 + 70, mid, c.fit(ev.title, 17, "Medium", x1 - x0 - 74), 17, "Medium", fill=color, anchor="lm")
-    if len(events) > rows:
-        mid = y + 38 + (rows - 1) * 38 + 18
-        c.text(x0 + 70, mid, f"ほか {len(events) - len(shown)} 件", 16, "Medium", fill=GRAY, anchor="lm")
+    draw_heading(c, x0, x1, y, f"{now.year}年{now.month}月", "Googleカレンダー")
+    grid = gcal.month_grid(now.date(), week_start)
+    events = events + gcal.holidays(grid[0][0], grid[-1][-1], now.tzinfo)
+    names = "日月火水木金土" if week_start == "sunday" else "月火水木金土日"
+    cw = (x1 - x0) / 7
+    head_y = y + 46
+    for i, name in enumerate(names):
+        weekend = name in "日土"
+        c.text(x0 + cw * i + cw / 2, head_y, name, 12, "Bold" if weekend else "Medium",
+               fill=BLACK if weekend else GRAY, anchor="mm")
+
+    top, bottom = head_y + 10, 722
+    rh = (bottom - top) / len(grid)
+    line_h, size = 14, 11.5
+    for r, week in enumerate(grid):
+        ry = top + r * rh
+        c.line(x0, ry, x1, ry, 1, fill=LIGHT)
+        for i, day in enumerate(week):
+            cx = x0 + i * cw
+            in_month = day.month == now.month
+            past = day < now.date()
+            color = BLACK if in_month and not past else GRAY if in_month else LIGHT
+            if day == now.date():
+                c.rect(cx + 2, ry + 3, cx + 24, ry + 19, fill=BLACK)
+                c.text(cx + 13, ry + 11, str(day.day), 13, "Bold", fill=WHITE, anchor="mm")
+            else:
+                c.text(cx + 13, ry + 11, str(day.day), 13, "Bold", fill=color, anchor="mm")
+            if not in_month:
+                continue
+            todays = gcal.events_on(events, day)
+            room = max(0, int((rh - 21) // line_h))
+            shown = todays[:room]
+            for k, ev in enumerate(shown):
+                ey = ry + 21 + k * line_h + line_h / 2
+                fill = GRAY if past else BLACK
+                if ev.all_day:  # 終日・祝日は帯
+                    c.rect(cx + 2, ey - line_h / 2 + 1, cx + cw - 2, ey + line_h / 2 - 1, fill=LIGHT)
+                c.text(cx + 4, ey, c.fit(ev.title, size, "Medium", cw - 8), size, "Medium", fill=fill, anchor="lm")
+            if len(todays) > len(shown):  # 入りきらない件数は日付の右に
+                c.text(cx + cw - 4, ry + 11, f"+{len(todays) - len(shown)}", 11, "Bold", fill=GRAY, anchor="rm")
 
 
 def draw_footer(c: Canvas, data: DashboardData):
@@ -470,7 +490,7 @@ def render(data: DashboardData, fonts: Fonts, width: int = 1024, height: int = 7
     if data.events is None:
         draw_news(c, data.news, data.news_label)
     else:
-        draw_events(c, data.events, data.now, data.events_label)
+        draw_month(c, data.events, data.now, data.week_start)
     draw_footer(c, data)
     return c.finish()
 
