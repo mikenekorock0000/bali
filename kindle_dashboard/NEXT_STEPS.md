@@ -7,6 +7,7 @@
 | 項目 | 状態 |
 |---|---|
 | 調査・脱獄手順 | ✅ `docs/kindle-dashboard/`（端末は **Kindle Paperwhite 第7世代・FW 5.15.1** → [paperwhite3.md](../docs/kindle-dashboard/paperwhite3.md)） |
+| ファームウェア | ⚠️ 2026-10-26 に自動アップデートが始まった。PW3 の最終版 **5.16.2.1.1** になる見込み（WinterBreak・LanguageBreak とも対応範囲内）。**版を確認してから脱獄** |
 | サーバー（画像生成・配信） | ✅ 実装済み。単体テスト 105 件成功、Docker イメージのビルド・起動を確認 |
 | Kindle 側スクリプト（KUAL 拡張） | ✅ 実装済み。PC 上でコマンドを模擬して動作確認 |
 | 配布ファイル | ✅ `dist/kindle-dashboard-nas.zip`・`dist/kindle-dashboard-kindle.zip`、手順は [NAS_SETUP.md](NAS_SETUP.md) |
@@ -33,6 +34,7 @@
 手順: [paperwhite3.md](../docs/kindle-dashboard/paperwhite3.md)
 
 1. **50% 以上まで充電**、**機内モード ON**（ファームウェアが上がらないように）。
+   設定 → 端末オプション → 端末情報 で版を確認（自動アップデート後なら 5.16.2.1.1 のはず）。
 2. [Jailbreak Wizard](https://kindlemodding.org/jailbreak-wizard.html) で機種・FW を入れて方法を確認。
 3. WinterBreak で脱獄（ダメなら LanguageBreak）。
 4. Hotfix → KUAL/MRPI（`;log mrpi`）。
