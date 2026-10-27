@@ -41,12 +41,14 @@ def build_nas() -> Path:
 
 
 def build_kindle() -> Path:
-    ext = ROOT / "kindle" / "extensions"
+    """dashboard/（Kindle のルートへ）と documents/（Scriptlets）を入れる。"""
+    kindle = ROOT / "kindle"
     out = DIST / "kindle-dashboard-kindle.zip"
     with zipfile.ZipFile(out, "w") as z:
-        for f in sorted((ext / "dashboard").rglob("*")):
-            if f.is_file() and f.name != "dashboard.log":
-                add(z, f, f"extensions/{f.relative_to(ext)}")
+        for d in ("dashboard", "documents"):
+            for f in sorted((kindle / d).rglob("*")):
+                if f.is_file() and f.name != "dashboard.log":
+                    add(z, f, str(f.relative_to(kindle)))
     return out
 
 

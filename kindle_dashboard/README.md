@@ -17,7 +17,7 @@
 
 ```
 server/ (PC・Raspberry Pi)                         kindle/ (脱獄済み Kindle)
-  Open-Meteo / Yahoo Finance / NHK RSS / SwitchBot      KUAL ▸ Dashboard ▸ Start
+  Open-Meteo / Yahoo Finance / NHK RSS / SwitchBot      ライブラリ ▸ Dashboard 開始
         │ 5〜15分ごとに取得（失敗時は前回値）              │ 毎分 0 秒すぎに
         ▼                                               ▼
   GET /dash.png ──── その時刻で描画した PNG ────────▶ wget → eips/fbink で表示
@@ -201,15 +201,33 @@ tenki.jp の服装指数を参考にした**独自の目安**（tenki.jp の値�
 
 ## 2. Kindle に入れる
 
-前提: 脱獄済み・KUAL 導入済み（[paperwhite3.md](../docs/kindle-dashboard/paperwhite3.md)）、Wi-Fi 設定済み・機内モード OFF。
+前提: 新しい脱獄（WinterBreak2 など）済み（[paperwhite3.md](../docs/kindle-dashboard/paperwhite3.md)）。
+起動には KindleModding の **Scriptlets**（`documents` の `.sh` がライブラリに本として出て、開くと root で実行される仕組み）を使う。
+KUAL は不要（新しい脱獄では廃止）。
 
-1. USB で接続し、`kindle/extensions/dashboard` フォルダを Kindle の `extensions/` にコピー。
-2. `extensions/dashboard/config.sh` の `SERVER_URL` を、サーバー起動時に表示された URL に書き換える。
-   **改行コードは LF のまま保存**（Windows のメモ帳なら右下を「LF」に。VS Code 推奨）。
-3. 取り外して KUAL → **Dashboard → Test (1回表示)** で画像が出るか確認。
-4. 問題なければ **Dashboard → Start**。以後、毎分更新される。
+1. USB で Mac/PC に接続し、`kindle-dashboard-kindle.zip` を展開してできた 2 つのフォルダを Kindle のルートへコピー:
+   - **`dashboard`** → Kindle のルート（`/mnt/us/dashboard` になる。本体とスクリプト）
+   - **`documents`** の中の 3 つの `.sh` → Kindle の `documents` フォルダ（ライブラリに本として出る起動ボタン）
+2. Kindle の `dashboard/config.sh` の `SERVER_URL` を `http://<NASのIP>:8080/dash.png` に書き換え
+   （**改行コードは LF のまま保存**。Mac のテキストエディットは「標準テキスト」で。VS Code 推奨）。
+3. 取り出して、機内モード OFF（Wi-Fi 接続）。ライブラリに **Dashboard テスト / 開始 / 停止** が出る。
+4. **Dashboard テスト** を開く → 画像が出れば接続 OK（数秒で元の画面に戻ることがある）。
+5. **Dashboard 開始** を開く → 約 5 秒後にダッシュボードに切り替わり、以後毎分更新。
 
-終了方法: **電源ボタンを押す**（ダッシュボードを終了して通常の Kindle に戻る）／SSH で `sh /mnt/us/extensions/dashboard/bin/stop.sh`／再起動。
+**Mac の場合（おすすめ）**: Finder でコピーすると隠しファイル `._〜.sh` ができ、ライブラリに壊れた項目として出てしまう。
+ターミナルで次を実行すると、それを避けてコピーと URL の書き換えまで済む（`192.168.x.x` は NAS の IP に置き換え）:
+
+```bash
+cd ~/Downloads && rm -rf kd && unzip -q kindle-dashboard-kindle.zip -d kd
+COPYFILE_DISABLE=1 cp -R kd/dashboard /Volumes/Kindle/
+COPYFILE_DISABLE=1 cp kd/documents/*.sh /Volumes/Kindle/documents/
+sed -i '' 's|^SERVER_URL=.*|SERVER_URL="http://192.168.x.x:8080/dash.png"|' /Volumes/Kindle/dashboard/config.sh
+find /Volumes/Kindle/dashboard /Volumes/Kindle/documents -name '._*' -delete
+grep SERVER_URL /Volumes/Kindle/dashboard/config.sh   # 書き換わったか確認
+```
+
+終了方法: **電源ボタンを押す**（ダッシュボードを終了して通常の Kindle に戻る）／ライブラリの **Dashboard 停止**／
+SSH で `sh /mnt/us/dashboard/bin/stop.sh`／再起動。
 
 ### config.sh
 
@@ -220,10 +238,11 @@ tenki.jp の服装指数を参考にした**独自の目安**（tenki.jp の値�
 | `FULL_REFRESH_EVERY` | 何回に 1 回全面リフレッシュするか |
 | `STOP_MODE` | `pause`（UI を一時停止, 既定）／ `stop`（UI を停止）。表示が上書きされるなら `stop` に |
 | `FRONTLIGHT` | フロントライトの明るさ（0 で消灯、空なら変更しない） |
+| `START_DELAY` | 開始してから画面を確保するまでの秒数（既定 5）。ライブラリが上に出てくるなら増やす |
 | `EXIT_ON_POWER_BUTTON` | 1 なら電源ボタンで終了 |
-| `LOG_FILE` | ログ。不調時は USB 接続して `extensions/dashboard/dashboard.log` を見る |
+| `LOG_FILE` | ログ。不調時は USB 接続して `dashboard/dashboard.log` を見る |
 
-FBInk が入っていれば FBInk、なければ標準の `eips` で表示する。
+表示は脱獄で入る FBInk（`/mnt/us/libkh/bin/fbink`）を使う。無ければ標準の `eips`。
 
 ## 3. 開発
 

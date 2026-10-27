@@ -4,6 +4,8 @@
 
 echo $$ >"$PID_FILE"
 log "start: $SERVER_URL every ${INTERVAL}s"
+# 起動元（Scriptlet）が終わるとライブラリが描き直されるので、それを待ってから画面を確保する
+sleep "${START_DELAY:-5}"
 take_screen
 
 cleanup() {

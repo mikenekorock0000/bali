@@ -5,7 +5,7 @@
 | ファイル | 置き場所 |
 |---|---|
 | `kindle-dashboard-nas.zip` | NAS（Docker で動かすサーバー） |
-| `kindle-dashboard-kindle.zip` | Kindle（脱獄・KUAL 導入後に USB でコピー） |
+| `kindle-dashboard-kindle.zip` | Kindle（脱獄後に USB でコピー） |
 
 zip が古いときは、リポジトリのルートで `python kindle_dashboard/tool/package.py` を実行すると作り直せる。
 
@@ -69,16 +69,30 @@ zip が古いときは、リポジトリのルートで `python kindle_dashboard
 
 詳しくは `docs/kindle-dashboard/paperwhite3.md`（脱獄）と `kindle_dashboard/README.md`「2. Kindle に入れる」。
 
-1. 充電（50% 以上）→ 機内モード ON → WinterBreak で脱獄 → Hotfix → KUAL/MRPI。
-2. `kindle-dashboard-kindle.zip` を展開し、中の `extensions/dashboard` を Kindle の `extensions/` にコピー。
-3. Kindle の `extensions/dashboard/config.sh` の 1 行を書き換え（**LF 改行のまま保存**。VS Code 推奨）:
+脱獄（WinterBreak2）が済んでいれば、Hotfix・KUAL は不要。
 
-   ```sh
-   SERVER_URL="http://<NASのIP>:8080/dash.png"
-   ```
+1. USB で Mac/PC に接続し、`kindle-dashboard-kindle.zip` を展開してできた 2 つのフォルダを Kindle のルートへコピー:
+   - **`dashboard`** → Kindle のルート（`/mnt/us/dashboard` になる。本体とスクリプト）
+   - **`documents`** の中の 3 つの `.sh` → Kindle の `documents` フォルダ（ライブラリに本として出る起動ボタン）
+2. Kindle の `dashboard/config.sh` の `SERVER_URL` を `http://<NASのIP>:8080/dash.png` に書き換え
+   （**改行コードは LF のまま保存**。Mac のテキストエディットは「標準テキスト」で。VS Code 推奨）。
+3. 取り出して、機内モード OFF（Wi-Fi 接続）。ライブラリに **Dashboard テスト / 開始 / 停止** が出る。
+4. **Dashboard テスト** を開く → 画像が出れば接続 OK（数秒で元の画面に戻ることがある）。
+5. **Dashboard 開始** を開く → 約 5 秒後にダッシュボードに切り替わり、以後毎分更新。
 
-4. 機内モード OFF（Wi-Fi 接続）→ KUAL → Dashboard → **Test** で画像が出れば → **Start**。
-   終了は電源ボタン。
+**Mac の場合（おすすめ）**: Finder でコピーすると隠しファイル `._〜.sh` ができ、ライブラリに壊れた項目として出てしまう。
+ターミナルで次を実行すると、それを避けてコピーと URL の書き換えまで済む（`192.168.x.x` は NAS の IP に置き換え）:
+
+```bash
+cd ~/Downloads && rm -rf kd && unzip -q kindle-dashboard-kindle.zip -d kd
+COPYFILE_DISABLE=1 cp -R kd/dashboard /Volumes/Kindle/
+COPYFILE_DISABLE=1 cp kd/documents/*.sh /Volumes/Kindle/documents/
+sed -i '' 's|^SERVER_URL=.*|SERVER_URL="http://192.168.x.x:8080/dash.png"|' /Volumes/Kindle/dashboard/config.sh
+find /Volumes/Kindle/dashboard /Volumes/Kindle/documents -name '._*' -delete
+grep SERVER_URL /Volumes/Kindle/dashboard/config.sh   # 書き換わったか確認
+```
+
+終了は電源ボタン（またはライブラリの **Dashboard 停止**）。
 
 ## 5. 更新・変更
 

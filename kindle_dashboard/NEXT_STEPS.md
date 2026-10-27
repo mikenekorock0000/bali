@@ -9,10 +9,10 @@
 | 調査・脱獄手順 | ✅ `docs/kindle-dashboard/`（端末は **Kindle Paperwhite 第7世代・FW 5.16.2.1.1** → [paperwhite3.md](../docs/kindle-dashboard/paperwhite3.md)） |
 | ファームウェア | ✅ **5.16.2.1.1** を確認済み（PW3 の最終版。2026-10-26 に自動アップデート）。WinterBreak・LanguageBreak とも対応範囲内 |
 | サーバー（画像生成・配信） | ✅ 実装済み。単体テスト 105 件成功、Docker イメージのビルド・起動を確認 |
-| Kindle 側スクリプト（KUAL 拡張） | ✅ 実装済み。PC 上でコマンドを模擬して動作確認 |
+| Kindle 側スクリプト（Scriptlets で起動） | ✅ 実装済み。PC 上でコマンドを模擬して動作確認 |
 | 配布ファイル | ✅ `dist/kindle-dashboard-nas.zip`・`dist/kindle-dashboard-kindle.zip`、手順は [NAS_SETUP.md](NAS_SETUP.md) |
 | 実データの取得 | ⚠️ **未確認**（開発環境から外部 API に繋がらなかった） |
-| 脱獄 | ✅ WinterBreak 完了（2026-10-27）。次は Hotfix → KUAL/MRPI |
+| 脱獄 | ✅ WinterBreak2 完了（2026-10-27）。`libkh/bin/fbink`・`JAILBROKEN.txt` あり。**Hotfix・KUAL は不要**（新しい脱獄では KPM/Scriptlets。Universal Hotfix は PW3 5.16.2.1.1 で不具合報告あり・入れない） |
 | Kindle 実機での表示 | ⚠️ **未確認** |
 
 ## やること（順番に）
@@ -36,18 +36,18 @@
 
 1. **50% 以上まで充電**、**機内モード ON**（ファームウェアが上がらないように）。
 2. [Jailbreak Wizard](https://kindlemodding.org/jailbreak-wizard.html) で機種・FW を入れて方法を確認。
-3. WinterBreak で脱獄（ダメなら LanguageBreak）。
-4. Hotfix → KUAL/MRPI（`;log mrpi`）。
-5. （推奨）USBNetwork で SSH、FBInk。
+3. WinterBreak2 で脱獄 ✅
+4. ~~Hotfix → KUAL/MRPI~~ → **不要**（KindleModding 公式: 新しい脱獄では KUAL は廃止。Universal Hotfix は入れない）。
+5. ルートに残った `.bin` ファイル・詰め物ファイルがあれば削除（自動アップデートは脱獄で止まっている）。
 
-✅ 完了の目安: ライブラリに **KUAL** があり、開ける。
+✅ 完了の目安: ライブラリに「JAILBROKEN」がある（済）。
 
 ### ステップ 3. Kindle にダッシュボードを入れる（15 分）
 
-1. `dist/kindle-dashboard-kindle.zip` の `extensions/dashboard` を Kindle の `extensions/` へ。
-2. `extensions/dashboard/config.sh` の `SERVER_URL="http://<NASのIP>:8080/dash.png"`（LF 改行のまま保存）。
-3. 機内モード OFF → KUAL → Dashboard → **Test**。
-4. 出たら **Start**。電源ボタンで終了できるか確認。
+1. `dist/kindle-dashboard-kindle.zip` を展開し、`dashboard` を Kindle のルートへ、`documents` の 3 つの `.sh` を Kindle の `documents` へ。
+2. Kindle の `dashboard/config.sh` の `SERVER_URL="http://<NASのIP>:8080/dash.png"`（LF 改行のまま保存）。
+3. 機内モード OFF → ライブラリの **Dashboard テスト** を開く → 画像が出るか。
+4. 出たら **Dashboard 開始**。電源ボタン（または Dashboard 停止）で終了できるか確認。
 
 ✅ 完了の目安: 毎分時計が進み、15 回に 1 回画面全体が書き換わる。
 
@@ -59,7 +59,8 @@
 |---|---|
 | 上下逆さま | サーバーの `config.json` → `"display": {"rotate": 270}` |
 | Kindle の画面（メニュー等）が上書きしてくる | Kindle の `config.sh` → `STOP_MODE=stop` |
-| 電源ボタンで終了しない | SSH で `sh /mnt/us/extensions/dashboard/bin/stop.sh`、または再起動。報告して直す |
+| 電源ボタンで終了しない | 再起動（電源ボタン 40 秒長押し）で元に戻る。報告して直す |
+| 開始してもライブラリの画面のまま／上書きされる | `config.sh` の `START_DELAY` を 10 に、それでもダメなら `STOP_MODE=stop` |
 | 文字が細い・薄い（月カレンダーの予定、服の線など） | 文字サイズ・線の太さを上げる（`server/dashboard/render.py`） |
 | 残像が気になる | `config.sh` の `FULL_REFRESH_EVERY` を小さく（例 5） |
 | 「offline」と出る | Wi-Fi・`SERVER_URL`・NAS のポート/ファイアウォールを確認 |
@@ -67,7 +68,7 @@
 ### ステップ 5. 仕上げ（任意）
 
 - `main` へのマージ（PR を作る）。
-- Kindle の起動時に自動でダッシュボードを始める（今は KUAL から手動で Start）。
+- Kindle の起動時に自動でダッシュボードを始める（今はライブラリの Dashboard 開始から手動）。
 - 室内センサー（SwitchBot CO2 センサー）を買ったら `.env` と `config.json` の `indoor` を設定。
 
 ## 次のセッションに伝えること（報告テンプレート）
@@ -77,7 +78,7 @@
 ```
 ・どのステップか: （例 ステップ1の確認）
 ・/health の結果: （ok:false の項目と error の文）
-・Kindle の画面の写真 / extensions/dashboard/dashboard.log の中身
+・Kindle の画面の写真 / Kindle の dashboard/dashboard.log の中身
 ・やったこと / 起きたこと:
 ```
 
@@ -109,7 +110,8 @@ kindle_dashboard/
       store.py             取得間隔・失敗時は前回値
       demo.py              ダミーデータ
     tests/                 pytest
-  kindle/extensions/dashboard/   KUAL 拡張（BusyBox sh）
+  kindle/dashboard/        Kindle 側の本体（/mnt/us/dashboard。BusyBox sh）
+  kindle/documents/        Scriptlets（ライブラリに出る 開始・停止・テスト）
   tool/package.py          dist/ の zip を作る
 ```
 

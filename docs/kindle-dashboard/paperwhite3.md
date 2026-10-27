@@ -20,7 +20,7 @@
 
 - **充電しておく**（50% 以上推奨。作業中に電池切れで止まるのが一番危ない）。
 - **機内モードを ON**。勝手にファームウェアが上がると、使える脱獄方法が変わる（下記の範囲から外れる）ことがある。
-- 空き容量は 750MB 程度あれば十分（KUAL/MRPI の導入に約 220MB 必要）。
+- 空き容量は 750MB 程度あれば十分。
 - まず **[KindleModding の Jailbreak Wizard](https://kindlemodding.org/jailbreak-wizard.html)** に機種とファームウェアを入れ、出てきた方法を確認する（一次情報が正）。
 
 ## 2. 使える脱獄方法（5.16.2.1.1 の場合）
@@ -51,28 +51,33 @@
 
 ## 3. 脱獄後の作業
 
-1. **Hotfix**: [Update_hotfix_universal.bin](https://github.com/KindleModding/Hotfix/releases/latest/download/Update_hotfix_universal.bin) をルートへ（他の `.bin` は削除）→ 取り外し → 設定 → メニュー → **Kindle をアップデート** → 再起動後ライブラリの **Run Hotfix** を開く。
-2. **KUAL と MRPI**: [kual-mrinstaller-khf](https://fw.notmarek.com/khf/kual-mrinstaller-khf.tar.xz) の `extensions` と `mrpackages` をルートへ、
-   KUAL（6 世代以降用の `Update_KUALBooklet_HDRepack.bin`）を `mrpackages` へ → 取り外して検索バーに **`;log mrpi`** → ライブラリに KUAL が出る。
-   （KindleModding は現在 KPM・Scriptlets も案内している。どちらでもダッシュボードは起動できる）
-3. **OTA（自動アップデート）**: WinterBreak で脱獄した場合はブロック済み。LanguageBreak の場合は `renameotabin` 拡張で無効化。
-4. **SSH（推奨）**: USBNetwork を入れて `ssh root@<KindleのIP>` できるようにすると、設定変更や不具合調査が楽。
-5. **FBInk（推奨）**: 標準の `eips` でも表示できるが、FBInk のほうがリフレッシュ制御が確実。
+**新しい脱獄（WinterBreak2 など。KindleModding のいう hdnext スタック）では、ほとんど何もしなくてよい。**
+（2026-10-27 に KindleModding 公式 wiki のソースで確認）
+
+1. **自動アップデート**: 脱獄で止まっている。ルートに `update*.bin`・`update.bin.tmp.partial`・詰め物ファイルが残っていれば削除。
+2. **Hotfix（Universal Hotfix）は入れない**: 保守終了。PW3・5.16.2.1.1・WinterBreak2 で入れたら検索欄の `;` コマンドが壊れた報告あり
+   （[issue #206](https://github.com/KindleModding/kindlemodding.github.io/issues/206)）。「Kindle をアップデート」がグレーなのは正常。
+3. **KUAL は使わない**: 公式 wiki で「廃止され、もう動かない」。代わりに **Scriptlets**:
+   `documents` に置いた `.sh` がライブラリに本として出て、開くと root で実行される（[Scriptlets](https://kindlemodding.org/kindle-dev/scriptlets.html)）。
+   アプリの追加は検索欄の `;kpm install ...`（KPM）でもできる。
+4. **FBInk**: 脱獄で `/mnt/us/libkh/bin/fbink` に入っている（ダッシュボードはこれを使う）。
+
+確認の目安: ライブラリに「JAILBROKEN」、USB で見たルートに `libkh` と `winterbreak2` フォルダがある。
 
 ## 4. ダッシュボードを入れる
 
 [kindle_dashboard/README.md](../../kindle_dashboard/README.md) の「2. Kindle に入れる」の通り。
 
-1. `kindle_dashboard/kindle/extensions/dashboard` を Kindle の `extensions/` にコピー。
-2. `config.sh` の `SERVER_URL` を `http://<NASのIP>:8080/dash.png` に（**LF 改行で保存**）。
-3. Wi-Fi を ON（機内モード OFF）にして、KUAL → Dashboard → **Test** → 画像が出たら **Start**。
+1. `kindle-dashboard-kindle.zip` の `dashboard` を Kindle のルートへ、`documents` の 3 つの `.sh` を Kindle の `documents` へ。
+2. `dashboard/config.sh` の `SERVER_URL` を `http://<NASのIP>:8080/dash.png` に（**LF 改行で保存**）。
+3. Wi-Fi を ON（機内モード OFF）にして、ライブラリの **Dashboard テスト** → 画像が出たら **Dashboard 開始**。
 
 PW3 向けのポイント:
 
 - 画面いっぱいに出ない・ずれる → サーバーの `config.json` の `display` が `1448 x 1072` になっているか確認。
 - 上下逆さま → `display.rotate` を `270` に。
 - 毎分更新なら **USB 給電しっぱなし**（電池が古いので）。フロントライトは `config.sh` の `FRONTLIGHT=0` で消灯。
-- 表示が Kindle の画面に上書きされる → `config.sh` の `STOP_MODE=stop` を試す。
+- 開始してもライブラリが上に出る・上書きされる → `config.sh` の `START_DELAY=10`、それでもダメなら `STOP_MODE=stop`。
 
 ## 参考
 

@@ -17,8 +17,11 @@ STOP_MODE=pause
 # フロントライトの明るさ（0 = 消灯）。空にすると変更しない
 FRONTLIGHT=0
 
+# 起動してから画面を確保するまでの待ち時間（秒）。ライブラリが上書きしてくるなら増やす
+START_DELAY=5
+
 # 電源ボタンを押したらダッシュボードを終了する（1 = 有効）
 EXIT_ON_POWER_BUTTON=1
 
-# ログ（USB 接続で見える場所）
-LOG_FILE=/mnt/us/extensions/dashboard/dashboard.log
+# ログ（USB 接続で見える場所。Kindle の dashboard フォルダ内）
+LOG_FILE=/mnt/us/dashboard/dashboard.log

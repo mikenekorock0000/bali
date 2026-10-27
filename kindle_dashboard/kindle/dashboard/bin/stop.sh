@@ -1,5 +1,5 @@
 #!/bin/sh
-# ダッシュボードを終了して通常の Kindle に戻す（KUAL の「Stop」や SSH から）。
+# ダッシュボードを終了して通常の Kindle に戻す（電源ボタン、ライブラリの「Dashboard 停止」、SSH から）。
 . "$(dirname "$0")/common.sh"
 
 if [ -f "$WATCH_PID_FILE" ]; then
