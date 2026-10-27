@@ -99,6 +99,6 @@ grep SERVER_URL /Volumes/Kindle/dashboard/config.sh   # 書き換わったか確
 | やりたいこと | 方法 |
 |---|---|
 | 設定（`config.json` / `.env`）を変えた | プロジェクトを再起動（SSH: `docker compose up -d`） |
-| プログラムを新しくした（**`config/` と `docker-compose.yml` は上書きしない**。`dashboard` フォルダと `serve.py` だけ差し替え。フォルダの中に `dashboard/dashboard` と二重にならないよう注意。反映されたかは `/health` の `version` で確認） | ファイルを差し替えて作り直し（SSH: `docker compose up -d --build`、Container Manager は「ビルド」） |
+| プログラムを新しくした | 新しい zip の `kindle-dashboard` フォルダで NAS のフォルダを**丸ごと上書き** → プロジェクトを**再起動**（プログラムはフォルダから直接読むのでビルド不要。`Dockerfile`・`requirements.txt` が変わったときだけビルド）。反映されたかは `/health` の `version` で確認。自分の設定入りの完全版 zip なら `config` も上書きしてよい |
 | ログを見る | Container Manager のコンテナ →「ログ」／ `docker logs kindle-dashboard` |
 | 時計のフォントを変える | `config.json` に `"clock": {"font": "ZenDots-Regular.ttf"}` など（README の表） |

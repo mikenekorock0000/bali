@@ -15,3 +15,6 @@ services:
       - CALENDAR_ICS_URLS=${CALENDAR_ICS_URLS:-}
     volumes:
       - ./config:/config:ro  # config/config.json を置く
+      # プログラムはこのフォルダから直接読む（更新はファイルを上書きして再起動するだけ。ビルド不要）
+      - ./dashboard:/app/dashboard:ro
+      - ./serve.py:/app/serve.py:ro
