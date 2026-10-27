@@ -11,13 +11,14 @@
 | サーバー（画像生成・配信） | ✅ 実装済み。単体テスト 105 件成功、Docker イメージのビルド・起動を確認 |
 | Kindle 側スクリプト（Scriptlets で起動） | ✅ 実装済み。PC 上でコマンドを模擬して動作確認 |
 | 配布ファイル | ✅ `dist/kindle-dashboard-nas.zip`・`dist/kindle-dashboard-kindle.zip`、手順は [NAS_SETUP.md](NAS_SETUP.md) |
-| 実データの取得 | ⚠️ **未確認**（開発環境から外部 API に繋がらなかった） |
+| NAS サーバー | ✅ Synology Container Manager で起動（2026-10-27）。**ポートは 8090**（8080 は使用中だったため `"8090:8080"` に変更）。`http://<NASのIP>:8090/` |
+| 実データの取得 | ✅ `/health` で weather・market0〜2（ドル円・S&P500・FANG+）・news すべて `ok: true` を確認 |
 | 脱獄 | ✅ WinterBreak2 完了（2026-10-27）。`libkh/bin/fbink`・`JAILBROKEN.txt` あり。**Hotfix・KUAL は不要**（新しい脱獄では KPM/Scriptlets。Universal Hotfix は PW3 5.16.2.1.1 で不具合報告あり・入れない） |
 | Kindle 実機での表示 | ⚠️ **未確認** |
 
 ## やること（順番に）
 
-### ステップ 1. NAS でサーバーを動かす（30 分）
+### ステップ 1. NAS でサーバーを動かす（30 分）— ✅ 完了
 
 1. `dist/kindle-dashboard-nas.zip` を展開して NAS へ置く（[NAS_SETUP.md](NAS_SETUP.md) の 1）。
 2. `config/config.json` の `location` に自宅の緯度・経度。

@@ -61,7 +61,7 @@ zip が古いときは、リポジトリのルートで `python kindle_dashboard
 
 `/health` で `"ok": false` の項目があれば、その `error` の文をメモしておく（直すときに使う）。
 
-- ポート 8080 が使用中 → `docker-compose.yml` の `"8080:8080"` を `"8090:8080"` などに。
+- ポート 8080 が使用中（起動時に `driver failed programming external connectivity` と出る）→ `docker-compose.yml` の `"8080:8080"` を `"8090:8080"` などに（Container Manager ならプロジェクトの「YAML 設定」で編集）。Kindle の `SERVER_URL` も同じ番号に。
 - NAS のファイアウォールが有効 → そのポートを LAN 内に許可。
 - **NAS の IP はルーターで固定**しておく（変わると Kindle が画像を取りに行けなくなる）。
 
