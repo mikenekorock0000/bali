@@ -25,7 +25,10 @@ DEFAULT_CONFIG = {
     "location": {"name": "東京", "latitude": 35.6812, "longitude": 139.7671},
     "timezone": "Asia/Tokyo",
     # 横置きの画面サイズ（Kindle Paperwhite 第7世代 = 1448x1072）。rotate で縦の画面向きに回す
-    "display": {"width": 1448, "height": 1072, "rotate": 90},
+    # gamma: 中間色を濃くする補正（E-ink 向け, 1.0 で補正なし）
+    "display": {"width": 1448, "height": 1072, "rotate": 90, "gamma": 1.4},
+    # 文字を指定より何段階太くするか（E-ink 向け。0 で元の太さ）
+    "font_weight_boost": 1,
     "font_path": None,
     # 時計の数字のフォント（fonts/ 内のファイル名と太さ）。候補は README 参照
     "clock": {"font": "DMSerifDisplay-Regular.ttf"},
@@ -110,7 +113,7 @@ class Dashboard:
         d = self.cfg["display"]
         with self._lock:
             img = render(self.data(), self.fonts, d["width"], d["height"])
-            img = to_kindle(img, d["rotate"] if rotate else 0)
+            img = to_kindle(img, d["rotate"] if rotate else 0, d.get("gamma", 1.0))
             return png_bytes(img)
 
 

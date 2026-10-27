@@ -59,8 +59,9 @@ def cmd_render(cfg: dict, fonts: Fonts, demo: bool, out: Path, at: str | None = 
     d = cfg["display"]
     img = render(data, fonts, d["width"], d["height"])
     out.mkdir(parents=True, exist_ok=True)
-    (out / "preview.png").write_bytes(png_bytes(to_kindle(img, 0)))
-    (out / "dash.png").write_bytes(png_bytes(to_kindle(img, d["rotate"])))
+    gamma = d.get("gamma", 1.0)
+    (out / "preview.png").write_bytes(png_bytes(to_kindle(img, 0, gamma)))
+    (out / "dash.png").write_bytes(png_bytes(to_kindle(img, d["rotate"], gamma)))
     print(f"書き出しました: {out / 'preview.png'}, {out / 'dash.png'}")
 
 
@@ -77,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     cfg = load_config(args.config)
-    fonts = Fonts(cfg.get("font_path"), SERVER_DIR, cfg.get("clock"))
+    fonts = Fonts(cfg.get("font_path"), SERVER_DIR, cfg.get("clock"), cfg.get("font_weight_boost", 0))
 
     if args.cmd == "render":
         cmd_render(cfg, fonts, args.demo, args.out, args.at)

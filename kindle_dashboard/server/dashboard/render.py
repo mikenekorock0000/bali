@@ -18,7 +18,9 @@ from . import gcal
 from .gcal import Event
 from .sources import Indoor, Quote, Weather, co2_level, icon_kind, weather_label, wind_direction_ja
 
-BLACK, DARK, GRAY, LIGHT, WHITE = 0, 68, 119, 187, 255
+# E-ink は中間色が薄く出るので、灰色は濃いめにしておく（文字に使う GRAY でもはっきり読める濃さ）
+BLACK, DARK, GRAY, LIGHT, WHITE = 0, 34, 68, 153, 255
+WEIGHTS = ["Thin", "ExtraLight", "Light", "Regular", "Medium", "SemiBold", "Bold", "ExtraBold", "Black"]
 WEEKDAYS = "月火水木金土日"
 
 FONT_CANDIDATES = [
@@ -51,7 +53,8 @@ class Fonts:
     """サイズ・太さごとのフォントをキャッシュする。可変フォントなら太さを切り替える。"""
 
     def __init__(self, path: str | None = None, base_dir: Path | None = None,
-                 clock: dict | None = None):
+                 clock: dict | None = None, weight_boost: int = 0):
+        self.weight_boost = weight_boost  # 指定した太さより何段階太くするか（E-ink 向け）
         candidates = ([path] if path else []) + FONT_CANDIDATES
         base = base_dir or Path.cwd()
         self._clock_path = None
@@ -72,6 +75,8 @@ class Fonts:
         self._cache: dict[tuple[int, str], ImageFont.FreeTypeFont] = {}
 
     def get(self, size: int, weight: str = "Regular") -> ImageFont.FreeTypeFont:
+        if self.weight_boost and weight in WEIGHTS:
+            weight = WEIGHTS[min(len(WEIGHTS) - 1, WEIGHTS.index(weight) + self.weight_boost)]
         key = (size, weight)
         if key not in self._cache:
             font = ImageFont.truetype(self.path, size)
@@ -266,7 +271,7 @@ def draw_clothing(c: Canvas, w: Weather | None):
     if rain:
         c.umbrella_badge(x - 6, top + 4, 62)
         x += 70
-    c.text(x, top + 12, f"{cl.day_label}の服装", 13, "Medium", fill=GRAY, anchor="lm")
+    c.text(x, top + 12, f"{cl.day_label}の服装", 14, "Medium", fill=GRAY, anchor="lm")
     c.text(x, top + 36, cl.phrase, 24, "Bold", anchor="lm")
 
     # ひとこと（傘は太字で先頭に）。入りきらないものは後ろから省く
@@ -291,9 +296,9 @@ def draw_temp_chart(c: Canvas, w: Weather | None, now: datetime):
     x0, x1, y0, y1 = CHART_X0, c.w - M - 4, 264, 290  # 折れ線の範囲（y0 が上）
     base = y1 + 5  # 降水確率の棒の底・目盛りの線
     temps = [p.temperature for p in hours]
-    cw = c.text(x0, 250, f"{w.day_label}の気温", 13, "Medium", fill=GRAY, anchor="lm")
+    cw = c.text(x0, 250, f"{w.day_label}の気温", 14, "Medium", fill=GRAY, anchor="lm")
     c.text(x0 + cw + 8, 250, f"{round(min(temps))}〜{round(max(temps))}°", 14, "SemiBold", anchor="lm")
-    c.text(x1 + 4, 250, "■ 降水確率", 11, "Medium", fill=LIGHT, anchor="rm")
+    c.text(x1 + 4, 250, "■ 降水確率", 12, "Medium", fill=GRAY, anchor="rm")
 
     lo, hi = min(temps), max(temps)
     pad = max(0.0, 4 - (hi - lo)) / 2  # 変化が小さい日も平らに見えすぎないように
@@ -310,10 +315,10 @@ def draw_temp_chart(c: Canvas, w: Weather | None, now: datetime):
         if p.precip_prob:
             h = (base - y0) * p.precip_prob / 100
             c.rect(px(p.time.hour) - bar / 2, base - h, px(p.time.hour) + bar / 2, base, fill=LIGHT)
-    c.line(x0, base, x1, base, 1, fill=GRAY)
+    c.line(x0, base, x1, base, 1.5, fill=GRAY)
     for h in (0, 6, 12, 18):
-        c.text(px(h), base + 8, str(h), 10, "Medium", fill=GRAY, anchor="mm")
-    c.text(x1 + 4, base + 8, "24時", 10, "Medium", fill=GRAY, anchor="rm")
+        c.text(px(h), base + 8, str(h), 12, "Medium", fill=GRAY, anchor="mm")
+    c.text(x1 + 4, base + 8, "24時", 12, "Medium", fill=GRAY, anchor="rm")
 
     if w.day_label == "今日":  # 現在時刻の縦線
         nx = px(now.hour + now.minute / 60)
@@ -322,7 +327,7 @@ def draw_temp_chart(c: Canvas, w: Weather | None, now: datetime):
 
     pts = [(px(p.time.hour), py(p.temperature)) for p in hours]
     for a, b in zip(pts, pts[1:]):
-        c.line(*a, *b, 2.5)
+        c.line(*a, *b, 3.5)
 
     # 最高・最低の位置に点
     for i in (temps.index(max(temps)), temps.index(min(temps))):
@@ -347,15 +352,15 @@ def draw_hourly(c: Canvas, w: Weather | None):
         c.text(cx, 366, _deg(s.temperature), 20, "Bold", anchor="ma")
         if s.precip_prob is not None:
             label = f"{s.precip_prob}%"
-            tw = c.text_width(label, 13, "Medium")
+            tw = c.text_width(label, 14, "Medium")
             c.umbrella(cx - tw / 2 - 4, 397, 11)
-            c.text(cx - tw / 2 + 5, 397, label, 13, "Medium", anchor="lm")
+            c.text(cx - tw / 2 + 5, 397, label, 14, "Medium", anchor="lm")
 
 
 def draw_heading(c: Canvas, x0, x1, y, title, sub=""):
     tw = c.text(x0 + 4, y, title, 20, "Bold")
     if sub:
-        c.text(x0 + 4 + tw + 10, y + 7, sub, 13, "Medium", fill=GRAY)
+        c.text(x0 + 4 + tw + 10, y + 6, sub, 14, "Medium", fill=GRAY)
     c.line(x0, y + 32, x1, y + 32, 1.5)
 
 
@@ -400,7 +405,7 @@ def draw_market(c: Canvas, quotes: list[Quote | str]):
             continue
         if q.as_of:  # 投資信託は基準日をラベルの下に出す
             c.text(x0 + 6, mid - 6, q.label, 16, "Medium", anchor="lm")
-            c.text(x0 + 6, mid + 10, f"{q.as_of.month}/{q.as_of.day}基準", 11, "Medium", fill=GRAY, anchor="lm")
+            c.text(x0 + 6, mid + 10, f"{q.as_of.month}/{q.as_of.day}基準", 12, "Medium", fill=GRAY, anchor="lm")
         else:
             c.text(x0 + 6, mid, q.label, 16, "Medium", anchor="lm")
         c.text(value_right, mid, _num(q.price, q.decimals), 24, "Bold", anchor="rm")
@@ -433,7 +438,7 @@ def draw_month(c: Canvas, events: list[Event], now: datetime, week_start: str = 
     head_y = y + 46
     for i, name in enumerate(names):
         weekend = name in "日土"
-        c.text(x0 + cw * i + cw / 2, head_y, name, 12, "Bold" if weekend else "Medium",
+        c.text(x0 + cw * i + cw / 2, head_y, name, 13, "Bold" if weekend else "Medium",
                fill=BLACK if weekend else GRAY, anchor="mm")
 
     top, bottom = head_y + 10, 722
@@ -441,7 +446,7 @@ def draw_month(c: Canvas, events: list[Event], now: datetime, week_start: str = 
     line_h, size = 14, 11.5
     for r, week in enumerate(grid):
         ry = top + r * rh
-        c.line(x0, ry, x1, ry, 1, fill=LIGHT)
+        c.line(x0, ry, x1, ry, 1.5, fill=LIGHT)
         for i, day in enumerate(week):
             cx = x0 + i * cw
             in_month = day.month == now.month
@@ -464,7 +469,7 @@ def draw_month(c: Canvas, events: list[Event], now: datetime, week_start: str = 
                     c.rect(cx + 2, ey - line_h / 2 + 1, cx + cw - 2, ey + line_h / 2 - 1, fill=LIGHT)
                 c.text(cx + 4, ey, c.fit(ev.title, size, "Medium", cw - 8), size, "Medium", fill=fill, anchor="lm")
             if len(todays) > len(shown):  # 入りきらない件数は日付の右に
-                c.text(cx + cw - 4, ry + 11, f"+{len(todays) - len(shown)}", 11, "Bold", fill=GRAY, anchor="rm")
+                c.text(cx + cw - 4, ry + 11, f"+{len(todays) - len(shown)}", 12, "Bold", fill=GRAY, anchor="rm")
 
 
 def draw_footer(c: Canvas, data: DashboardData):
@@ -476,7 +481,7 @@ def draw_footer(c: Canvas, data: DashboardData):
     if data.failing:
         status += "　※取得失敗: " + "・".join(data.failing)
     c.text(M + 36, y, status, 14, "Medium", anchor="lm")
-    c.text(c.w - M, y, data.credits, 11, "Medium", fill=GRAY, anchor="rm")
+    c.text(c.w - M, y, data.credits, 12, "Medium", fill=GRAY, anchor="rm")
 
 
 def render(data: DashboardData, fonts: Fonts, width: int = LAYOUT_W, height: int = LAYOUT_H) -> Image.Image:
@@ -503,9 +508,12 @@ def render(data: DashboardData, fonts: Fonts, width: int = LAYOUT_W, height: int
     return c.finish()
 
 
-def to_kindle(img: Image.Image, rotate: int) -> Image.Image:
-    """16 階調に丸め、時計回りに rotate 度回転した Kindle 用画像にする。"""
-    img = img.convert("L").point(lambda v: round(v / 17) * 17)
+def to_kindle(img: Image.Image, rotate: int, gamma: float = 1.0) -> Image.Image:
+    """濃さを補正して 16 階調に丸め、時計回りに rotate 度回転した Kindle 用画像にする。
+
+    gamma > 1 で中間色を濃くする（E-ink で文字の輪郭や灰色が飛ばないように）。
+    """
+    img = img.convert("L").point(lambda v: round(255 * (v / 255) ** gamma / 17) * 17)
     transpose = {90: Image.Transpose.ROTATE_270, 180: Image.Transpose.ROTATE_180,
                  270: Image.Transpose.ROTATE_90}
     return img.transpose(transpose[rotate]) if rotate in transpose else img

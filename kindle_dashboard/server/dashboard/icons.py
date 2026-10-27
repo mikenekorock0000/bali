@@ -55,7 +55,7 @@ def moon(draw, cx: float, cy: float, r: float, w: float, fg=BLACK, bg=WHITE) -> 
 def weather(draw, kind: str, cx: float, cy: float, s: float, is_day: bool = True,
             fg=BLACK, bg=WHITE) -> None:
     """中心 (cx, cy)・大きさ s の天気アイコン。"""
-    w = max(1.5, s * 0.045)
+    w = max(2, s * 0.065)
     x, y = cx - s / 2, cy - s / 2
 
     if kind == "clear":
@@ -151,7 +151,7 @@ GARMENTS = {90: "tank", 80: "tshirt", 70: "cardigan", 60: "shirt", 50: "sweater"
 
 def garment(draw, kind: str, x: float, y: float, s: float, fg=BLACK, bg=WHITE, shade=187) -> None:
     """(x, y) を左上とする一辺 s の枠に服のイラストを描く。"""
-    w = max(2, round(s * 0.05))
+    w = max(2, round(s * 0.07))
 
     def P(pts):
         return [(x + px * s, y + py * s) for px, py in pts]

@@ -198,3 +198,19 @@ def test_render_scales_layout_to_screen(fonts, size):
     w, h = size
     col = img.crop((round(w * 0.97), 0, w, h))
     assert col.getextrema()[0] < 128
+
+
+def test_gamma_darkens_midtones():
+    img = Image.new("L", (3, 1))
+    img.putdata([0, 153, 255])
+    plain, dark = to_kindle(img, 0, 1.0), to_kindle(img, 0, 1.4)
+    assert list(dark.getdata())[0] == 0 and list(dark.getdata())[2] == 255  # 白黒はそのまま
+    assert list(dark.getdata())[1] < list(plain.getdata())[1]               # 中間色だけ濃く
+
+
+def test_font_weight_boost():
+    plain = Fonts(None, SERVER_DIR)
+    bold = Fonts(None, SERVER_DIR, weight_boost=1)
+    # 1 段階太い = Medium を頼むと SemiBold になる → 同じ文字列でも幅が広い
+    assert bold.get(40, "Medium").getlength("見やすさ") >= plain.get(40, "SemiBold").getlength("見やすさ") - 1
+    assert bold.get(40, "Black").getlength("A") == plain.get(40, "Black").getlength("A")  # 上限で止まる
