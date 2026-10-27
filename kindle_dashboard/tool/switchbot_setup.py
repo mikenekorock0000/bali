@@ -21,6 +21,7 @@ import hashlib
 import hmac
 import json
 import ssl
+import subprocess
 import sys
 import time
 import urllib.error
@@ -41,10 +42,36 @@ def headers(token: str, secret: str) -> dict[str, str]:
             "Content-Type": "application/json; charset=utf8"}
 
 
+_use_curl = False  # Python の証明書が使えない Mac では macOS 標準の curl で通信する
+
+
+def _is_cert_error(e: Exception) -> bool:
+    return isinstance(e, ssl.SSLError) or isinstance(getattr(e, "reason", None), ssl.SSLError)
+
+
+def _curl(url: str, hdrs: dict[str, str]) -> dict:
+    cmd = ["curl", "-sS", "--max-time", "15"]
+    for k, v in hdrs.items():
+        cmd += ["-H", f"{k}: {v}"]
+    out = subprocess.run(cmd + [url], capture_output=True, text=True, check=True).stdout
+    return json.loads(out)
+
+
 def get(path: str, token: str, secret: str) -> dict:
-    req = urllib.request.Request(API + path, headers=headers(token, secret))
-    with urllib.request.urlopen(req, timeout=15) as res:
-        data = json.load(res)
+    global _use_curl
+    hdrs = headers(token, secret)
+    if _use_curl:
+        data = _curl(API + path, hdrs)
+    else:
+        try:
+            req = urllib.request.Request(API + path, headers=hdrs)
+            with urllib.request.urlopen(req, timeout=15) as res:
+                data = json.load(res)
+        except (urllib.error.URLError, ssl.SSLError) as e:
+            if not _is_cert_error(e):
+                raise
+            _use_curl = True
+            data = _curl(API + path, hdrs)
     if data.get("statusCode") != 100:
         raise RuntimeError(f"SwitchBot API エラー: {data.get('statusCode')} {data.get('message')}")
     return data["body"]
@@ -93,11 +120,8 @@ def main() -> int:
     print("機器を探しています…")
     try:
         sensors = find_sensors(token, secret)
-    except urllib.error.URLError as e:
-        if isinstance(getattr(e, "reason", None), ssl.SSLError):
-            print("証明書のエラーです。python.org 版の Python なら「Applications/Python 3.x/Install Certificates.command」を実行してから再度お試しください。")
-        else:
-            print(f"接続できませんでした: {e}")
+    except (urllib.error.URLError, subprocess.CalledProcessError, json.JSONDecodeError) as e:
+        print(f"接続できませんでした: {e}")
         return 1
     except RuntimeError as e:
         print(e, "（トークン・シークレットが正しいか確認してください）")

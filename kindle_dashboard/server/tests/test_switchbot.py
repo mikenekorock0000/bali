@@ -83,3 +83,28 @@ def test_render_indoor_without_co2():
     data = demo_data(datetime(2026, 10, 27, 14, 0, tzinfo=ZoneInfo("Asia/Tokyo")))
     data.indoor = sources.Indoor(22.4, 48, None)
     assert render(data, Fonts(None, SERVER_DIR)).size == (1024, 758)
+
+
+def test_setup_falls_back_to_curl_on_cert_error(monkeypatch):
+    import ssl
+    import urllib.error
+
+    def bad_urlopen(*a, **k):
+        raise urllib.error.URLError(ssl.SSLCertVerificationError("unable to get local issuer certificate"))
+
+    calls = []
+
+    class Done:
+        stdout = json.dumps({"statusCode": 100, "body": {"deviceList": []}})
+
+    def fake_run(cmd, **k):
+        calls.append(cmd)
+        return Done()
+
+    monkeypatch.setattr(setup.urllib.request, "urlopen", bad_urlopen)
+    monkeypatch.setattr(setup.subprocess, "run", fake_run)
+    monkeypatch.setattr(setup, "_use_curl", False)
+    assert setup.get("/devices", "tok", "sec") == {"deviceList": []}
+    assert calls[0][0] == "curl" and calls[0][-1].endswith("/v1.1/devices")
+    assert "Authorization: tok" in calls[0]
+    assert setup._use_curl  # 2 回目以降は最初から curl
