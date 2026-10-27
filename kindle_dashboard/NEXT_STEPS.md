@@ -12,7 +12,8 @@
 | Kindle 側スクリプト（KUAL 拡張） | ✅ 実装済み。PC 上でコマンドを模擬して動作確認 |
 | 配布ファイル | ✅ `dist/kindle-dashboard-nas.zip`・`dist/kindle-dashboard-kindle.zip`、手順は [NAS_SETUP.md](NAS_SETUP.md) |
 | 実データの取得 | ⚠️ **未確認**（開発環境から外部 API に繋がらなかった） |
-| Kindle 実機での表示 | ⚠️ **未確認**（未脱獄） |
+| 脱獄 | ✅ WinterBreak 完了（2026-10-27）。次は Hotfix → KUAL/MRPI |
+| Kindle 実機での表示 | ⚠️ **未確認** |
 
 ## やること（順番に）
 
@@ -29,7 +30,7 @@
 
 ✅ 完了の目安: `/health` が全部 `true`、`preview.png` に実際の天気・市況・ニュースが出ている。
 
-### ステップ 2. Kindle を脱獄する（1〜2 時間）
+### ステップ 2. Kindle を脱獄する（1〜2 時間）— WinterBreak まで完了
 
 手順: [paperwhite3.md](../docs/kindle-dashboard/paperwhite3.md)
 
