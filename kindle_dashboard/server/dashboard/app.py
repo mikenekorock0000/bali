@@ -21,6 +21,9 @@ log = logging.getLogger(__name__)
 
 SERVER_DIR = Path(__file__).resolve().parent.parent
 
+# /health に出す。NAS に新しいプログラムが反映されたかの確認用（変更したら上げる）
+VERSION = "2026.10.27-eink"
+
 DEFAULT_CONFIG = {
     "location": {"name": "東京", "latitude": 35.6812, "longitude": 139.7671},
     "timezone": "Asia/Tokyo",
@@ -134,7 +137,7 @@ def make_handler(dash: Dashboard):
             elif url.path == "/preview.png":
                 self._send(200, "image/png", dash.render_png(rotate=False))
             elif url.path == "/health":
-                body = json.dumps(dash.store.status(), ensure_ascii=False, indent=2)
+                body = json.dumps({"version": VERSION, **dash.store.status()}, ensure_ascii=False, indent=2)
                 self._send(200, "application/json; charset=utf-8", body.encode())
             else:
                 self._send(404, "text/plain; charset=utf-8", b"not found")

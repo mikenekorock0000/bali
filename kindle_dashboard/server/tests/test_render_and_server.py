@@ -121,7 +121,9 @@ def test_http_server_serves_png_and_records_battery(fonts):
             assert Image.open(io.BytesIO(res.read())).size == (1448, 1072)
 
         with opener.open(f"{base}/health") as res:
-            assert json.load(res)["device"]["battery"] == 96
+            health = json.load(res)
+            assert health["device"]["battery"] == 96
+            assert health["version"]
     finally:
         server.shutdown()
 
