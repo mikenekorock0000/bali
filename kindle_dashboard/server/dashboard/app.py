@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 SERVER_DIR = Path(__file__).resolve().parent.parent
 
 # /health に出す。NAS に新しいプログラムが反映されたかの確認用（変更したら上げる）
-VERSION = "2026.10.27-eink"
+VERSION = "2026.10.28-switchbot"
 
 DEFAULT_CONFIG = {
     "location": {"name": "東京", "latitude": 35.6812, "longitude": 139.7671},
@@ -57,9 +57,16 @@ DEFAULT_CONFIG = {
 
 
 def load_config(path: Path | None) -> dict:
+    """既定値に config.json を重ね、同じフォルダに secrets.json があればさらに重ねる。
+
+    secrets.json は SwitchBot のトークンなど人に見せない値の置き場（配布 zip には入らない）。
+    """
     cfg = json.loads(json.dumps(DEFAULT_CONFIG))
-    if path and path.is_file():
-        for key, value in json.loads(path.read_text(encoding="utf-8")).items():
+    files = [path, path.parent / "secrets.json"] if path else []
+    for f in files:
+        if not f.is_file():
+            continue
+        for key, value in json.loads(f.read_text(encoding="utf-8")).items():
             if isinstance(value, dict) and isinstance(cfg.get(key), dict):
                 cfg[key].update(value)
             else:

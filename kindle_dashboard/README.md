@@ -193,11 +193,22 @@ tenki.jp の服装指数を参考にした**独自の目安**（tenki.jp の値�
 
 ### 室内センサー（任意: SwitchBot）
 
-1. SwitchBot アプリ → プロフィール → 設定 → 「アプリバージョン」を 10 回タップ → 開発者向けオプションでトークンとシークレットを取得。
-2. 環境変数 `SWITCHBOT_TOKEN` と `SWITCHBOT_SECRET` を設定。
-3. `config.json` を `"indoor": {"provider": "switchbot", "device_id": "<CO2センサーのデバイスID>"}` に。
-   デバイス ID は `GET https://api.switch-bot.com/v1.1/devices` の一覧で確認できる。
-4. CO2 は 1000ppm 未満「良好」、1500ppm 未満「やや高い」、それ以上「換気推奨」と表示。
+SwitchBot の **ハブ2 / ハブ3**（温湿度センサー内蔵）、**温湿度計**、**CO2センサー**（＋ハブ）に対応。
+ハブ2・温湿度計は CO2 を測れないので、室内欄は温度・湿度と「乾燥（40% 未満）/ 快適 / 多湿（70% 超）」を出す。
+CO2センサーなら CO2 と「良好（1000ppm 未満）/ やや高い / 換気推奨」。
+
+1. SwitchBot アプリ → プロフィール → 設定 →「アプリバージョン」を 10 回タップ → 開発者向けオプションで
+   **トークン**と**クライアントシークレット**をコピー。
+2. Mac のターミナルで設定スクリプトを実行（機器を自動で探し、値が読めるか確かめて `secrets.json` を作る）:
+   ```bash
+   cd ~/Downloads && curl -fsSL -o switchbot_setup.py "https://raw.githubusercontent.com/mikenekorock0000/bali/kindle-dashboard/kindle_dashboard/tool/switchbot_setup.py" && python3 switchbot_setup.py
+   ```
+3. できた `secrets.json` を NAS の `docker/kindle-dashboard/config/` に置き、プロジェクトを**再起動**。
+   `/health` に `indoor` が出て `ok: true` なら完了。
+
+`secrets.json` は `config.json` に重ねて読まれる（`{"indoor": {"provider": "switchbot", "device_id": ..., "token": ..., "secret": ...}}`）。
+配布 zip には入らないので、NAS のフォルダを**上書き**しても消えない（フォルダを削除すると消える）。
+トークンが入っているので人に渡さないこと。環境変数 `SWITCHBOT_TOKEN` / `SWITCHBOT_SECRET` でも指定できる。
 
 ## 2. Kindle に入れる
 

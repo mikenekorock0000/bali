@@ -330,6 +330,17 @@ class Indoor:
     co2: int | None
 
 
+def comfort_level(humidity: float | None) -> str:
+    """CO2 を測れない機器（ハブ2・温湿度計）用の目安。"""
+    if humidity is None:
+        return ""
+    if humidity < 40:
+        return "乾燥"
+    if humidity > 70:
+        return "多湿"
+    return "快適"
+
+
 def co2_level(ppm: int | None) -> str:
     if ppm is None:
         return ""
@@ -364,9 +375,11 @@ def fetch_indoor(cfg: dict, env: dict[str, str]) -> Indoor | None:
     indoor = cfg.get("indoor") or {}
     if indoor.get("provider") != "switchbot":
         return None
-    token, secret = env.get("SWITCHBOT_TOKEN"), env.get("SWITCHBOT_SECRET")
+    # トークンは環境変数か config（secrets.json）の indoor.token / indoor.secret
+    token = env.get("SWITCHBOT_TOKEN") or indoor.get("token")
+    secret = env.get("SWITCHBOT_SECRET") or indoor.get("secret")
     device_id = indoor.get("device_id")
     if not (token and secret and device_id):
-        raise ValueError("SWITCHBOT_TOKEN / SWITCHBOT_SECRET / indoor.device_id が未設定")
+        raise ValueError("SwitchBot のトークン・シークレット・device_id が未設定")
     url = f"https://api.switch-bot.com/v1.1/devices/{urllib.parse.quote(device_id)}/status"
     return parse_switchbot_status(http_get_json(url, switchbot_headers(token, secret)))

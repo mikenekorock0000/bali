@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 from . import icons
 from . import gcal
 from .gcal import Event
-from .sources import Indoor, Quote, Weather, co2_level, icon_kind, weather_label, wind_direction_ja
+from .sources import Indoor, Quote, Weather, co2_level, comfort_level, icon_kind, weather_label, wind_direction_ja
 
 # E-ink は中間色が薄く出るので、灰色は濃いめにしておく（文字に使う GRAY でもはっきり読める濃さ）
 BLACK, DARK, GRAY, LIGHT, WHITE = 0, 34, 68, 153, 255
@@ -245,18 +245,20 @@ def draw_indoor(c: Canvas, ind: Indoor | None):
     tw = c.text(x, 118, temp, 56, "Bold", anchor="ls")
     c.text(x + tw + 2, 118, "℃", 22, "Medium", anchor="ls")
 
-    rows = [("湿度", "—" if ind.humidity is None else f"{round(ind.humidity)}", "%", 156),
-            ("CO2", "—" if ind.co2 is None else str(ind.co2), "ppm", 192)]
+    rows = [("湿度", "—" if ind.humidity is None else f"{round(ind.humidity)}", "%", 156)]
+    if ind.co2 is not None:  # ハブ2・温湿度計は CO2 を測れないので行ごと出さない
+        rows.append(("CO2", str(ind.co2), "ppm", 192))
     for label, value, unit, y in rows:
         c.text(x + 2, y, label, 14, "Medium", fill=GRAY, anchor="ls")
         vw = c.text(x + 52, y, value, 26, "Bold", anchor="ls")
         c.text(x + 56 + vw, y, unit, 15, "Medium", anchor="ls")
 
-    level = co2_level(ind.co2)
+    level = co2_level(ind.co2) if ind.co2 is not None else comfort_level(ind.humidity)
     if level:
+        top = 206 if ind.co2 is not None else 172  # CO2 の行が無ければ詰める
         bw = c.text_width(level, 16, "Bold") + 16
-        c.rect(x + 2, 206, x + 2 + bw, 232, outline=BLACK, width=2)
-        c.text(x + 2 + bw / 2, 219, level, 16, "Bold", anchor="mm")
+        c.rect(x + 2, top, x + 2 + bw, top + 26, outline=BLACK, width=2)
+        c.text(x + 2 + bw / 2, top + 13, level, 16, "Bold", anchor="mm")
 
 
 def draw_clothing(c: Canvas, w: Weather | None):

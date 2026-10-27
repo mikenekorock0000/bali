@@ -34,7 +34,7 @@ zip が古いときは、リポジトリのルートで `python kindle_dashboard
 
 3. **（任意）`.env` を作る**: `.env.example` を `.env` という名前でコピーし、使うものだけ書く。
    - `CALENDAR_ICS_URLS=` … Google カレンダーの「iCal 形式の非公開 URL」（3:00〜9:00 に月表示）
-   - `SWITCHBOT_TOKEN=` / `SWITCHBOT_SECRET=` … 室内の温湿度・CO2（`config.json` の `indoor` も設定）
+   - SwitchBot（室内の温湿度・CO2）は `.env` より **`config/secrets.json`** が簡単（README の「室内センサー」の設定スクリプトで作れる）
 
    ※ File Station などでは `.` で始まるファイルが見えないことがある。その場合は SSH で作るか、
    `docker-compose.yml` の `environment:` に直接書いてもよい（人に見せない）。
