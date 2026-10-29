@@ -59,7 +59,8 @@ def render(mesh, rot, light, color=(225, 225, 230)):
 
 
 def main():
-    frame = trimesh.load(HERE / "stl" / "frame.stl")
+    # 本体と左端の帯は組み立てた位置で書き出してあるので、そのまま重ねる
+    frame = trimesh.util.concatenate([trimesh.load(HERE / "stl" / f"{n}.stl") for n in ("frame", "frame_side")])
     back = trimesh.load(HERE / "stl" / "back.stl")
     light = np.array([-0.35, 0.45, 0.82]); light /= np.linalg.norm(light)
     # 画面座標: x 右, y 上, z 手前（大きいほど手前）
