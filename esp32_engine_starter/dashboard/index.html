@@ -417,6 +417,8 @@ function renderControls() {
   const list = [
     btn("今すぐ施錠", "施錠信号を出す", "lock", { primary: true, confirm: ["今すぐ施錠しますか？", "車両の施錠信号を 1 回出します。"] }),
     btn("状態を更新", "最新の状態を送らせる", "state"),
+    btn("今の値を通知", "電圧・温度・キーなどを通知で", "status"),
+    btn("近くの BLE 機器", "ビーコン登録用。結果は通知で", "scan"),
     s.paused ? btn("自動ロックを再開", "一時停止を解除", "resume") : btn("自動ロックを 60 分止める", "車のそばで作業するとき", "pause 60"),
     btn(s.al === false ? "自動ロックを ON" : "自動ロックを OFF", "", s.al === false ? "autolock on" : "autolock off"),
     btn(s.alarm === false ? "警戒を ON" : "警戒を OFF", "侵入・揺れの通知", s.alarm === false ? "alarm on" : "alarm off"),
