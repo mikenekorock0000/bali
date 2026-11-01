@@ -1,0 +1,28 @@
+# HIJET MONITOR の状態・指示用の ntfy サーバー（自宅の常時動く機械で動かす）
+# ntfy を Cloudflare Tunnel で https://ntfy.takuya.win として外に出す。ルーターのポートは開けない。
+#   1. .env.example を .env にコピーして、TUNNEL_TOKEN を入れる（README の手順 2）
+#   2. docker compose up -d
+services:
+  ntfy:
+    image: binwiederhier/ntfy:v2.11.0
+    command: serve
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Tokyo
+    volumes:
+      - ./ntfy/server.yml:/etc/ntfy/server.yml:ro
+      - ./data:/var/lib/ntfy        # 利用者・トークン・届いたメッセージ・添付
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --tries=1 http://localhost/v1/health -O - | grep -q true"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  cloudflared:
+    image: cloudflare/cloudflared:2024.12.2
+    command: tunnel --no-autoupdate run
+    restart: unless-stopped
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - ntfy

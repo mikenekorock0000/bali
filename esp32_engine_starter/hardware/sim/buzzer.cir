@@ -1,0 +1,17 @@
+* ブザー駆動：GPIO13 ─ R13 1k ─ B、R14 10k B-GND、ブザー（5V 30mA 相当 167Ω）
+.include models.lib
+V5 v5 0 5
+Vg g 0 3.3
+R13 g b 1k
+R14 b 0 10k
+Q1 c b 0 Q1815
+Rbz v5 c 167
+D7 c v5 D4148
+.control
+op
+echo "  ON : Ib(mA)=" $&@q1[ib]*1000 "  Ic(mA)=" $&@q1[ic]*1000 "  Vce=" $&v(c)
+alter vg dc = 0
+op
+echo "  OFF: Ic(uA)=" $&@q1[ic]*1e6
+.endc
+.end

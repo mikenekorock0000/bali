@@ -1,0 +1,58 @@
+﻿部品番号,値,フットプリント,X(mm),Y(mm),角度,実装
+BZ1,Buzzer 5V 12mm,Buzzer_12x9.5RM7.6,43.50,54.00,0,リード
+C1,100uF 50V,CP_Radial_D8.0mm_P3.50mm,40.50,25.50,0,リード
+C2,100uF 16V,CP_Radial_D6.3mm_P2.50mm,51.00,27.00,0,リード
+C3,0.1uF,C_Disc_D5.0mm_W2.5mm_P2.50mm,58.00,52.00,90,リード
+C4,0.1uF,C_Disc_D5.0mm_W2.5mm_P2.50mm,51.00,42.00,0,リード
+C5,0.1uF,C_Disc_D5.0mm_W2.5mm_P2.50mm,56.50,80.50,0,リード
+C6,0.1uF,C_Disc_D5.0mm_W2.5mm_P2.50mm,62.00,80.50,0,リード
+D1,SB340LS,D_DO-15_P5.08mm_Vertical_KathodeUp,49.50,15.50,0,リード
+D2,P4KE15A,D_DO-41_SOD81_P5.08mm_Vertical_KathodeUp,49.50,21.50,0,リード
+D3,BAT43,D_DO-35_SOD27_P5.08mm_Vertical_KathodeUp,50.50,46.00,0,リード
+D4,1N4148,D_DO-35_SOD27_P5.08mm_Vertical_KathodeUp,19.08,57.00,180,リード
+D5,1N4148,D_DO-35_SOD27_P5.08mm_Vertical_KathodeUp,19.08,67.16,180,リード
+D6,1N4148,D_DO-35_SOD27_P5.08mm_Vertical_KathodeUp,19.08,77.32,180,リード
+D7,1N4148,D_DO-35_SOD27_P5.08mm_Vertical_KathodeUp,41.50,63.00,0,リード
+D8,SMBJ45CA,D_SMB_Handsoldering,14.00,13.04,90,表面実装
+D9,SMBJ45CA,D_SMB_Handsoldering,14.00,23.20,90,表面実装
+D10,SMBJ45CA,D_SMB_Handsoldering,14.00,33.36,90,表面実装
+D11,SMBJ45CA,D_SMB_Handsoldering,14.00,43.52,90,表面実装
+D12,P4KE6.8CA,D_DO-41_SOD81_P5.08mm_Vertical_KathodeUp,41.00,16.50,0,リード
+F1,PTC 1.1A,PTC_Radial_W12.8mm_T3.0mm_P5.10mm,24.00,4.00,0,リード
+H1,M3,MountingHole_3.2mm_M3,3.50,3.50,0,リード
+H2,M3,MountingHole_3.2mm_M3,94.50,3.50,0,リード
+H3,M3,MountingHole_3.2mm_M3,3.50,86.50,0,リード
+H4,M3,MountingHole_3.2mm_M3,94.50,86.50,0,リード
+J1,12V IN,"TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal",53.00,5.80,180,リード
+J2,OUT,"TerminalBlock_Phoenix_MKDS-1,5-8-5.08_1x08_P5.08mm_Horizontal",5.60,10.50,-90,リード
+J3,IN,"TerminalBlock_Phoenix_MKDS-1,5-6-5.08_1x06_P5.08mm_Horizontal",5.60,53.50,-90,リード
+J4,I2C,PinHeader_1x04_P2.54mm_Vertical,93.50,18.00,0,リード
+J5,ESP32 VIN row,PinHeader_1x15_P2.54mm_Vertical,62.00,14.00,0,リード
+J6,ESP32 3V3 row,PinHeader_1x15_P2.54mm_Vertical,87.40,14.00,0,リード
+J7,OBD-II CAN,"TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal",38.00,84.40,0,リード
+J8,GPS,PinHeader_1x04_P2.54mm_Vertical,93.50,31.00,0,リード
+Q1,2SC1815,TO-92_Inline_Wide,41.50,67.50,0,リード
+R1,100k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,50.50,34.00,0,リード
+R2,10k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,50.50,38.00,0,リード
+R3,330,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,30.40,13.04,0,リード
+R4,330,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,30.40,23.20,0,リード
+R5,330,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,30.40,33.36,0,リード
+R6,330,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,30.40,43.52,0,リード
+R7,3.3k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,14.00,53.50,0,リード
+R8,3.3k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,14.00,63.66,0,リード
+R9,3.3k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,14.00,73.82,0,リード
+R10,10k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,33.00,53.50,0,リード
+R11,10k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,33.00,63.66,0,リード
+R12,10k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,33.00,73.82,0,リード
+R13,1k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,49.80,63.00,0,リード
+R14,10k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,49.80,67.50,0,リード
+R15,10k,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,58.50,63.50,0,リード
+U1,M78AR05-1,Converter_DCDC_Murata_OKI-78SR_Vertical,40.50,37.00,0,リード
+U2,PC817,DIP-4_W7.62mm,27.00,13.04,180,リード
+U3,PC817,DIP-4_W7.62mm,27.00,23.20,180,リード
+U4,PC817,DIP-4_W7.62mm,27.00,33.36,180,リード
+U5,PC817,DIP-4_W7.62mm,27.00,43.52,180,リード
+U6,PC817,DIP-4_W7.62mm,22.50,53.50,0,リード
+U7,PC817,DIP-4_W7.62mm,22.50,63.66,0,リード
+U8,PC817,DIP-4_W7.62mm,22.50,73.82,0,リード
+U9,MCP2562-E/P,DIP-8_W7.62mm,58.00,69.00,0,リード

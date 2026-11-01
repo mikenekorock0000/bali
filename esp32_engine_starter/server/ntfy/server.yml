@@ -1,0 +1,31 @@
+# ntfy の設定（HIJET MONITOR 用）。https://docs.ntfy.sh/config/
+base-url: "https://ntfy.takuya.win"
+listen-http: ":80"
+behind-proxy: true                 # Cloudflare Tunnel の後ろ。送り元の IP は X-Forwarded-For から取る
+
+# 届いたメッセージを保存する（ダッシュボードは直近 24 時間の状態と通知を読む）
+cache-file: "/var/lib/ntfy/cache.db"
+cache-duration: "48h"
+
+# 利用者とアクセストークン。登録していない人は読み書きできない
+auth-file: "/var/lib/ntfy/user.db"
+auth-default-access: "deny-all"
+
+# 遠隔更新のファームウェア（1.4MB ほど）を添付で受け取る
+attachment-cache-dir: "/var/lib/ntfy/attachments"
+attachment-file-size-limit: "4M"
+attachment-total-size-limit: "200M"
+attachment-expiry-duration: "24h"
+
+# ESP32 は 15 秒ごとに指示を読み、1 分ごとに状態を送る。ダッシュボードも 30 秒ごとに読む
+visitor-request-limit-burst: 120
+visitor-request-limit-replenish: "2s"
+visitor-message-daily-limit: 0     # 1 日の件数の上限なし
+visitor-attachment-total-size-limit: "100M"
+visitor-attachment-daily-bandwidth-limit: "500M"
+
+# スマホのアプリは使わない（通知は ntfy.sh に送る）ので、iPhone 用の中継（upstream-base-url）は設定しない
+enable-signup: false
+enable-login: true
+web-root: "disable"
+log-level: "info"

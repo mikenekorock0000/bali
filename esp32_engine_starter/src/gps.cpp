@@ -1,0 +1,99 @@
+#include "gps.h"
+
+#include "config.h"
+
+using namespace starter;
+
+void Gps::begin() {
+  Serial2.begin(GPS_BAUD, SERIAL_8N1, PIN_GPS_RX, PIN_GPS_TX);
+  Serial2.write("\r\n");  // 待機中のモジュールを起こす
+}
+
+void Gps::standby() {
+  // MediaTek（GT-502MGG-N など）：$PMTK161,0*cs（チェックサムは $ と * の間の XOR）
+  const char* body = "PMTK161,0";
+  uint8_t x = 0;
+  for (const char* p = body; *p; ++p) x ^= (uint8_t)*p;
+  Serial2.printf("$%s*%02X\r\n", body, x);
+  // u-blox（NEO-6M など）：UBX-RXM-PMREQ（期間 0＝無期限、flags 2＝バックアップ）
+  uint8_t ubx[] = {0xB5, 0x62, 0x02, 0x41, 0x08, 0x00, 0, 0, 0, 0, 0x02, 0, 0, 0, 0, 0};
+  uint8_t a = 0, b = 0;
+  for (int i = 2; i < 14; ++i) {
+    a += ubx[i];
+    b += a;
+  }
+  ubx[14] = a;
+  ubx[15] = b;
+  Serial2.write(ubx, sizeof(ubx));
+  Serial2.flush();
+}
+
+void Gps::loop(uint32_t nowMs) {
+  while (Serial2.available()) {
+    char c = (char)Serial2.read();
+    if (c == '\n' || c == '\r') {
+      if (len_ > 0) {
+        buf_[len_] = '\0';
+        handleLine(buf_, nowMs);
+        len_ = 0;
+      }
+    } else if (len_ < sizeof(buf_) - 1) {
+      buf_[len_++] = c;
+    } else {
+      len_ = 0;  // 長すぎる行は捨てる
+    }
+  }
+}
+
+void Gps::handleLine(const char* line, uint32_t nowMs) {
+  GpsFix f;
+  if (!parseRmc(line, f)) return;
+  sawData_ = true;
+  if (!fromUdp_) sawUart_ = true;
+  // 両方から届くときは、測位できている方を使う
+  if (!f.valid && fix_.valid && nowMs - fixMs_ < 5000) return;
+  fix_ = f;
+  if (!f.valid) return;
+  lastFromUdp_ = fromUdp_;
+  fixMs_ = nowMs;
+  haveLast_ = true;
+  lastLat_ = f.lat;
+  lastLon_ = f.lon;
+  if (!inTrip_) return;
+  if (f.speedKmh > tripMaxKmh_) tripMaxKmh_ = f.speedKmh;
+  // 停車中の位置のふらつきを距離に足さない
+  if (tripHavePrev_ && f.speedKmh > 3.0f) {
+    double d = haversineM(prevLat_, prevLon_, f.lat, f.lon);
+    if (d < 200) tripDistM_ += d;  // 1 秒で 200m 以上は測位の飛びとみなす
+  }
+  prevLat_ = f.lat;
+  prevLon_ = f.lon;
+  tripHavePrev_ = true;
+}
+
+void Gps::startTrip(uint32_t nowMs) {
+  inTrip_ = true;
+  tripStartMs_ = nowMs;
+  tripDistM_ = 0;
+  tripMaxKmh_ = 0;
+  tripHavePrev_ = false;
+}
+
+TripSummary Gps::endTrip(uint32_t nowMs) {
+  TripSummary s;
+  if (!inTrip_) return s;
+  inTrip_ = false;
+  s.durationSec = (nowMs - tripStartMs_) / 1000;
+  s.distanceKm = tripDistM_ / 1000.0f;
+  s.maxSpeedKmh = tripMaxKmh_;
+  s.hasFix = haveLast_;
+  s.endLat = lastLat_;
+  s.endLon = lastLon_;
+  return s;
+}
+
+bool Gps::lastKnown(double& lat, double& lon) const {
+  lat = lastLat_;
+  lon = lastLon_;
+  return haveLast_;
+}
