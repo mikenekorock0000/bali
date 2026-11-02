@@ -14,3 +14,4 @@
 
 - アプリ: [madamis_app/](madamis_app/)
 - 設計書: [docs/DESIGN.md](docs/DESIGN.md)
+- まとめリモコン（M5Stack Dial ＋ SwitchBot ハブ2）: [universal_remote/](universal_remote/)
