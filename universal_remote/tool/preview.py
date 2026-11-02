@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 """画面のイメージ図を描く（docs/preview.png）。実機の描画（firmware/src/main.cpp）と同じ配置を Pillow でなぞったもの。
 
-  python3 universal_remote/tool/preview.py
+  python3 universal_remote/tool/preview.py [フォントのフォルダ]
+
+フォント（NotoSansJP-VF.ttf と Orbitron-VF.ttf）は Kindle ダッシュボードの
+`kindle_dashboard/server/fetch_fonts.py` で取得したもの（kindle-dashboard ブランチ）を使う。
 """
 
 from __future__ import annotations
 
 import math
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
-FONTS = ROOT.parent / "kindle_dashboard" / "server" / "fonts"
+FONTS = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT.parent / "kindle_dashboard" / "server" / "fonts"
 S = 2  # 2 倍で描いて見やすく
 W = 240 * S
 
@@ -129,6 +133,8 @@ def scenes() -> Image.Image:
 
 
 def main() -> None:
+    if not (FONTS / "NotoSansJP-VF.ttf").exists():
+        sys.exit(f"フォントがありません: {FONTS}（kindle_dashboard/server/fetch_fonts.py で取得するか、フォルダを引数で指定）")
     shots = [("ホーム（ダイヤルで機器を選ぶ）", home()), ("エアコン", aircon()),
              ("テレビ（音量を送った直後）", tv()), ("シーン・学習ボタン", scenes())]
     w, h = shots[0][1].size
