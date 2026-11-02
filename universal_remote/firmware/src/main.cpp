@@ -15,6 +15,14 @@
 #include "config.h"
 #include "remote_core.h"
 #include "switchbot.h"
+#include "layout.h"
+
+// 画面の並び・ボタンの名前と配置（無ければ全部自動）
+#if __has_include("my_layout.h")
+#include "my_layout.h"
+#else
+static const char LAYOUT_JSON[] = "";
+#endif
 
 #ifndef ENCODER_DIRECTION
 #define ENCODER_DIRECTION 1
@@ -60,13 +68,14 @@ static uint32_t kindColor(Kind k) {
 
 struct Page {
   int remote = -1;  // remotes の添字。シーンは -1
-  Kind kind;
+  Kind kind = Kind::Generic;
   rc::AcState ac;
   bool on = false;    // 照明・扇風機の ON/OFF（こちらで覚えているだけ）
   int fanSpeed = 1;   // 1 弱 / 2 中 / 3 強
   int sel = 0;        // 一覧の選択位置
   bool list = false;  // 長押しで出す一覧モード
   std::vector<rc::ListItem> items;
+  rc::PageSpec spec;  // my_layout.h で決めた名前・色・ボタン配置
 };
 
 static SwitchBot api(SWITCHBOT_TOKEN, SWITCHBOT_SECRET);
@@ -74,6 +83,7 @@ static std::vector<Remote> remotes;
 static std::vector<Scene> scenes;
 static std::vector<Page> pages;
 static std::string sensorId = SENSOR_DEVICE_ID;
+static std::vector<std::string> layoutErrors;
 static Preferences prefs;
 static M5Canvas canvas(&M5Dial.Display);
 
@@ -182,37 +192,60 @@ static String acKey(const std::string& id) {
   return buf;
 }
 
+static Page remotePage(int i) {
+  Page p;
+  p.remote = i;
+  p.kind = remotes[i].kind;
+  p.items = rc::genericItems(remotes[i].id, remotes[i].remoteType, customButtonsFor(remotes[i].name));
+  if (p.kind == Kind::AirCon)
+    p.ac = rc::AcState::unpack(prefs.getUInt(acKey(remotes[i].id).c_str(), 0));
+  return p;
+}
+
+static Page scenesPage() {
+  Page p;
+  p.kind = Kind::Scenes;
+  for (auto& s : scenes) {
+    rc::Command c{s.id, "execute"};
+    c.scene = true;
+    p.items.push_back({s.name, c});
+  }
+  return p;
+}
+
 static void buildPages() {
   pages.clear();
-  for (size_t i = 0; i < remotes.size(); i++) {
-    Page p;
-    p.remote = i;
-    p.kind = remotes[i].kind;
-    p.items = rc::genericItems(remotes[i].id, remotes[i].remoteType,
-                               customButtonsFor(remotes[i].name));
-    if (p.kind == Kind::AirCon)
-      p.ac = rc::AcState::unpack(prefs.getUInt(acKey(remotes[i].id).c_str(), 0));
-    pages.push_back(p);
+  std::vector<rc::DeviceRef> rr, ss;
+  for (auto& r : remotes) rr.push_back({r.id, r.name, r.remoteType});
+  for (auto& s : scenes) ss.push_back({s.id, s.name, ""});
+  rc::LayoutResult lay = rc::parseLayout(LAYOUT_JSON, rr, ss);
+  layoutErrors = lay.errors;
+  for (auto& e : layoutErrors) Serial.printf("layout: %s\n", e.c_str());
+
+  if (!lay.usePages) {  // 自動: 登録順に全部 ＋ シーン
+    for (size_t i = 0; i < remotes.size(); i++) pages.push_back(remotePage(i));
+    if (!scenes.empty()) pages.push_back(scenesPage());
+    return;
   }
-  if (!scenes.empty()) {
-    Page p;
-    p.kind = Kind::Scenes;
-    for (auto& s : scenes) {
-      rc::Command c{s.id, "execute"};
-      c.scene = true;
-      p.items.push_back({s.name, c});
-    }
+  for (auto& spec : lay.pages) {
+    Page p = spec.scenes ? scenesPage() : spec.remote >= 0 ? remotePage(spec.remote) : Page{};
+    if (!spec.scenes && spec.remote < 0) p.kind = Kind::Generic;  // リモコンに結びつかないページ
+    if (spec.hasList) p.items = spec.list;
+    p.spec = spec;
     pages.push_back(p);
   }
 }
 
 static const char* pageName(const Page& p) {
+  if (!p.spec.title.empty()) return p.spec.title.c_str();
   return p.remote >= 0 ? remotes[p.remote].name.c_str() : "シーン";
 }
 static const std::string& pageId(const Page& p) { return remotes[p.remote].id; }
 static bool showsList(const Page& p) {
+  if (p.spec.custom) return p.list;  // 自由配置の画面は長押しのときだけ一覧
   return p.list || p.kind == Kind::Generic || p.kind == Kind::Scenes;
 }
+static uint32_t pageColor(const Page& p) { return p.spec.hasColor ? p.spec.color : kindColor(p.kind); }
 
 // ---------------------------------------------------------------- 描画
 
@@ -273,7 +306,7 @@ static void drawHome() {
     return;
   }
   const Page& p = pages[cur];
-  uint32_t col = kindColor(p.kind);
+  uint32_t col = pageColor(p);
   canvas.fillSmoothCircle(120, 102, 40, col);
   canvas.setTextColor(C_BG);
   canvas.setFont(jp(16));
@@ -327,7 +360,7 @@ static void drawAirCon(const Page& p) {
 // 上・真ん中（電源）・下の 3 つのボタンがある画面（テレビ・照明など）
 static void drawThreeButtons(const Page& p, const char* top, const char* bottom,
                              const char* dial, bool power, bool poweredKnown) {
-  uint32_t col = kindColor(p.kind);
+  uint32_t col = pageColor(p);
   canvas.fillArc(120, 120, 112, 118, 0, 360, C_TRACK);
   text(pageName(p), 32, 16, C_SUB, 150);
   text(top, 62, 20, C_TEXT);
@@ -355,15 +388,42 @@ static void drawFan(const Page& p) {
   text("タイマー", 182, 20, C_TEXT);
 }
 
+// my_layout.h で決めた 上・真ん中・下・ダイヤル の画面
+static void drawCustom(const Page& p) {
+  const rc::PageSpec& sp = p.spec;
+  uint32_t col = pageColor(p);
+  canvas.fillArc(120, 120, 112, 118, 0, 360, C_TRACK);
+  text(pageName(p), 32, 16, C_SUB, 150);
+  if (sp.top.valid) text(sp.top.label.c_str(), 62, 20, C_TEXT);
+  if (sp.center.valid) {
+    const auto& c = sp.center;
+    bool power = (c.cmd.command == "turnOn" || c.cmd.command == "turnOff") && c.label == c.cmd.command;
+    if (power) {
+      canvas.fillSmoothCircle(120, 120, 32, 0x15181C);
+      powerIcon(120, 122, 16, col);
+    } else {
+      canvas.fillSmoothCircle(120, 120, 36, col);
+      text(c.label.c_str(), 120, 20, C_BG, 64);
+    }
+  }
+  if (sp.bottom.valid) text(sp.bottom.label.c_str(), 176, 20, C_TEXT);
+  if (sp.dialUp.valid || sp.dialDown.valid) {
+    char d[48];
+    snprintf(d, sizeof d, "ダイヤル: %s", sp.dialLabel.empty() ? "−／＋" : sp.dialLabel.c_str());
+    text(d, 198, 16, C_SUB);
+  }
+  if (!p.items.empty()) text("長押しで一覧", 216, 12, C_OFF);
+}
+
 static void drawList(const Page& p) {
   text(pageName(p), 32, 16, C_SUB, 150);
   int n = p.items.size();
   if (n == 0) {
     text("ボタンがありません", 110, 16, C_TEXT);
-    text("config.h に書いてください", 136, 16, C_SUB);
+    text("my_layout.h に書いてください", 136, 16, C_SUB);
     return;
   }
-  uint32_t col = kindColor(p.kind);
+  uint32_t col = pageColor(p);
   // 上下に前後の項目、真ん中に選択中（ホイール風）
   for (int d = -1; d <= 1; d++) {
     if (n < 2 && d != 0) continue;
@@ -401,6 +461,7 @@ static void render() {
   } else {
     const Page& p = pages[cur];
     if (showsList(p)) drawList(p);
+    else if (p.spec.custom) drawCustom(p);
     else switch (p.kind) {
       case Kind::AirCon: drawAirCon(p); break;
       case Kind::TV: drawThreeButtons(p, "チャンネル ＋", "チャンネル −", "音量", false, false); break;
@@ -464,6 +525,14 @@ static void onDial(int clicks) {
     beep(3000, 5);
     return;
   }
+  if (p.spec.custom) {
+    const rc::Action& a = clicks > 0 ? p.spec.dialUp : p.spec.dialDown;
+    if (!a.valid) return;
+    String label = String(p.spec.dialLabel.empty() ? a.label.c_str() : p.spec.dialLabel.c_str()) +
+                   (clicks > 0 ? " ＋" : " −");
+    for (int i = 0, n = std::min(5, std::abs(clicks)); i < n; i++) sendCmd(a.cmd, label);
+    return;
+  }
   const char* up = nullptr;
   const char* down = nullptr;
   switch (p.kind) {
@@ -503,6 +572,11 @@ static void onTap(Zone z) {
     if (p.items.empty()) return;
     const auto& it = p.items[p.sel];
     sendCmd(it.cmd, it.label.c_str());
+    return;
+  }
+  if (p.spec.custom) {
+    const rc::Action& a = z == Zone::Top ? p.spec.top : z == Zone::Center ? p.spec.center : p.spec.bottom;
+    if (a.valid) sendCmd(a.cmd, a.label.c_str());
     return;
   }
   const std::string& id = pageId(p);
@@ -550,7 +624,8 @@ static void onTap(Zone z) {
 static void onLongPress() {
   if (screen != Screen::Device) return;
   Page& p = pages[cur];
-  if (p.kind == Kind::Generic || p.kind == Kind::Scenes) return;
+  if (!p.spec.custom && (p.kind == Kind::Generic || p.kind == Kind::Scenes)) return;
+  if (p.items.empty()) return;
   p.list = !p.list;
   p.sel = 0;
   beep(2000, 30);
@@ -610,6 +685,12 @@ static void loadDevices() {
   Serial.printf("remotes=%u scenes=%u sensor=%s\n", (unsigned)remotes.size(),
                 (unsigned)scenes.size(), sensorId.c_str());
   buildPages();
+  if (!layoutErrors.empty()) {  // 書き間違いは起動時に知らせる（その部分だけ飛ばして動く）
+    char n[40];
+    snprintf(n, sizeof n, "my_layout.h に %u か所の誤り", (unsigned)layoutErrors.size());
+    message(n, layoutErrors[0].c_str(), C_ERR);
+    delay(5000);
+  }
 }
 
 void setup() {

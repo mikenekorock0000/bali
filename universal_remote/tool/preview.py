@@ -117,6 +117,35 @@ def tv() -> Image.Image:
     return s.done()
 
 
+def speaker() -> Image.Image:
+    # my_layout.h で決めた自由配置（my_layout.example.h の「スピーカー」）
+    s = Screen()
+    col = "#ff6b81"
+    s.arc(112, 118, 0, 360, TRACK)
+    s.text("スピーカー", 32, 16, SUB)
+    s.text("入力", 62, 20, TEXT)
+    s.circle(120, 120, 32, "#15181c")
+    s.power(120, 122, 16, col)
+    s.text("ミュート", 176, 20, TEXT)
+    s.text("ダイヤル: 音量", 198, 16, SUB)
+    s.text("長押しで一覧", 216, 12, OFF)
+    return s.done()
+
+
+def movie() -> Image.Image:
+    # 1 ページで 2 台＋シーン（my_layout.example.h の「映画」）
+    s = Screen()
+    col = "#e056fd"
+    s.arc(112, 118, 0, 360, TRACK)
+    s.text("映画", 32, 16, SUB)
+    s.text("テレビ電源", 62, 20, TEXT)
+    s.circle(120, 120, 36, col)
+    s.text("映画モード", 120, 12, BG)  # 実機も円に収まるまで文字を小さくする
+    s.text("スピーカー", 176, 20, TEXT)
+    s.text("ダイヤル: 音量", 198, 16, SUB)
+    return s.done()
+
+
 def scenes() -> Image.Image:
     s = Screen()
     s.text("シーン", 32, 16, SUB)
@@ -136,7 +165,8 @@ def main() -> None:
     if not (FONTS / "NotoSansJP-VF.ttf").exists():
         sys.exit(f"フォントがありません: {FONTS}（kindle_dashboard/server/fetch_fonts.py で取得するか、フォルダを引数で指定）")
     shots = [("ホーム（ダイヤルで機器を選ぶ）", home()), ("エアコン", aircon()),
-             ("テレビ（音量を送った直後）", tv()), ("シーン・学習ボタン", scenes())]
+             ("テレビ（音量を送った直後）", tv()), ("シーン・学習ボタン", scenes()),
+             ("スピーカー（自由配置）", speaker()), ("映画（2 台＋シーン）", movie())]
     w, h = shots[0][1].size
     gap = 24 * S
     sheet = Image.new("RGB", (len(shots) * w + (len(shots) + 1) * gap, h + 60 * S), "#f2f2f2")

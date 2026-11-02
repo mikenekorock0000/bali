@@ -1,4 +1,5 @@
 firmware/include/config.h
+firmware/include/my_layout.h
 firmware/.pio/
 firmware/.vscode/
 __pycache__/

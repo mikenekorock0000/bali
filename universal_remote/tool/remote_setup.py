@@ -7,7 +7,8 @@ Mac のターミナルで:
 
 1. Wi-Fi（2.4GHz）の SSID とパスワード、SwitchBot のトークンとシークレットを入れる
 2. ハブ2 に登録してある赤外線リモコンを一覧にして、それぞれどの画面になるかを表示する
-3. config.h を書き出す（学習ボタンの欄は、表示された候補を見て手で書き足す）
+3. config.h を書き出す
+4. my_layout.h（画面の並び・ボタンの名前と配置）が無ければ、登録済みのリモコンを並べたひな形を作る
 
 標準ライブラリだけで動く。
 """
@@ -101,6 +102,19 @@ def render_config(ssid: str, password: str, token: str, secret: str, remotes: li
     return out
 
 
+def render_layout(remotes: list[dict], scenes: list[dict]) -> str:
+    """登録済みのリモコンを並べただけの my_layout.h。ボタン配置は my_layout.example.h を見て書き足す。"""
+    pages = [{"remote": r["deviceName"]} for r in remotes]
+    if scenes:
+        pages.append({"scenes": True})
+    body = ",\n".join("    " + json.dumps(p, ensure_ascii=False) for p in pages)
+    return ("// 画面の並び・ボタンの名前と配置。書き方は my_layout.example.h の説明を参照。\n"
+            "// 並べ替え・消す・\"top\" \"center\" \"bottom\" \"dial\" \"list\" を足す、ができる。\n"
+            "#pragma once\n\n"
+            'static const char LAYOUT_JSON[] = R"json(\n'
+            '{\n  "pages": [\n' + body + '\n  ]\n}\n)json";\n')
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--secrets", help="Kindle ダッシュボードの secrets.json（トークンを流用）")
@@ -154,7 +168,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     out.write_text(render_config(ssid, password, token, secret, remotes, template), encoding="utf-8")
     print(f"\n✅ {out} を作りました")
-    print("   学習ボタン（アプリでリモコンに追加したボタン）を使うなら CUSTOM_BUTTONS に書き足してください")
+    layout = out.parent / "my_layout.h"
+    if layout.exists():
+        print(f"   {layout} はもうあるのでそのままにしました")
+    else:
+        layout.write_text(render_layout(remotes, scenes), encoding="utf-8")
+        print(f"✅ {layout} を作りました（ボタンの名前・配置はここに書き足す。書き方は my_layout.example.h）")
     print("   ※ パスワードとトークンが入っているので、人に送ったり Git に入れたりしないこと（.gitignore 済み）")
     return 0
 

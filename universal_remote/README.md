@@ -50,7 +50,7 @@ python3 universal_remote/tool/remote_setup.py --secrets secrets.json
 ```
 
 SwitchBot のトークン・シークレットと Wi-Fi（**2.4GHz**）の SSID・パスワードを入れると、
-登録済みのリモコンと「どの画面になるか」を一覧にして、`firmware/include/config.h` を書き出す。
+登録済みのリモコンと「どの画面になるか」を一覧にして、`firmware/include/config.h` と、画面の並びのひな形 `my_layout.h` を書き出す。
 （手で作るなら `config.example.h` を `config.h` にコピーして書き換える。`config.h` は Git に入らない）
 
 ### 3. 書き込む
@@ -86,18 +86,34 @@ Dial を USB-C で PC につないで:
 - 20 秒で暗く、60 秒で消灯。触るかダイヤルを回すと点く（点けた操作は送らない）。
 - 送れなかったときは赤い表示とブザー（例:「ハブがオフライン」「回数制限」）。
 
-### 学習ボタン（アプリでリモコンに追加したボタン）
+## 画面とボタンを自分で決める（my_layout.h）
 
-`config.h` の `CUSTOM_BUTTONS` に `{"アプリでのリモコン名", "ボタン名"}` で並べる（名前は 1 文字も違わないように）。
-DIY・その他のリモコンは、ここに書いたボタンが一覧に出る。
+`firmware/include/my_layout.h` に JSON で書く（`remote_setup.py` が登録済みリモコンを並べたひな形を作る。
+書き方の説明と例は [my_layout.example.h](firmware/include/my_layout.example.h)）。ファイルが無ければ全部自動。
 
-```c
-static const char* const CUSTOM_BUTTONS[][2] = {
-    {"リビングの照明", "常夜灯"},
-    {"テレビ", "入力切替"},
-    {nullptr, nullptr},  // 最後の印（消さない）
-};
+決められること:
+
+- **ページの順番・出すリモコン**（書かなかったリモコンは出ない）、画面の名前（`title`）、色（`color`）
+- **上・真ん中・下のタップ**と**ダイヤル**に割り当てるボタンと、その表示名
+- **長押しで出す一覧**（`list`）のボタン（DIY・その他のリモコンはこれがメイン画面）
+- 1 つのボタンで **別のリモコン**（`remote`）や **シーン**（`scene`）に送る → 「映画」ページでテレビとスピーカーをまとめて操作、など
+
+```json
+{"remote": "スピーカー", "color": "#ff6b81",
+ "dial":   {"label": "音量", "up": {"cmd": "volumeAdd"}, "down": {"cmd": "volumeSub"}},
+ "top":    {"label": "入力", "btn": "入力切替"},
+ "center": {"cmd": "turnOn"},
+ "bottom": {"label": "ミュート", "cmd": "setMute"},
+ "list":   [{"label": "Bluetooth", "btn": "BT"}, {"label": "低音 ＋", "btn": "BASS+"}]}
 ```
+
+- `btn` … SwitchBot アプリでリモコンに追加した**学習ボタン**（名前はアプリと 1 文字も違わずに）
+- `cmd` … 標準コマンド（`turnOn`・`volumeAdd`・`setMute` など。種類ごとの一覧は example にある）
+- `scene` … シーン名
+- 名前の書き間違いは起動時に赤字で知らせ、その部分だけ飛ばして動く
+- エアコンは `{"remote": "…"}` のまま（温度表示つきのいつもの画面）にして、`list` だけ足すのがおすすめ
+
+※ `config.h` の `CUSTOM_BUTTONS` は簡易版（一覧にボタンを足すだけ）。両方書くと `my_layout.h` の `list` が優先。
 
 ## 調整
 
@@ -136,9 +152,10 @@ firmware/
   platformio.ini              ビルド設定（M5Dial・M5Unified・ArduinoJson）
   src/main.cpp                画面と操作
   src/switchbot.{h,cpp}       SwitchBot API（署名・一覧・送信・室温）
-  lib/remote_core/            画面や通信に依存しない部分（エアコンの状態・コマンド・間引き）
-  test/test_core/             ↑ のテスト（PC で `pio test -e native`）
+  lib/remote_core/            画面や通信に依存しない部分（エアコンの状態・コマンド・間引き・レイアウトの読み込み）
+  test/                       ↑ のテスト（PC で `pio test -e native`）
   include/config.example.h    設定の見本 → config.h にコピー
+  include/my_layout.example.h 画面・ボタン配置の見本と説明 → my_layout.h にコピー
   include/root_ca.h           SwitchBot API の証明書を確かめるルート証明書
 tool/
   remote_setup.py             config.h を作る（リモコン一覧の確認つき）
