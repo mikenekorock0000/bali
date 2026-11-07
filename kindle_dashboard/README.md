@@ -5,6 +5,8 @@
 
 **このあとやること・引き継ぎ**: [NEXT_STEPS.md](NEXT_STEPS.md)
 
+**Fire タブレットでカラー表示**: 同じサーバーが `/fire` でブラウザ用のカラー版も配信する → [FIRE_SETUP.md](FIRE_SETUP.md)
+
 **NAS に置くファイル**: [dist/kindle-dashboard-nas.zip](dist/kindle-dashboard-nas.zip)（サーバー）と
 [dist/kindle-dashboard-kindle.zip](dist/kindle-dashboard-kindle.zip)（Kindle 側）。手順は [NAS_SETUP.md](NAS_SETUP.md)。
 作り直しは `python kindle_dashboard/tool/package.py`。

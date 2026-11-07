@@ -13,7 +13,8 @@ from typing import Callable
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
-from . import gcal, sources
+from . import gcal, sources, web
+from .demo import demo_data, demo_events
 from .render import DashboardData, Fonts, png_bytes, render, to_kindle
 from .store import DataStore
 
@@ -22,7 +23,9 @@ log = logging.getLogger(__name__)
 SERVER_DIR = Path(__file__).resolve().parent.parent
 
 # /health に出す。NAS に新しいプログラムが反映されたかの確認用（変更したら上げる）
-VERSION = "2026.10.28-switchbot"
+VERSION = "2026.11.07-fire"
+
+FIRE_HTML = Path(__file__).resolve().parent / "fire.html"
 
 DEFAULT_CONFIG = {
     "location": {"name": "東京", "latitude": 35.6812, "longitude": 139.7671},
@@ -53,6 +56,8 @@ DEFAULT_CONFIG = {
     # ics_urls は「iCal 形式の非公開 URL」（環境変数 CALENDAR_ICS_URLS でも可）
     "calendar": {"ics_urls": [], "window": ["03:00", "09:00"], "week_start": "sunday"},
     "credits": "Open-Meteo・Yahoo Finance・三菱UFJアセット・投資信託協会",
+    # カラー版（/fire）: night は画面を暗くする時間帯。Fully Kiosk Browser なら本体の明るさも変える
+    "web": {"night": ["23:00", "06:00"], "brightness": {"day": 180, "night": 10}},
 }
 
 
@@ -119,6 +124,19 @@ class Dashboard:
             credits=self.cfg.get("credits", ""),
         )
 
+    def web_payload(self, demo: bool = False) -> dict:
+        """カラー版（/fire）用。予定は時間帯に関係なく、今日からの 1 週間を出す。"""
+        now = self.now()
+        if demo:
+            data, events = demo_data(now), demo_events(now)
+        else:
+            data = self.data()
+            events = self.store.get("calendar") if "calendar" in self.store.sources else None
+        out = web.payload(data, events, VERSION)
+        out["clock_font"] = Path((self.cfg.get("clock") or {}).get("font") or "").name
+        out["web"] = self.cfg.get("web") or {}
+        return out
+
     def render_png(self, rotate: bool = True) -> bytes:
         d = self.cfg["display"]
         with self._lock:
@@ -143,17 +161,32 @@ def make_handler(dash: Dashboard):
                 self._send(200, "image/png", dash.render_png())
             elif url.path == "/preview.png":
                 self._send(200, "image/png", dash.render_png(rotate=False))
+            elif url.path in ("/fire", "/fire/"):
+                # 毎回読む（NAS 上で fire.html を差し替えたらすぐ反映される）
+                self._send(200, "text/html; charset=utf-8", FIRE_HTML.read_bytes())
+            elif url.path == "/data.json":
+                demo = parse_qs(url.query).get("demo", ["0"])[0] in ("1", "true")
+                body = json.dumps(dash.web_payload(demo), ensure_ascii=False)
+                self._send(200, "application/json; charset=utf-8", body.encode())
+            elif url.path.startswith("/fonts/"):
+                # fonts/ の中のフォントだけ（../ などは通さない）
+                name = Path(url.path).name
+                f = SERVER_DIR / "fonts" / name
+                if name.endswith((".ttf", ".otf", ".woff2")) and f.is_file():
+                    self._send(200, "font/ttf", f.read_bytes(), cache=86400)
+                else:
+                    self._send(404, "text/plain; charset=utf-8", b"not found")
             elif url.path == "/health":
                 body = json.dumps({"version": VERSION, **dash.store.status()}, ensure_ascii=False, indent=2)
                 self._send(200, "application/json; charset=utf-8", body.encode())
             else:
                 self._send(404, "text/plain; charset=utf-8", b"not found")
 
-        def _send(self, code: int, ctype: str, body: bytes):
+        def _send(self, code: int, ctype: str, body: bytes, cache: int = 0):
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", f"max-age={cache}" if cache else "no-store")
             self.end_headers()
             self.wfile.write(body)
 

@@ -40,7 +40,7 @@ def build_nas(config: Path | None = None, port: int | None = None, out: Path | N
             else:
                 add(z, server / name, f"kindle-dashboard/{name}")
         for d in NAS_DIRS:
-            for f in sorted((server / d).rglob("*.py")):
+            for f in sorted(p for ext in ("*.py", "*.html") for p in (server / d).rglob(ext)):
                 add(z, f, f"kindle-dashboard/{f.relative_to(server)}")
         # そのまま使える設定ファイル（既定は example。緯度・経度だけ直す）
         add(z, config or server / "config.example.json", "kindle-dashboard/config/config.json")
