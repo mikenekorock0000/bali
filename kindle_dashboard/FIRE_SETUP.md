@@ -38,11 +38,39 @@ NAS の `config/config.json` に足して、Container Manager でプロジェク
 | `video` | 特定のライブを固定で流すとき（動画 ID や `https://youtu.be/…` の URL）。書くと `channel` より優先 |
 | `mute` | `true` で消音のまま流す。`false` で音あり（下の注意） |
 | `clock` | `true` で右下に小さく時計 |
-| `check_minutes` | 今のライブを調べ直す間隔（既定 5 分） |
+| `check_minutes` | 今のライブを調べ直す間隔（既定 5 分。無音で切り替えるなら 2 がおすすめ） |
+| `fallbacks` | 無音・停止のときの切り替え先（下の「無音になったら…」） |
 
 **音を出したいとき**: ブラウザは「音ありの自動再生」を止めることがある。止められたら消音で流し始めて
 「タップで音を出せます」と出るので、一度タップする。Fully Kiosk Browser なら Web Content Settings →
 **Autoplay Videos** を ON にすると、最初から音ありで流せる。
+
+## 無音になったら別のチャンネルに切り替える
+
+いつもの配信が**無音のまま続いたら**（または配信が止まったら）、`fallbacks` に書いた配信に切り替え、
+音が戻ったら自動でいつもの配信に戻す。
+
+```json
+"live": {
+  "video": "https://www.youtube.com/live/Odz4oWGT4NY",
+  "fallbacks": ["@切り替え先のチャンネル", "https://www.youtube.com/live/動画ID"],
+  "check_minutes": 2,
+  "silence": {"threshold_db": -50, "seconds": 15, "switch_after": 2},
+  "mute": false
+}
+```
+
+- **仕組み**: NAS が `check_minutes` ごとに、いつもの配信の音声を `seconds` 秒だけ聞いて音量を測る（Fire 側では測れないため）。
+  最大音量が `threshold_db` 未満の回が `switch_after` 回続いたら無音とみなす。上の設定なら**無音が約 4 分続くと切り替わる**。
+- **切り替え先**: `fallbacks` を上から順に見て、配信中で音が出ているものを流す。全部無音なら、配信中の最初のもの。
+- **戻るとき**: 切り替え中もいつもの配信を測り続け、音が戻った回の次で元に戻す。
+- 切り替わると Fire の画面下に「無音が続いているため、別の配信に切り替えました」と出る。
+- 音量を測れないとき（ffmpeg が無い、YouTube から音声が取れない）は**切り替えない**（いつもの配信のまま）。
+  理由は `http://<NASのIP>:8090/live.json` の `note` に、最後に測った音量は `level_db` に出る。
+- 小さな BGM でも「音あり」と判定させたいなら `threshold_db` を下げる（例 `-60`）。
+  「ほぼ無音」でも切り替えたいなら上げる（例 `-40`）。完全な無音は −91 dB 前後。
+- 通信量: 1 回の測定で最も軽い画質の配信を 15 秒受け取る（1 回 0.5MB 前後、2 分ごとで 1 日 0.4GB 程度）。
+- ffmpeg は Docker イメージに入っている（NAS でプロジェクトを**ビルドし直す**と入る）。
 
 ## うまくいかないとき（ライブ）
 
@@ -81,11 +109,11 @@ Fire 側はブラウザで `http://<NASのIP>:8090/fire` を開いて全画面�
 
 ## 1. NAS のサーバーを更新する
 
-1. `dist/kindle-dashboard-nas.zip` を展開し、`dashboard/` フォルダを NAS の `docker/kindle-dashboard/dashboard/` に**上書き**コピー
-   （`config/` と `.env` はそのまま。新しく増えたのは `dashboard/` の `live.html`・`live.py`・`fire.html`・`web.py`）。
+1. `dist/kindle-dashboard-nas.zip` を展開し、**`dashboard/` フォルダと `Dockerfile`** を NAS の `docker/kindle-dashboard/` に上書きコピー
+   （`config/` と `.env` はそのまま。`dashboard/` に `live.html`・`live.py`・`fire.html`・`web.py` が増え、`Dockerfile` で ffmpeg が入る）。
 2. Container Manager → プロジェクト → 停止 → **ビルド** → 起動（SSH なら `docker compose up -d --build`）。
 3. PC のブラウザで確認:
-   - `http://<NASのIP>:8090/health` の `version` が `2026.11.08-live`
+   - `http://<NASのIP>:8090/health` の `version` が `2026.11.08-live-fallback`
    - `http://<NASのIP>:8090/live`（ライブ）・`/fire`（ダッシュボード）に画面が出る
 
 ## 2. Fire に表示する

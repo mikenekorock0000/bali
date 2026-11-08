@@ -40,7 +40,8 @@ var offset = 0, tzMin = null;
 function msg(t, s) { $("mt").textContent = t; $("ms").textContent = s || ""; $("msg").className = "show"; }
 function hideMsg() { $("msg").className = ""; }
 var toastTimer = null;
-function toast(t) { $("toast").textContent = t; $("toast").className = "show"; clearTimeout(toastTimer); toastTimer = setTimeout(function () { $("toast").className = ""; }, 2000); }
+function toast(t, ms) { $("toast").textContent = t; $("toast").className = "show"; clearTimeout(toastTimer); toastTimer = setTimeout(function () { $("toast").className = ""; }, ms || 2000); }
+var lastReason = "";
 
 // ---- サーバー（NAS）に今のライブを聞く
 function poll() {
@@ -66,7 +67,14 @@ function apply() {
   if (!info.configured) return msg("流すライブが設定されていません", "NAS の config.json の live.channel（または live.video）を設定してください");
   if (!info.video) { cur = null; if (player && ready) player.stopVideo(); return msg("配信を待っています", info.error ? "取得エラー: " + info.error : "配信が始まると自動で流れます"); }
   if (!window.YT || !YT.Player) return;  // API の読み込み待ち
-  if (info.video !== cur) { start(info.video); return; }
+  if (info.video !== cur) {
+    // 無音・停止でサーバーが別の配信に切り替えたら知らせる
+    if (cur && info.reason) toast(info.reason + "、別の配信に切り替えました", 8000);
+    else if (cur && lastReason && !info.reason) toast("いつもの配信に戻しました", 6000);
+    lastReason = info.reason || "";
+    start(info.video);
+    return;
+  }
   // 同じ動画で終わっている／エラーのまま → サーバーがまだ配信中と言うなら入れ直す
   if ((ended || errored) && info.live && Date.now() - stuckSince > 120000) start(info.video);
 }

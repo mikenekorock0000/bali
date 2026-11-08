@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 SERVER_DIR = Path(__file__).resolve().parent.parent
 
 # /health に出す。NAS に新しいプログラムが反映されたかの確認用（変更したら上げる）
-VERSION = "2026.11.08-live"
+VERSION = "2026.11.08-live-fallback"
 
 FIRE_HTML = Path(__file__).resolve().parent / "fire.html"
 LIVE_HTML = Path(__file__).resolve().parent / "live.html"
@@ -62,7 +62,10 @@ DEFAULT_CONFIG = {
     # YouTube ライブを流し続ける（/live）。channel は "@handle"・"UC…"・チャンネル URL。
     # video に動画 ID / URL を書くとそれを固定で流す。mute: 音を消して流す（自動再生が確実）
     # clock: 右下に小さく時計を出す
-    "live": {"channel": "", "video": "", "mute": True, "check_minutes": 5, "clock": False},
+    # fallbacks: いつもの配信が無音・停止のときに切り替える先（上から順に、配信中のもの）
+    # silence: 無音の判定（最大音量が threshold_db 未満を switch_after 回続けて無音とみなす。ffmpeg が必要）
+    "live": {"channel": "", "video": "", "mute": True, "check_minutes": 5, "clock": False,
+             "fallbacks": [], "silence": {"threshold_db": -50, "seconds": 15, "switch_after": 2}},
 }
 
 
@@ -97,7 +100,8 @@ def build_store(cfg: dict, now: Callable[[], datetime], env=os.environ) -> DataS
         store.add("indoor", "室内", lambda: sources.fetch_indoor(cfg, env), ttl["indoor"])
     lv = cfg.get("live") or {}
     if lv.get("channel") or lv.get("video"):
-        store.add("live", "YouTube", lambda: live.fetch_live(cfg), lv.get("check_minutes", 5) * 60)
+        selector = live.LiveSelector(cfg)
+        store.add("live", "YouTube", selector.check, lv.get("check_minutes", 5) * 60)
     urls = gcal.calendar_urls(cfg, env)
     if urls:
         week_start = cfg["calendar"].get("week_start", "sunday")
@@ -153,6 +157,10 @@ class Dashboard:
             "video": v.video if v else None,
             "live": bool(v and v.live),
             "title": v.title if v else "",
+            "reason": v.reason if v else "",          # 切り替え中なら理由（いつもの配信なら空）
+            "source": v.source if v else "",
+            "level_db": None if not v or v.level_db is None or v.level_db == float("-inf") else round(v.level_db, 1),
+            "note": v.note if v else "",
             "configured": src is not None,
             "error": src.error if src and not src.ok and src.next_at else "",
             "mute": bool(lv.get("mute", True)),

@@ -16,7 +16,7 @@
 | 脱獄 | ✅ WinterBreak2 完了（2026-10-27）。`libkh/bin/fbink`・`JAILBROKEN.txt` あり。**Hotfix・KUAL は不要**（新しい脱獄では KPM/Scriptlets。Universal Hotfix は PW3 5.16.2.1.1 で不具合報告あり・入れない） |
 | Kindle 実機での表示 | ⚠️ **未確認** |
 | Fire 用カラー版（`/fire`） | ✅ 実装済み（2026-11-07）。ブラウザ（Chromium, 1024×600）でダミーデータの表示を確認。**NAS への反映・Fire 実機は未確認** → [FIRE_SETUP.md](FIRE_SETUP.md) |
-| Fire で YouTube ライブ（`/live`） | ✅ 実装済み（2026-11-08）。今のライブを探す処理はテスト済み。**YouTube の実再生は未確認**（開発環境から YouTube に届かないため）。Fire 実機で確認する → [FIRE_SETUP.md](FIRE_SETUP.md) |
+| Fire で YouTube ライブ（`/live`） | ✅ 実装済み（2026-11-08）。今のライブを探す処理はテスト済み。**YouTube の実再生は未確認**（開発環境から YouTube に届かないため）。Fire 実機で確認する → [FIRE_SETUP.md](FIRE_SETUP.md)。2026-11-08: 無音が続いたら `fallbacks` に切り替える機能を追加（音量の測定は ffmpeg で実際の音声を使ってテスト済み。YouTube の実配信・Docker での ffmpeg 導入は未確認） |
 
 ## やること（順番に）
 
