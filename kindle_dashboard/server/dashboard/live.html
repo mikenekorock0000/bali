@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>ライブ</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: #000; color: #fff; overflow: hidden;
+  font-family: "Noto Sans CJK JP", "Noto Sans JP", sans-serif; -webkit-user-select: none; user-select: none; }
+#player, #player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+/* 画面のタップを YouTube に渡さず受け取る（タップで音の ON/OFF） */
+#tap { position: absolute; inset: 0; z-index: 2; }
+#msg { position: absolute; inset: 0; z-index: 3; display: none; flex-direction: column; align-items: center;
+  justify-content: center; gap: 10px; background: #000; text-align: center; padding: 24px; }
+#msg.show { display: flex; }
+#msg .t { font-size: 26px; font-weight: 700; }
+#msg .s { font-size: 16px; color: #9aa3b0; max-width: 80%; }
+#toast { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 4; background: rgba(0,0,0,.7);
+  padding: 8px 18px; border-radius: 99px; font-size: 18px; font-weight: 700; opacity: 0; transition: opacity .4s; pointer-events: none; }
+#toast.show { opacity: 1; }
+#clock { position: absolute; right: 18px; bottom: 12px; z-index: 4; font-size: 30px; font-weight: 700; display: none;
+  text-shadow: 0 0 6px #000, 0 0 12px #000; font-variant-numeric: tabular-nums; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="player"></div>
+<div id="tap"></div>
+<div id="msg"><div class="t" id="mt">読み込み中…</div><div class="s" id="ms"></div></div>
+<div id="toast"></div>
+<div id="clock"></div>
+<script>
+"use strict";
+var $ = function (id) { return document.getElementById(id); };
+var player = null, ready = false, cur = null, info = null;
+var state = -1, stuckSince = Date.now(), ended = false, errored = false;
+var offset = 0, tzMin = null;
+
+function msg(t, s) { $("mt").textContent = t; $("ms").textContent = s || ""; $("msg").className = "show"; }
+function hideMsg() { $("msg").className = ""; }
+var toastTimer = null;
+function toast(t) { $("toast").textContent = t; $("toast").className = "show"; clearTimeout(toastTimer); toastTimer = setTimeout(function () { $("toast").className = ""; }, 2000); }
+
+// ---- サーバー（NAS）に今のライブを聞く
+function poll() {
+  var x = new XMLHttpRequest();
+  x.open("GET", "/live.json", true);
+  x.timeout = 15000;
+  x.onload = function () {
+    if (x.status !== 200) return;
+    try { info = JSON.parse(x.responseText); } catch (e) { return; }
+    if (info.now) {
+      offset = new Date(info.now).getTime() - Date.now();
+      var z = /([+-])(\d\d):(\d\d)$/.exec(info.now);
+      tzMin = z ? (z[1] === "-" ? -1 : 1) * (+z[2] * 60 + +z[3]) : null;
+    }
+    $("clock").style.display = info.clock ? "block" : "none";
+    apply();
+  };
+  x.onerror = x.ontimeout = function () { if (!cur) msg("サーバーに接続できません", "NAS が動いているか確認してください。自動で再接続します"); };
+  x.send();
+}
+
+function apply() {
+  if (!info.configured) return msg("流すライブが設定されていません", "NAS の config.json の live.channel（または live.video）を設定してください");
+  if (!info.video) { cur = null; if (player && ready) player.stopVideo(); return msg("配信を待っています", info.error ? "取得エラー: " + info.error : "配信が始まると自動で流れます"); }
+  if (!window.YT || !YT.Player) return;  // API の読み込み待ち
+  if (info.video !== cur) { start(info.video); return; }
+  // 同じ動画で終わっている／エラーのまま → サーバーがまだ配信中と言うなら入れ直す
+  if ((ended || errored) && info.live && Date.now() - stuckSince > 120000) start(info.video);
+}
+
+function start(id) {
+  cur = id; ended = false; errored = false; stuckSince = Date.now();
+  msg("読み込み中…", info && info.title || "");
+  if (!player) {
+    player = new YT.Player("player", {
+      videoId: id,
+      playerVars: { autoplay: 1, controls: 0, playsinline: 1, rel: 0, fs: 0, disablekb: 1, iv_load_policy: 3, origin: location.origin },
+      events: { onReady: onReady, onStateChange: onState, onError: onError }
+    });
+  } else if (ready) {
+    player.loadVideoById(id);
+  }
+}
+
+function onReady() {
+  ready = true;
+  if (info && info.mute) player.mute(); else player.unMute();
+  if (cur && player.getVideoData && player.getVideoData().video_id !== cur) player.loadVideoById(cur);
+  player.playVideo();
+}
+
+function onState(e) {
+  state = e.data;
+  if (state === YT.PlayerState.PLAYING) { hideMsg(); ended = false; errored = false; stuckSince = Date.now(); }
+  else if (state === YT.PlayerState.ENDED) { ended = true; stuckSince = Date.now(); msg("配信が終了しました", "次の配信を待っています"); }
+}
+
+function onError(e) {
+  errored = true; stuckSince = Date.now();
+  var c = e.data;
+  if (c === 101 || c === 150) msg("このライブは埋め込み再生が許可されていません", "配信者の設定のため、このページでは流せません。別のチャンネルを設定してください");
+  else if (c === 153) msg("YouTube がこのページからの再生を受け付けません", "NAS のページ（http://…:8090/live）から開いているか確認してください");
+  else msg("再生できません（エラー " + c + "）", "しばらくして自動で再試行します");
+}
+
+// ---- 見張り: 止まっていたら再生し直す・遅れたらライブの先頭に戻る
+setInterval(function () {
+  if (!player || !ready || !cur || ended || errored) return;
+  var playing = state === YT.PlayerState.PLAYING;
+  if (playing) {
+    stuckSince = Date.now();
+    // 一時停止や回線の詰まりで 1 分以上遅れたら、ライブの最新に飛ぶ
+    try { var d = player.getDuration(), t = player.getCurrentTime(); if (d && d - t > 60) player.seekTo(d, true); } catch (e) {}
+    return;
+  }
+  var stuck = Date.now() - stuckSince;
+  if (state === YT.PlayerState.BUFFERING && stuck < 60000) return;
+  // 音ありの自動再生がブラウザに止められたら、消音で流して「タップで音」を出す
+  if (stuck > 8000 && !player.isMuted() && (state === -1 || state === YT.PlayerState.CUED || state === YT.PlayerState.PAUSED)) {
+    player.mute(); player.playVideo(); toast("タップで音を出せます"); return;
+  }
+  if (stuck > 180000) { player.loadVideoById(cur); stuckSince = Date.now(); }
+  else if (stuck > 15000) player.playVideo();
+}, 5000);
+
+// ---- タップで音の ON/OFF
+$("tap").addEventListener("click", function () {
+  if (!player || !ready) return;
+  if (player.isMuted()) { player.unMute(); player.setVolume(100); toast("🔊 音あり"); }
+  else { player.mute(); toast("🔇 消音"); }
+  if (state !== YT.PlayerState.PLAYING) player.playVideo();
+});
+
+// ---- 時計（任意）
+setInterval(function () {
+  if (!info || !info.clock) return;
+  var t = Date.now() + offset, tz = tzMin == null ? -new Date(t).getTimezoneOffset() : tzMin;
+  var n = new Date(t + tz * 60000), m = n.getUTCMinutes();
+  $("clock").textContent = n.getUTCHours() + ":" + (m < 10 ? "0" : "") + m;
+}, 1000);
+
+// ---- YouTube の再生 API
+window.onYouTubeIframeAPIReady = function () { if (info) apply(); };
+(function () {
+  var s = document.createElement("script");
+  s.src = "https://www.youtube.com/iframe_api";
+  s.onerror = function () { msg("YouTube に接続できません", "インターネット接続を確認してください。1 分後に読み込み直します"); setTimeout(function () { location.reload(); }, 60000); };
+  document.head.appendChild(s);
+})();
+
+poll();
+setInterval(poll, 30000);
+// 長時間つけっぱなしでも重くならないよう、12 時間ごとに読み込み直す
+setTimeout(function () { location.reload(); }, 12 * 3600 * 1000);
+</script>
+</body>
+</html>

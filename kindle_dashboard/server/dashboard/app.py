@@ -13,7 +13,7 @@ from typing import Callable
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
-from . import gcal, sources, web
+from . import gcal, live, sources, web
 from .demo import demo_data, demo_events
 from .render import DashboardData, Fonts, png_bytes, render, to_kindle
 from .store import DataStore
@@ -23,9 +23,10 @@ log = logging.getLogger(__name__)
 SERVER_DIR = Path(__file__).resolve().parent.parent
 
 # /health に出す。NAS に新しいプログラムが反映されたかの確認用（変更したら上げる）
-VERSION = "2026.11.07-fire"
+VERSION = "2026.11.08-live"
 
 FIRE_HTML = Path(__file__).resolve().parent / "fire.html"
+LIVE_HTML = Path(__file__).resolve().parent / "live.html"
 
 DEFAULT_CONFIG = {
     "location": {"name": "東京", "latitude": 35.6812, "longitude": 139.7671},
@@ -58,6 +59,10 @@ DEFAULT_CONFIG = {
     "credits": "Open-Meteo・Yahoo Finance・三菱UFJアセット・投資信託協会",
     # カラー版（/fire）: night は画面を暗くする時間帯。Fully Kiosk Browser なら本体の明るさも変える
     "web": {"night": ["23:00", "06:00"], "brightness": {"day": 180, "night": 10}},
+    # YouTube ライブを流し続ける（/live）。channel は "@handle"・"UC…"・チャンネル URL。
+    # video に動画 ID / URL を書くとそれを固定で流す。mute: 音を消して流す（自動再生が確実）
+    # clock: 右下に小さく時計を出す
+    "live": {"channel": "", "video": "", "mute": True, "check_minutes": 5, "clock": False},
 }
 
 
@@ -90,6 +95,9 @@ def build_store(cfg: dict, now: Callable[[], datetime], env=os.environ) -> DataS
     store.add("news", "ニュース", lambda: sources.fetch_news(cfg), ttl["news"])
     if (cfg.get("indoor") or {}).get("provider") == "switchbot":
         store.add("indoor", "室内", lambda: sources.fetch_indoor(cfg, env), ttl["indoor"])
+    lv = cfg.get("live") or {}
+    if lv.get("channel") or lv.get("video"):
+        store.add("live", "YouTube", lambda: live.fetch_live(cfg), lv.get("check_minutes", 5) * 60)
     urls = gcal.calendar_urls(cfg, env)
     if urls:
         week_start = cfg["calendar"].get("week_start", "sunday")
@@ -137,6 +145,21 @@ class Dashboard:
         out["web"] = self.cfg.get("web") or {}
         return out
 
+    def live_payload(self) -> dict:
+        lv = self.cfg.get("live") or {}
+        src = self.store.sources.get("live")
+        v = src.value if src else None
+        return {
+            "video": v.video if v else None,
+            "live": bool(v and v.live),
+            "title": v.title if v else "",
+            "configured": src is not None,
+            "error": src.error if src and not src.ok and src.next_at else "",
+            "mute": bool(lv.get("mute", True)),
+            "clock": bool(lv.get("clock", False)),
+            "now": self.now().isoformat(),
+        }
+
     def render_png(self, rotate: bool = True) -> bytes:
         d = self.cfg["display"]
         with self._lock:
@@ -164,6 +187,11 @@ def make_handler(dash: Dashboard):
             elif url.path in ("/fire", "/fire/"):
                 # 毎回読む（NAS 上で fire.html を差し替えたらすぐ反映される）
                 self._send(200, "text/html; charset=utf-8", FIRE_HTML.read_bytes())
+            elif url.path in ("/live", "/live/"):
+                self._send(200, "text/html; charset=utf-8", LIVE_HTML.read_bytes())
+            elif url.path == "/live.json":
+                body = json.dumps(dash.live_payload(), ensure_ascii=False)
+                self._send(200, "application/json; charset=utf-8", body.encode())
             elif url.path == "/data.json":
                 demo = parse_qs(url.query).get("demo", ["0"])[0] in ("1", "true")
                 body = json.dumps(dash.web_payload(demo), ensure_ascii=False)
