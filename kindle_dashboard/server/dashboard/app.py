@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 SERVER_DIR = Path(__file__).resolve().parent.parent
 
 # /health に出す。NAS に新しいプログラムが反映されたかの確認用（変更したら上げる）
-VERSION = "2026.11.08-live-fallback"
+VERSION = "2026.11.08-almanac"
 
 FIRE_HTML = Path(__file__).resolve().parent / "fire.html"
 LIVE_HTML = Path(__file__).resolve().parent / "live.html"
@@ -59,6 +59,9 @@ DEFAULT_CONFIG = {
     "credits": "Open-Meteo・Yahoo Finance・三菱UFJアセット・投資信託協会",
     # カラー版（/fire）: night は画面を暗くする時間帯。Fully Kiosk Browser なら本体の明るさも変える
     "web": {"night": ["23:00", "06:00"], "brightness": {"day": 180, "night": 10}},
+    # ゴミ出しの日（/fire に表示）。rules: name と weekdays（"月"〜"日"）、weeks（第何週, 省略で毎週）、
+    # dates（"2026-12-30" など個別の日）、except（その日は除く, "MM-DD" も可）。except は全体の休み
+    "garbage": {"until": "09:00", "evening": "17:00", "rules": [], "except": []},
     # YouTube ライブを流し続ける（/live）。channel は "@handle"・"UC…"・チャンネル URL。
     # video に動画 ID / URL を書くとそれを固定で流す。mute: 音を消して流す（自動再生が確実）
     # clock: 右下に小さく時計を出す
@@ -144,7 +147,11 @@ class Dashboard:
         else:
             data = self.data()
             events = self.store.get("calendar") if "calendar" in self.store.sources else None
-        out = web.payload(data, events, VERSION)
+        out = web.payload(data, events, VERSION, self.cfg)
+        if demo:  # 見た目の確認用に、今日・明日のゴミと暦を必ず出す
+            out["today"].update(garbage=["燃えるゴミ"], garbage_tomorrow=["プラスチック資源"],
+                                sekki=out["today"]["sekki"] or "立冬",
+                                zassetsu=out["today"]["zassetsu"] or ["八十八夜"])
         out["clock_font"] = Path((self.cfg.get("clock") or {}).get("font") or "").name
         out["web"] = self.cfg.get("web") or {}
         return out

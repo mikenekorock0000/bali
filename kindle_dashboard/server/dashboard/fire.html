@@ -17,11 +17,30 @@
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
+/* 背景（天気 × 朝昼夕夜）。2 枚を重ねてゆっくり入れ替える */
+.bg { position: fixed; inset: 0; transition: opacity 4s; }
+#bg2 { opacity: 0; }
+#fx { position: fixed; inset: 0; pointer-events: none; }
+#shade { position: fixed; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.25)); }
+#fx.rain { background-image: repeating-linear-gradient(105deg, rgba(180,210,255,.0) 0 14px, rgba(180,210,255,.16) 14px 15px);
+  background-size: 120px 120px; animation: rainfall .6s linear infinite; }
+@keyframes rainfall { to { background-position: -32px 120px; } }
+#fx.snow { background-image: radial-gradient(circle, rgba(255,255,255,.9) 0 2px, transparent 3px),
+  radial-gradient(circle, rgba(255,255,255,.6) 0 1.5px, transparent 2.5px);
+  background-size: 90px 90px, 55px 55px; background-position: 0 0, 20px 30px; animation: snowfall 9s linear infinite; }
+@keyframes snowfall { to { background-position: 30px 360px, 0 330px; } }
+#fx.stars { background-image: radial-gradient(circle, rgba(255,255,255,.85) 0 1.2px, transparent 2px),
+  radial-gradient(circle, rgba(255,255,255,.5) 0 1px, transparent 1.6px);
+  background-size: 140px 110px, 90px 70px; background-position: 10px 20px, 50px 5px; animation: twinkle 5s ease-in-out infinite alternate; }
+@keyframes twinkle { from { opacity: .45; } to { opacity: .9; } }
+#fx.sunny { background: radial-gradient(circle at 88% 8%, rgba(255,230,150,.45), rgba(255,230,150,0) 38%); }
+#fx.dusk { background: radial-gradient(ellipse at 50% 110%, rgba(255,150,80,.35), rgba(255,150,80,0) 60%); }
 body { font-family: "JP", "Noto Sans CJK JP", "Noto Sans JP", sans-serif; -webkit-user-select: none; user-select: none; }
 #stage { position: absolute; left: 0; top: 0; width: 1024px; height: 600px; transform-origin: 0 0; padding: 14px 16px;
-  display: grid; grid-template-rows: 228px 166px 150px; gap: 13px; transition: filter 2s; }
+  display: grid; grid-template-rows: 242px 160px 140px; gap: 12px; transition: filter 2s; }
 body.night #stage { filter: brightness(.45); }
-.card { background: var(--card); border-radius: 18px; position: relative; overflow: hidden; }
+.card { background: rgba(8,12,20,.5); border-radius: 18px; position: relative; overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
 .num { font-variant-numeric: tabular-nums; }
 .hi { color: var(--up); } .lo { color: var(--rain); }
 .up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--sub); }
@@ -29,12 +48,27 @@ body.night #stage { filter: brightness(.45); }
 /* ---- 上段: 時計（左）と今の天気（右） */
 #top { display: grid; grid-template-columns: 440px 1fr; gap: 14px; }
 #clockbox { display: flex; flex-direction: column; justify-content: center; padding-left: 4px; }
-#time { font-family: "Clock", "JP", sans-serif; font-size: 134px; line-height: .92; letter-spacing: -.01em; }
+#clockbox { text-shadow: 0 2px 14px rgba(0,0,0,.45); }
+#time { font-family: "Clock", "JP", sans-serif; font-size: 122px; line-height: .92; letter-spacing: -.01em; }
 #time .colon { display: inline-block; transform: translateY(-.06em); transition: opacity .3s; }
-#date { font-size: 27px; font-weight: 700; color: var(--sub); margin-top: 4px; }
-#date .sat { color: var(--accent); } #date .sun { color: var(--up); } #date .hol { color: var(--up); font-size: 18px; margin-left: 6px; }
-#indoor { display: flex; gap: 10px; margin-top: 10px; }
-.pill { background: var(--card); border-radius: 12px; padding: 5px 12px; display: flex; align-items: baseline; gap: 6px; }
+#date { font-size: 27px; font-weight: 800; color: #e3e8ef; margin-top: 2px; }
+#date .sat { color: #8fc0ff; } #date .sun { color: #ff8f8f; }
+/* 今日のお知らせ（ゴミ・祝日・二十四節気・雑節） */
+#chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; text-shadow: none; }
+#chips:empty { display: none; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 16px; font-weight: 800; padding: 3px 11px; border-radius: 99px;
+  background: rgba(8,12,20,.6); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); white-space: nowrap; }
+.chip small { font-size: 11px; font-weight: 700; opacity: .8; }
+.chip svg { width: 16px; height: 16px; }
+.chip.gomi { background: #ffd34d; color: #1b1500; box-shadow: none; animation: pulse 2.4s ease-in-out infinite; }
+.chip.gomi.later { background: rgba(255,211,77,.18); color: #ffe08a; box-shadow: inset 0 0 0 1px rgba(255,211,77,.5); animation: none; }
+.chip.gomi.tomorrow { background: rgba(8,12,20,.6); color: #ffe08a; box-shadow: inset 0 0 0 2px #ffd34d; animation: none; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 5px rgba(255,211,77,.25); } }
+.chip.hol { background: #e24b4b; box-shadow: none; }
+.chip.sekki { box-shadow: none; }
+.chip.zas { background: rgba(160,120,255,.25); box-shadow: inset 0 0 0 1px rgba(190,160,255,.5); }
+#indoor { display: flex; gap: 10px; margin-top: 8px; text-shadow: none; }
+.pill { background: rgba(8,12,20,.58); border-radius: 12px; padding: 5px 12px; display: flex; align-items: baseline; gap: 6px; }
 .pill .k { font-size: 14px; color: var(--sub); font-weight: 600; }
 .pill .v { font-size: 26px; font-weight: 800; }
 .pill .u { font-size: 14px; color: var(--sub); }
@@ -42,7 +76,7 @@ body.night #stage { filter: brightness(.45); }
 .pill.warn .v { color: var(--warn); }
 
 #now { display: grid; grid-template-columns: 150px 1fr; align-items: center; padding: 14px 22px 14px 14px; color: #fff;
-  background: linear-gradient(135deg, #2a3446, #3b4a60); transition: background 3s; }
+  background: rgba(8,12,20,.32); }
 #now .icon svg { width: 150px; height: 150px; display: block; }
 #now .temp { font-size: 92px; font-weight: 800; line-height: .95; letter-spacing: -.02em; }
 #now .temp small { font-size: 34px; font-weight: 600; opacity: .85; margin-left: 2px; }
@@ -66,16 +100,16 @@ body.night #stage { filter: brightness(.45); }
 .page.out { opacity: 0; transform: translateX(-30px); }
 
 .hours { display: grid; grid-template-columns: repeat(8, 1fr); text-align: center; height: 100%; align-items: center; }
-.hours .t { font-size: 17px; color: var(--sub); font-weight: 600; }
-.hours svg { width: 50px; height: 50px; display: block; margin: 0 auto; }
-.hours .tp { font-size: 28px; font-weight: 800; line-height: 1.1; }
+.hours .t { font-size: 16px; color: var(--sub); font-weight: 600; line-height: 1.2; }
+.hours svg { width: 42px; height: 42px; display: block; margin: 0 auto; }
+.hours .tp { font-size: 26px; font-weight: 800; line-height: 1.05; }
 .hours .pp { font-size: 16px; color: var(--rain); font-weight: 700; height: 20px; }
 .hours .now .t { color: var(--sun); }
 
 .chart svg { width: 100%; height: 118px; display: block; }
 
 .days { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; height: 100%; }
-.days .d { background: var(--card2); border-radius: 14px; display: grid; grid-template-columns: 70px 1fr; align-items: center; padding: 6px 14px; }
+.days .d { background: rgba(255,255,255,.06); border-radius: 14px; display: grid; grid-template-columns: 70px 1fr; align-items: center; padding: 6px 14px; }
 .days .d svg { width: 66px; height: 66px; }
 .days .dt { font-size: 18px; font-weight: 700; color: var(--sub); }
 .days .dt.we { color: var(--accent); }
@@ -83,7 +117,7 @@ body.night #stage { filter: brightness(.45); }
 .days .lb { font-size: 15px; color: var(--sub); font-weight: 600; }
 
 .quotes { display: grid; gap: 12px; height: 100%; }
-.quotes .q { background: var(--card2); border-radius: 14px; padding: 8px 16px; display: flex; flex-direction: column; justify-content: center; }
+.quotes .q { background: rgba(255,255,255,.06); border-radius: 14px; padding: 8px 16px; display: flex; flex-direction: column; justify-content: center; }
 .quotes .lb { font-size: 16px; font-weight: 700; color: var(--sub); }
 .quotes .lb small { font-size: 12px; color: var(--dim); margin-left: 6px; font-weight: 600; }
 .quotes .pr { font-size: 34px; font-weight: 800; line-height: 1.15; }
@@ -92,7 +126,7 @@ body.night #stage { filter: brightness(.45); }
 .quotes .ch .arrow { display: inline-block; margin-right: 2px; }
 
 .events { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; align-content: center; height: 100%; }
-.events .e { display: flex; gap: 12px; align-items: center; background: var(--card2); border-radius: 12px; padding: 6px 12px; min-width: 0; }
+.events .e { display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,.06); border-radius: 12px; padding: 6px 12px; min-width: 0; }
 .events .w { font-size: 14px; font-weight: 700; color: var(--sub); min-width: 74px; line-height: 1.25; }
 .events .e.today .w { color: var(--sun); }
 .events .ti { font-size: 20px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -104,7 +138,7 @@ body.night #stage { filter: brightness(.45); }
 #news .badge { background: var(--up); color: #fff; font-size: 13px; padding: 2px 10px; border-radius: 6px; letter-spacing: .08em; }
 #news .cnt { margin-left: auto; color: var(--dim); font-variant-numeric: tabular-nums; }
 #hl { flex: 1; position: relative; margin-top: 6px; }
-#hl .item { position: absolute; inset: 0; display: flex; align-items: center; font-size: 33px; font-weight: 800; line-height: 1.32;
+#hl .item { position: absolute; inset: 0; display: flex; align-items: center; font-size: 31px; font-weight: 800; line-height: 1.32;
   transition: opacity .7s, transform .7s; }
 #hl .item span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 #hl .item.in { opacity: 0; transform: translateY(26px); }
@@ -125,11 +159,13 @@ body.night #stage { filter: brightness(.45); }
 </style>
 </head>
 <body>
+<div class="bg" id="bg1"></div><div class="bg" id="bg2"></div><div id="fx"></div><div id="shade"></div>
 <div id="stage">
   <div id="top">
     <div id="clockbox">
       <div id="time" class="num">--:--</div>
       <div id="date">&nbsp;</div>
+      <div id="chips"></div>
       <div id="indoor"></div>
     </div>
     <div class="card" id="now"></div>
@@ -180,12 +216,79 @@ function icon(kind, day) {
   else s = cloud(-4, -2, 1.05);
   return '<svg viewBox="0 0 64 64">' + s + '</svg>';
 }
-// 今の天気カードの背景（天気と昼夜）
-var SKY = { clear: ["#1565c0", "#3d9bf0"], partly: ["#2a5d9f", "#5f97d6"], cloudy: ["#3a4657", "#66758a"],
-  fog: ["#4a5560", "#7d8893"], rain: ["#1d3450", "#3a5f88"], snow: ["#55687f", "#93a8c0"], thunder: ["#29233f", "#4b3f73"] };
-function sky(kind, day) {
-  var c = day === false ? ["#0f1838", "#283668"] : (SKY[kind] || SKY.cloudy);
-  return "linear-gradient(135deg, " + c[0] + ", " + c[1] + ")";
+// ---- 背景（天気 × 朝・昼・夕方・夜）
+// 上から下へのグラデーション。読みやすさのため、どれも白い文字が乗る濃さにしてある
+var SKY = {
+  clear:  { morning: ["#24508f", "#4f8cc9", "#e3a273"], day: ["#0d4ea6", "#2f86dc", "#62b2f2"],
+            evening: ["#26285e", "#9b4a6c", "#ec8a4a"], night: ["#030818", "#0c1a3d", "#1b2d5c"] },
+  partly: { morning: ["#2c4f7c", "#6a8db5", "#c49a7c"], day: ["#24548f", "#5185bd", "#86acd3"],
+            evening: ["#302d58", "#7d5670", "#bb7a5e"], night: ["#070d1e", "#141f3a", "#243150"] },
+  cloudy: { morning: ["#37414f", "#5f6b7c", "#8d857f"], day: ["#3d4757", "#5f6b7d", "#8692a3"],
+            evening: ["#302f3c", "#57495a", "#7a6058"], night: ["#0a0d13", "#161b24", "#232a36"] },
+  rain:   { morning: ["#1d2a3c", "#344b66", "#56708e"], day: ["#1a2d45", "#2f4d70", "#4b6c92"],
+            evening: ["#1c1a2c", "#3a3150", "#5a4560"], night: ["#05080f", "#0e1522", "#182233"] },
+  thunder:{ morning: ["#1d1a30", "#3a3358", "#5a5078"], day: ["#1f1b35", "#3c3463", "#5b4f86"],
+            evening: ["#1a1428", "#3b2a4c", "#5c3d58"], night: ["#06050d", "#120f22", "#1f1a36"] },
+  snow:   { morning: ["#4b5d76", "#8396b0", "#c9b9b4"], day: ["#55697f", "#8aa0bb", "#b4c6da"],
+            evening: ["#3b3b55", "#6d6584", "#9a8296"], night: ["#0f1626", "#1f2b44", "#33425f"] },
+  fog:    { morning: ["#46505b", "#76808b", "#a59c95"], day: ["#4f5965", "#7a8591", "#a3acb6"],
+            evening: ["#3a3a44", "#625a63", "#86766f"], night: ["#0d1015", "#1b2028", "#2a3039"] }
+};
+var PHASE_JA = { morning: "朝", day: "昼", evening: "夕方", night: "夜" };
+function phaseOf(n, w) {
+  var h = n.getUTCHours();
+  if (w && w.is_day === false) return "night";       // 日の出前・日の入り後
+  if (!w && (h < 5 || h >= 19)) return "night";
+  if (h < 9) return "morning";
+  if (h >= 16) return "evening";
+  return "day";
+}
+var bgKey = "", bgFront = 1;
+function applyBackground() {
+  var w = data && data.weather, n = serverNow();
+  var kind = w ? w.icon : "cloudy", phase = phaseOf(n, w);
+  var q = /[?&]sky=(\w+)-(\w+)/.exec(location.search);  // 確認用: ?sky=rain-evening
+  if (q) { kind = q[1]; phase = q[2]; }
+  var key = kind + "-" + phase;
+  if (key === bgKey) return;
+  bgKey = key;
+  var c = (SKY[kind] || SKY.cloudy)[phase] || SKY.cloudy.day;
+  var next = $(bgFront === 1 ? "bg2" : "bg1"), cur = $(bgFront === 1 ? "bg1" : "bg2");
+  next.style.background = "linear-gradient(180deg, " + c[0] + " 0%, " + c[1] + " 55%, " + c[2] + " 100%)";
+  next.style.opacity = 1; cur.style.opacity = 0;
+  bgFront = bgFront === 1 ? 2 : 1;
+  // 天気の動き（雨・雪・星・日差し・夕焼け）
+  var fx = kind === "rain" || kind === "thunder" ? "rain" : kind === "snow" ? "snow"
+    : phase === "night" && (kind === "clear" || kind === "partly") ? "stars"
+    : phase === "day" && kind === "clear" ? "sunny" : phase === "evening" && (kind === "clear" || kind === "partly") ? "dusk" : "";
+  $("fx").className = fx;
+  document.documentElement.setAttribute("data-sky", key);
+}
+
+// ---- 今日のお知らせ（ゴミ・祝日・二十四節気・雑節）
+var TRASH = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 3h6l1 2h4v2H4V5h4l1-2zM6 8h12l-1 13H7L6 8z"/></svg>';
+var SEASON = { 春: "#3fae5a", 夏: "#1aa3a3", 秋: "#d9772b", 冬: "#3f74c9" };
+function sekkiColor(name) {
+  var order = ["立春", "雨水", "啓蟄", "春分", "清明", "穀雨", "立夏", "小満", "芒種", "夏至", "小暑", "大暑",
+               "立秋", "処暑", "白露", "秋分", "寒露", "霜降", "立冬", "小雪", "大雪", "冬至", "小寒", "大寒"];
+  var i = order.indexOf(name);
+  return i < 0 ? "#555" : [SEASON.春, SEASON.夏, SEASON.秋, SEASON.冬][Math.floor(i / 6)];
+}
+function minutesOf(hhmm, def) { var m = /^(\d+):(\d+)$/.exec(hhmm || def); return +m[1] * 60 + +m[2]; }
+var chipsKey = "";
+function drawChips() {
+  var t = (data && data.today) || {}, n = serverNow(), now = n.getUTCHours() * 60 + n.getUTCMinutes(), out = [];
+  var until = minutesOf(t.garbage_until, "09:00"), evening = minutesOf(t.garbage_evening, "17:00");
+  if (t.garbage && t.garbage.length && now < 12 * 60)
+    out.push('<span class="chip gomi' + (now >= until ? " later" : "") + '">' + TRASH + '今日は ' + t.garbage.map(esc).join("・") + '</span>');
+  if (t.garbage_tomorrow && t.garbage_tomorrow.length && now >= evening)
+    out.push('<span class="chip gomi tomorrow">' + TRASH + '明日は ' + t.garbage_tomorrow.map(esc).join("・") + '</span>');
+  var hol = data && data.events ? data.events.filter(function (e) { return e.today && e.holiday; })[0] : null;
+  if (hol) out.push('<span class="chip hol">' + esc(hol.title) + '</span>');
+  if (t.sekki) out.push('<span class="chip sekki" style="background:' + sekkiColor(t.sekki) + '"><small>二十四節気</small>' + esc(t.sekki) + '</span>');
+  (t.zassetsu || []).forEach(function (z) { out.push('<span class="chip zas">' + esc(z) + '</span>'); });
+  var html = out.join("");
+  if (html !== chipsKey) { chipsKey = html; $("chips").innerHTML = html; }
 }
 
 // ---- 時計（端末の時計を NAS の時刻・時刻帯に合わせる。getUTC* が NAS の現地時刻になる）
@@ -196,9 +299,10 @@ function serverNow() {
 function tick() {
   var n = serverNow(), h = n.getUTCHours(), m = n.getUTCMinutes(), w = n.getUTCDay();
   $("time").innerHTML = h + '<span class="colon" style="opacity:' + (n.getUTCSeconds() % 2 ? .3 : 1) + '">:</span>' + (m < 10 ? "0" : "") + m;
-  var hol = data && data.events ? data.events.filter(function (e) { return e.today && e.holiday; })[0] : null;
+  var hol = data && data.events ? data.events.some(function (e) { return e.today && e.holiday; }) : false;
   $("date").innerHTML = (n.getUTCMonth() + 1) + "月" + n.getUTCDate() + "日 <span class=\"" + (w === 0 || hol ? "sun" : w === 6 ? "sat" : "") + "\">" +
-    WD[w] + "曜日</span>" + (hol ? '<span class="hol">' + esc(hol.title) + '</span>' : "");
+    WD[w] + "曜日</span>";
+  if (n.getUTCSeconds() === 0 || !bgKey) { applyBackground(); drawChips(); }
   night(n);
 }
 
@@ -221,8 +325,7 @@ function night(n) {
 // ---- 上段
 function drawNow(w) {
   var el = $("now");
-  if (!w) { el.style.background = ""; el.innerHTML = '<div class="empty" style="grid-column:1/3;padding-left:20px">天気を取得できません</div>'; return; }
-  el.style.background = sky(w.icon, w.is_day);
+  if (!w) { el.innerHTML = '<div class="empty" style="grid-column:1/3;padding-left:20px">天気を取得できません</div>'; return; }
   var c = w.clothing;
   var tip = c && c.tips.length ? c.tips[0] : (w.pop >= 50 ? "傘を持って" : "");
   el.innerHTML = '<div class="icon">' + icon(w.icon, w.is_day) + '</div>' +
@@ -357,7 +460,7 @@ function drawStatus() {
 
 var started = false;
 function render() {
-  drawNow(data.weather); drawIndoor(data.indoor); drawStatus();
+  drawNow(data.weather); drawIndoor(data.indoor); drawStatus(); applyBackground(); drawChips();
   if (!started) { started = true; showPanel(false); startPanels(); showHeadline(true); startHeadlines(); }
 }
 

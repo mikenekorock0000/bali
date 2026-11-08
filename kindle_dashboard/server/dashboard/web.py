@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from . import gcal
+from . import almanac, gcal
 from .gcal import Event
 from .render import DashboardData, _num
 from .sources import Quote, co2_level, comfort_level, icon_kind, weather_label, wind_direction_ja
@@ -90,9 +90,25 @@ def upcoming(events: list[Event] | None, now: datetime, days: int = 7, limit: in
     return out
 
 
-def payload(data: DashboardData, events: list[Event] | None = None, version: str = "") -> dict:
+def today_info(cfg: dict, now: datetime) -> dict:
+    """今日・明日の暦（二十四節気・雑節）とゴミ出し。"""
+    today, tomorrow = now.date(), now.date() + timedelta(days=1)
+    g = cfg.get("garbage") or {}
+    return {
+        "sekki": almanac.sekki_of(today),
+        "zassetsu": almanac.zassetsu_of(today),
+        "garbage": almanac.garbage_on(cfg, today),
+        "garbage_tomorrow": almanac.garbage_on(cfg, tomorrow),
+        "garbage_until": g.get("until", "09:00"),     # この時刻までは「今日は〇〇」を強調
+        "garbage_evening": g.get("evening", "17:00"),  # この時刻からは「明日は〇〇」
+    }
+
+
+def payload(data: DashboardData, events: list[Event] | None = None, version: str = "",
+            cfg: dict | None = None) -> dict:
     now = data.now
     return {
+        "today": today_info(cfg or {}, now),
         "version": version,
         "now": now.isoformat(),
         "weather": _weather(data),
