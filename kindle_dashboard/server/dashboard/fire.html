@@ -6,18 +6,17 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>ダッシュボード</title>
 <style>
-/* Fire HD 8（1280x800 横置き）向け。幅 1024 で組み、高さは画面の縦横比に合わせて伸び縮みする
-   （16:10 なら 640、Fire 7 の 1024x600 なら 600）。#stage ごと画面に合わせて拡大縮小する。
-   少し離れても読めるよう、常に出すもの（時計・今の天気・室内）は大きく、
-   それ以外（時間ごと・グラフ・この先・マーケット・予定）は 1 枚ずつ大きく順番に出す。 */
+/* Fire HD 8（1280x800 横置き）向け。幅 1024 で組み、高さは画面の縦横比に合わせる（16:10 なら 640）。
+   いつも見たい情報を全部一度に並べる: 左＝時計・お知らせ・今の天気・室内・この先、右＝時間ごと・マーケット・予定・ニュース */
 @font-face { font-family: "JP"; src: url("/fonts/NotoSansJP-VF.ttf"); font-weight: 100 900; font-display: swap; }
 :root {
-  --bg: #0a0d12; --card: #141922; --card2: #1b2230; --line: #262e3b; --text: #f4f6f9; --sub: #9aa4b3; --dim: #5d6778;
+  --bg: #0a0d12; --text: #f4f6f9; --sub: #a3adbb; --dim: #66707f; --line: rgba(255,255,255,.08);
   --sun: #ffc93c; --rain: #52adff; --cloud: #b4bdca; --snow: #eaf2ff; --up: #ff6b6b; --down: #3fd69c;
   --accent: #6ea8ff; --warn: #ffb020;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
+body { font-family: "JP", "Noto Sans CJK JP", "Noto Sans JP", sans-serif; -webkit-user-select: none; user-select: none; }
 /* 背景（天気 × 朝昼夕夜）。2 枚を重ねてゆっくり入れ替える */
 .bg { position: fixed; inset: 0; transition: opacity 4s; }
 #bg2 { opacity: 0; }
@@ -36,28 +35,36 @@ html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text
 @keyframes twinkle { from { opacity: .45; } to { opacity: .9; } }
 #fx.sunny { background: radial-gradient(circle at 88% 8%, rgba(255,230,150,.45), rgba(255,230,150,0) 38%); }
 #fx.dusk { background: radial-gradient(ellipse at 50% 110%, rgba(255,150,80,.35), rgba(255,150,80,0) 60%); }
-body { font-family: "JP", "Noto Sans CJK JP", "Noto Sans JP", sans-serif; -webkit-user-select: none; user-select: none; }
-#stage { position: absolute; left: 0; top: 0; width: 1024px; height: 640px; transform-origin: 0 0; padding: 14px 16px;
-  display: grid; grid-template-rows: 242px minmax(160px, 1fr) 150px; gap: 12px; transition: filter 2s; }
+
+#stage { position: absolute; left: 0; top: 0; width: 1024px; height: 640px; transform-origin: 0 0; padding: 12px;
+  display: grid; grid-template-columns: 420px 1fr; gap: 12px; transition: filter 2s; }
 body.night #stage { filter: brightness(.45); }
-.card { background: rgba(8,12,20,.5); border-radius: 18px; position: relative; overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.col { display: grid; gap: 10px; min-height: 0; }
+.left { grid-template-rows: auto auto auto minmax(0, 1fr); }
+.right { grid-template-rows: 200px minmax(0, 1fr) 62px; }
+.card { background: rgba(8,12,20,.5); border-radius: 16px; position: relative; overflow: hidden; padding: 10px 14px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); min-height: 0; }
+.h { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 800; color: var(--sub);
+  letter-spacing: .04em; margin-bottom: 4px; }
+.h small { font-size: 12px; font-weight: 600; color: var(--dim); letter-spacing: 0; }
 .num { font-variant-numeric: tabular-nums; }
 .hi { color: var(--up); } .lo { color: var(--rain); }
 .up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--sub); }
+.empty { color: var(--dim); font-size: 15px; padding-top: 6px; }
 
-/* ---- 上段: 時計（左）と今の天気（右） */
-#top { display: grid; grid-template-columns: 440px 1fr; gap: 14px; }
-#clockbox { display: flex; flex-direction: column; justify-content: center; padding-left: 4px; }
-#clockbox { text-shadow: 0 2px 14px rgba(0,0,0,.45); }
-#time { font-family: "Clock", "JP", sans-serif; font-size: 122px; line-height: .92; letter-spacing: -.01em; }
+/* 時計 */
+#clockbox { text-shadow: 0 2px 14px rgba(0,0,0,.45); padding: 0 2px; }
+#time { font-family: "Clock", "JP", sans-serif; font-size: 92px; line-height: .9; letter-spacing: -.01em; }
 #time .colon { display: inline-block; transform: translateY(-.06em); transition: opacity .3s; }
-#date { font-size: 27px; font-weight: 800; color: #e3e8ef; margin-top: 2px; }
+#date { font-size: 22px; font-weight: 800; color: #e3e8ef; margin-top: 2px; }
 #date .sat { color: #8fc0ff; } #date .sun { color: #ff8f8f; }
+#status { font-size: 11px; color: var(--dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: none; }
+#status:empty { display: none; }
+#status.err { color: var(--warn); font-size: 13px; font-weight: 800; }
 /* 今日のお知らせ（ゴミ・祝日・二十四節気・雑節） */
-#chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; text-shadow: none; }
+#chips { display: flex; flex-wrap: nowrap; overflow: hidden; gap: 5px; margin-top: 6px; text-shadow: none; }
 #chips:empty { display: none; }
-.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 16px; font-weight: 800; padding: 3px 11px; border-radius: 99px;
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; flex-shrink: 0; font-weight: 800; padding: 3px 11px; border-radius: 99px;
   background: rgba(8,12,20,.6); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); white-space: nowrap; }
 .chip small { font-size: 11px; font-weight: 700; opacity: .8; }
 .chip svg { width: 16px; height: 16px; }
@@ -68,98 +75,94 @@ body.night #stage { filter: brightness(.45); }
 .chip.hol { background: #e24b4b; box-shadow: none; }
 .chip.sekki { box-shadow: none; }
 .chip.zas { background: rgba(160,120,255,.25); box-shadow: inset 0 0 0 1px rgba(190,160,255,.5); }
-#indoor { display: flex; gap: 10px; margin-top: 8px; text-shadow: none; }
-.pill { background: rgba(8,12,20,.58); border-radius: 12px; padding: 5px 12px; display: flex; align-items: baseline; gap: 6px; }
-.pill .k { font-size: 14px; color: var(--sub); font-weight: 600; }
-.pill .v { font-size: 26px; font-weight: 800; }
-.pill .u { font-size: 14px; color: var(--sub); }
-.pill.warn { box-shadow: inset 0 0 0 2px var(--warn); }
-.pill.warn .v { color: var(--warn); }
 
-#now { display: grid; grid-template-columns: 150px 1fr; align-items: center; padding: 14px 22px 14px 14px; color: #fff;
-  background: rgba(8,12,20,.32); }
-#now .icon svg { width: 150px; height: 150px; display: block; }
-#now .temp { font-size: 92px; font-weight: 800; line-height: .95; letter-spacing: -.02em; }
-#now .temp small { font-size: 34px; font-weight: 600; opacity: .85; margin-left: 2px; }
-#now .label { font-size: 28px; font-weight: 800; margin-top: 4px; }
-#now .meta { display: flex; gap: 16px; font-size: 18px; font-weight: 600; margin-top: 8px; opacity: .95; }
-#now .meta .hi { color: #ffd0d0; } #now .meta .lo { color: #cfe6ff; }
-#now .cloth { position: absolute; right: 18px; top: 14px; font-size: 15px; font-weight: 700; background: rgba(0,0,0,.25);
-  padding: 4px 12px; border-radius: 99px; max-width: 46%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#now .tip { position: absolute; right: 18px; bottom: 14px; font-size: 15px; font-weight: 800; color: #ffe08a; }
+/* 今の天気 */
+#now { display: grid; grid-template-columns: 92px 1fr; column-gap: 8px; align-items: center; background: rgba(8,12,20,.34); }
+#now .icon svg { width: 92px; height: 92px; display: block; }
+#now .temp { font-size: 56px; font-weight: 800; line-height: .95; letter-spacing: -.02em; }
+#now .temp small { font-size: 26px; font-weight: 600; opacity: .85; margin-left: 2px; }
+#now .label { font-size: 19px; font-weight: 800; }
+#now .meta { grid-column: 1 / 3; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px 8px; font-size: 15px; font-weight: 600;
+  margin-top: 4px; color: #dfe5ee; }
+#now .meta b { font-weight: 800; color: #fff; }
+#now .meta .k { color: var(--sub); font-size: 13px; margin-right: 3px; }
+#now .cloth { grid-column: 1 / 3; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--line); font-size: 14px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#now .cloth .idx { color: var(--sun); font-weight: 900; margin-right: 6px; }
+#now .cloth .tip { color: #ffe08a; margin-left: 8px; }
 
-/* ---- 中段: 順番に切り替わるパネル */
-#panel { padding: 0; }
-#tabs { position: absolute; left: 18px; right: 18px; top: 10px; display: flex; gap: 8px; align-items: center; z-index: 2; }
-#tabs .tab { font-size: 14px; font-weight: 700; color: var(--dim); padding: 2px 10px; border-radius: 99px; }
-#tabs .tab.on { color: var(--bg); background: var(--accent); }
-#tabs .bar { flex: 1; height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin-left: 6px; }
-#tabs .bar i { display: block; height: 100%; width: 0; background: var(--accent); }
-.page { position: absolute; left: 0; right: 0; top: 38px; bottom: 0; padding: 0 18px 12px; opacity: 0; display: flex; flex-direction: column; justify-content: center;
-  transform: translateX(30px); transition: opacity .6s, transform .6s; }
-.page.on { opacity: 1; transform: none; }
-.page.out { opacity: 0; transform: translateX(-30px); }
+/* 室内 */
+#indoor { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+#indoor:empty { display: none; }
+.pill { background: rgba(8,12,20,.5); border-radius: 12px; padding: 5px 10px; display: flex; align-items: baseline; gap: 4px; justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.pill .k { font-size: 12px; color: var(--sub); font-weight: 700; }
+.pill .v { font-size: 24px; font-weight: 800; }
+.pill .u { font-size: 12px; color: var(--sub); }
+.pill.warn { box-shadow: inset 0 0 0 2px var(--warn); } .pill.warn .v { color: var(--warn); }
 
-.hours { display: grid; grid-template-columns: repeat(8, 1fr); text-align: center; height: 100%; align-items: center; }
-.hours .t { font-size: 16px; color: var(--sub); font-weight: 600; line-height: 1.2; }
-.hours svg { width: 42px; height: 42px; display: block; margin: 0 auto; }
-.hours .tp { font-size: 26px; font-weight: 800; line-height: 1.05; }
-.hours .pp { font-size: 16px; color: var(--rain); font-weight: 700; height: 20px; }
-.hours .now .t { color: var(--sun); }
+/* この先 */
+#days .d { display: grid; grid-template-columns: 96px 36px 1fr auto; align-items: center; gap: 6px; padding: 2px 0; white-space: nowrap; border-bottom: 1px solid var(--line); }
+#days .d:last-child { border: 0; }
+#days .dt { font-size: 16px; font-weight: 700; } #days .dt.we { color: #8fc0ff; }
+#days svg { width: 36px; height: 36px; display: block; }
+#days .lb { font-size: 14px; color: var(--sub); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#days .lb .pop { color: var(--rain); margin-left: 6px; }
+#days .tt { font-size: 21px; font-weight: 800; }
 
-.chart svg { width: 100%; height: 118px; display: block; }
-.page > div { flex: 1; min-height: 0; }
-/* 縦に余裕のある画面（Fire HD 8 など 16:10）では中段を一回り大きく */
-body.tall .hours .t { font-size: 18px; } body.tall .hours svg { width: 54px; height: 54px; }
-body.tall .hours .tp { font-size: 32px; } body.tall .hours .pp { font-size: 18px; height: 24px; }
-body.tall .days .d svg { width: 78px; height: 78px; } body.tall .days .d { grid-template-columns: 84px 1fr; }
-body.tall .days .tt { font-size: 36px; } body.tall .days .dt { font-size: 20px; }
-body.tall .quotes .pr { font-size: 40px; } body.tall .quotes .ch { font-size: 19px; }
-body.tall .events .ti { font-size: 23px; } body.tall .events .e { padding: 10px 14px; }
-body.tall .chart svg { height: 148px; }
+/* 時間ごと＋グラフ */
+#hours { display: grid; grid-template-columns: repeat(8, 1fr); text-align: center; }
+#hours .t { font-size: 13px; color: var(--sub); font-weight: 700; }
+#hours .now .t { color: var(--sun); }
+#hours svg { width: 34px; height: 34px; display: block; margin: 0 auto; }
+#hours .tp { font-size: 21px; font-weight: 800; line-height: 1.1; }
+#hours .pp { font-size: 12px; color: var(--rain); font-weight: 700; height: 15px; }
+#chart { height: 60px; margin-top: 0; }
+#chart svg { width: 100%; height: 100%; display: block; }
 
-.days { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; height: 100%; }
-.days .d { background: rgba(255,255,255,.06); border-radius: 14px; display: grid; grid-template-columns: 70px 1fr; align-items: center; padding: 6px 14px; }
-.days .d svg { width: 66px; height: 66px; }
-.days .dt { font-size: 18px; font-weight: 700; color: var(--sub); }
-.days .dt.we { color: var(--accent); }
-.days .tt { font-size: 30px; font-weight: 800; line-height: 1.15; }
-.days .lb { font-size: 15px; color: var(--sub); font-weight: 600; }
+/* マーケット・予定 */
+#row2 { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 10px; min-height: 0;
+  grid-template-areas: "market cal" "events cal"; }
+#market { grid-area: market; } #events { grid-area: events; } #cal { grid-area: cal; }
+/* 予定が無いときは マーケット｜カレンダー だけ */
+#row2.wide { grid-template-rows: minmax(0, 1fr); grid-template-areas: "market cal"; } #row2.wide #events { display: none; }
+#market .q { display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--line); }
+#market .q:last-child { border: 0; }
+#market .lb { font-size: 16px; font-weight: 700; }
+#market .lb small { display: block; font-size: 11px; color: var(--dim); font-weight: 600; }
+#market .pr { font-size: 23px; font-weight: 800; text-align: right; line-height: 1.05; }
+#market .pr small { font-size: 11px; color: var(--sub); margin-left: 1px; }
+#market .ch { font-size: 14px; font-weight: 800; text-align: right; line-height: 1.3; }
+#events .e { display: grid; grid-template-columns: 82px 1fr; gap: 6px; align-items: center; padding: 2px 0; white-space: nowrap; border-bottom: 1px solid var(--line); }
+#events .e:last-child { border: 0; }
+#events .w { font-size: 12px; color: var(--sub); font-weight: 700; line-height: 1.2; }
+#events .e.today .w { color: var(--sun); }
+#events .ti { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#events .e.hol .ti { color: #ff8f8f; }
 
-.quotes { display: grid; gap: 12px; height: 100%; }
-.quotes .q { background: rgba(255,255,255,.06); border-radius: 14px; padding: 8px 16px; display: flex; flex-direction: column; justify-content: center; }
-.quotes .lb { font-size: 16px; font-weight: 700; color: var(--sub); }
-.quotes .lb small { font-size: 12px; color: var(--dim); margin-left: 6px; font-weight: 600; }
-.quotes .pr { font-size: 34px; font-weight: 800; line-height: 1.15; }
-.quotes .pr small { font-size: 15px; color: var(--sub); margin-left: 2px; font-weight: 600; }
-.quotes .ch { font-size: 17px; font-weight: 800; }
-.quotes .ch .arrow { display: inline-block; margin-right: 2px; }
+/* 今月のカレンダー */
+#cal { display: flex; flex-direction: column; }
+#mgrid { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; text-align: center; min-height: 0; }
+#mgrid .hd { font-size: 12px; font-weight: 800; color: var(--sub); align-self: center; }
+#mgrid .c { position: relative; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; padding-bottom: 6px; }
+#mgrid .c.out { color: var(--dim); opacity: .5; }
+#mgrid .c.past { color: #8590a0; }
+#mgrid .c.sun, #mgrid .c.hol { color: #ff8f8f; } #mgrid .c.sat { color: #8fc0ff; }
+#mgrid .c.today span { background: #fff; color: #0a0d12; border-radius: 99px; min-width: 28px; line-height: 26px; font-weight: 900; }
+#mgrid .c i { position: absolute; bottom: 3px; width: 5px; height: 5px; border-radius: 3px; }
+#mgrid .c i.g { background: #ffd34d; left: calc(50% - 7px); } #mgrid .c i.e { background: #fff; left: calc(50% + 2px); }
+#mgrid .c i.g:only-of-type, #mgrid .c i.e:only-of-type { left: calc(50% - 2.5px); }
 
-.events { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; align-content: center; height: 100%; }
-.events .e { display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,.06); border-radius: 12px; padding: 6px 12px; min-width: 0; }
-.events .w { font-size: 14px; font-weight: 700; color: var(--sub); min-width: 74px; line-height: 1.25; }
-.events .e.today .w { color: var(--sun); }
-.events .ti { font-size: 20px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.events .e.hol .ti { color: var(--up); }
-
-/* ---- 下段: ヘッドライン（1 本ずつ大きく） */
-#news { padding: 14px 22px 12px; display: flex; flex-direction: column; }
-#news .head { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; color: var(--sub); }
-#news .badge { background: var(--up); color: #fff; font-size: 13px; padding: 2px 10px; border-radius: 6px; letter-spacing: .08em; }
-#news .cnt { margin-left: auto; color: var(--dim); font-variant-numeric: tabular-nums; }
-#hl { flex: 1; position: relative; margin-top: 6px; }
-#hl .item { position: absolute; inset: 0; display: flex; align-items: center; font-size: 31px; font-weight: 800; line-height: 1.32;
-  transition: opacity .7s, transform .7s; }
-#hl .item span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-#hl .item.in { opacity: 0; transform: translateY(26px); }
-#hl .item.gone { opacity: 0; transform: translateY(-26px); }
-#hlbar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
-#hlbar i { display: block; height: 100%; width: 0; background: var(--up); }
-
-#status { position: absolute; left: 22px; top: 2px; font-size: 11px; color: var(--dim); white-space: nowrap; }
-#status.err { color: var(--warn); font-size: 14px; font-weight: 800; }
-.empty { color: var(--dim); font-size: 18px; display: flex; align-items: center; height: 100%; }
-
+/* ニュース: ヘッドラインを 1 本ずつ（8 秒ごとに下から差し替え） */
+#news { display: flex; align-items: center; gap: 12px; padding: 0 16px; }
+#news .badge { background: var(--up); color: #fff; font-size: 12px; font-weight: 800; padding: 2px 9px; border-radius: 5px; letter-spacing: .08em; flex-shrink: 0; }
+#hl { flex: 1; position: relative; height: 100%; overflow: hidden; }
+#hl .item { position: absolute; inset: 0; display: flex; align-items: center; font-size: 21px; font-weight: 800;
+  transition: opacity .6s, transform .6s; }
+#hl .item span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hl .item.in { opacity: 0; transform: translateY(22px); }
+#hl .item.gone { opacity: 0; transform: translateY(-22px); }
+#ncnt { font-size: 12px; color: var(--dim); font-weight: 700; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 /* 天気アイコンの小さな動き（太陽がゆっくり回る・雨が落ちる） */
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes drop { 0% { transform: translateY(-3px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(6px); opacity: 0; } }
@@ -171,27 +174,32 @@ body.tall .chart svg { height: 148px; }
 <body>
 <div class="bg" id="bg1"></div><div class="bg" id="bg2"></div><div id="fx"></div><div id="shade"></div>
 <div id="stage">
-  <div id="top">
+  <div class="col left">
     <div id="clockbox">
       <div id="time" class="num">--:--</div>
       <div id="date">&nbsp;</div>
       <div id="chips"></div>
-      <div id="indoor"></div>
+      <div id="status"></div>
     </div>
     <div class="card" id="now"></div>
+    <div id="indoor"></div>
+    <div class="card" id="days"><div class="h"><span>この先の天気</span></div><div id="dlist"></div></div>
   </div>
-  <div class="card" id="panel"><div id="tabs"></div><div id="pages"></div></div>
-  <div class="card" id="news">
-    <div class="head"><span class="badge">NEWS</span><span id="newslabel"></span><span class="cnt" id="hlcnt"></span></div>
-    <div id="hl"></div>
-    <div id="hlbar"><i></i></div>
+  <div class="col right">
+    <div class="card"><div class="h"><span>時間ごとの天気</span><small id="chartlabel"></small></div><div id="hours"></div><div id="chart"></div></div>
+    <div id="row2">
+      <div class="card" id="market"><div class="h"><span>マーケット</span><small id="mtime"></small></div><div id="quotes"></div></div>
+      <div class="card" id="events"><div class="h"><span>予定</span><small>1週間</small></div><div id="elist"></div></div>
+      <div class="card" id="cal"><div class="h"><span id="mtitle"></span><small><span style="color:#ffd34d">●</span>ゴミ <span style="color:#fff">●</span>予定</small></div><div id="mgrid"></div></div>
+    </div>
+    <div class="card" id="news"><span class="badge">NEWS</span><div id="hl"></div><span id="ncnt"></span></div>
   </div>
-  <div id="status"></div>
 </div>
 <script>
+
 "use strict";
 var WD = "日月火水木金土";
-var PANEL_SEC = 10, HEADLINE_SEC = 8;
+var HEADLINE_SEC = 8;  // ヘッドラインを次に送る間隔
 var data = null, offset = 0, tzMin = null, lastOk = 0, demo = /[?&]demo=1/.test(location.search);
 var $ = function (id) { return document.getElementById(id); };
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]; }); }
@@ -335,18 +343,19 @@ function night(n) {
   if (window.fully && br != null && br !== lastBright) { try { fully.setScreenBrightness(br); lastBright = br; } catch (e) {} }
 }
 
-// ---- 上段
+// ---- 今の天気
 function drawNow(w) {
   var el = $("now");
-  if (!w) { el.innerHTML = '<div class="empty" style="grid-column:1/3;padding-left:20px">天気を取得できません</div>'; return; }
-  var c = w.clothing;
-  var tip = c && c.tips.length ? c.tips[0] : (w.pop >= 50 ? "傘を持って" : "");
+  if (!w) { el.innerHTML = '<div class="empty" style="grid-column:1/3">天気を取得できません</div>'; return; }
+  var c = w.clothing, tip = c && c.tips.length ? c.tips.join("・") : (w.pop >= 50 ? "傘を持って" : "");
+  var m = function (k, v) { return '<span><span class="k">' + k + '</span><b>' + v + '</b></span>'; };
   el.innerHTML = '<div class="icon">' + icon(w.icon, w.is_day) + '</div>' +
-    '<div><div class="temp num">' + w.temp + '<small>℃</small></div><div class="label">' + esc(w.label) + '</div>' +
-    '<div class="meta num"><span><span class="hi">' + deg(w.max) + '</span> / <span class="lo">' + deg(w.min) + '</span></span>' +
-    '<span>☂ ' + (w.pop == null ? "—" : w.pop + "%") + '</span><span>体感 ' + deg(w.apparent) + '</span></div></div>' +
-    (c ? '<div class="cloth">' + esc(c.day) + '：' + esc(c.phrase) + '</div>' : "") +
-    (tip ? '<div class="tip">' + esc(tip) + '</div>' : "");
+    '<div><div class="temp num">' + w.temp + '<small>℃</small></div><div class="label">' + esc(w.label) + '</div></div>' +
+    '<div class="meta num">' + m("最高", '<span class="hi">' + deg(w.max) + '</span>') + m("最低", '<span class="lo">' + deg(w.min) + '</span>') +
+    m("降水", w.pop == null ? "—" : w.pop + "%") + m("体感", deg(w.apparent)) + m("湿度", w.humidity == null ? "—" : w.humidity + "%") +
+    m("風", esc(w.wind)) + '</div>' +
+    (c || tip ? '<div class="cloth">' + (c ? '<span class="idx">服装 ' + c.index + '</span>' + esc(c.day) + '：' + esc(c.phrase) : "") +
+      (tip ? '<span class="tip">' + esc(tip) + '</span>' : "") + '</div>' : "");
 }
 
 function drawIndoor(ind) {
@@ -357,109 +366,104 @@ function drawIndoor(ind) {
     pill("CO₂", ind.co2, "ppm", ind.co2 != null && ind.co2 >= 1000);
 }
 
-// ---- 中段: パネル（ある情報だけを順番に）
-function panels() {
-  var d = data || {}, w = d.weather, out = [];
-  if (w && w.hourly && w.hourly.length) out.push(["時間ごと", pageHours]);
-  if (w && w.chart && w.chart.length > 1) out.push([w.chart_label + "の気温", pageChart]);
-  if (w && w.daily && w.daily.length) out.push(["この先", pageDays]);
-  if (d.quotes && d.quotes.length) out.push(["マーケット", pageMarket]);
-  if (d.events && d.events.length) out.push(["予定", pageEvents]);
-  return out;
+// ---- この先
+function drawDays(w) {
+  if (!w || !w.daily.length) { $("dlist").innerHTML = '<div class="empty">—</div>'; return; }
+  // 収まる日数だけ（Fire HD 8 など縦に余裕があれば 4 日、Fire 7 は 3 日）
+  $("dlist").innerHTML = w.daily.slice(0, 5).map(function (d) {
+    return '<div class="d"><span class="dt' + (d.weekend ? " we" : "") + '">' + d.date + '（' + d.weekday + '）</span>' + icon(d.icon, true) +
+      '<span class="lb">' + esc(d.label) + (d.pop == null ? "" : '<span class="pop">☂' + d.pop + '%</span>') + '</span>' +
+      '<span class="tt num"><span class="hi">' + deg(d.max) + '</span> <span class="lo">' + deg(d.min) + '</span></span></div>'; }).join("");
 }
 
-function pageHours(w) {
-  w = data.weather;
-  return '<div class="hours">' + w.hourly.map(function (h, i) {
+// ---- 時間ごと＋今日の気温グラフ
+function drawHourly(w) {
+  if (!w) { $("hours").innerHTML = '<div class="empty" style="grid-column:1/9">天気を取得できません</div>'; $("chart").innerHTML = ""; return; }
+  $("hours").innerHTML = w.hourly.map(function (h, i) {
     return '<div class="' + (i === 0 ? "now" : "") + '"><div class="t">' + h.time + '</div>' + icon(h.icon, h.is_day) +
-      '<div class="tp num">' + deg(h.temp) + '</div><div class="pp num">' + (h.pop ? "☂" + h.pop + "%" : "") + '</div></div>'; }).join("") + '</div>';
+      '<div class="tp num">' + deg(h.temp) + '</div><div class="pp num">' + (h.pop ? "☂" + h.pop + "%" : "") + '</div></div>'; }).join("");
+  $("chartlabel").textContent = w.chart && w.chart.length ? w.chart_label + "の気温と降水確率" : "";
+  drawChart(w.chart || []);
 }
-
-function pageChart() {
-  var pts = data.weather.chart, W = 956, H = document.body.classList.contains("tall") ? 148 : 118, top = 18, bot = 18;
+function drawChart(pts) {
+  if (pts.length < 2) { $("chart").innerHTML = ""; return; }
+  var W = 540, H = 58, top = 12, bot = 13;
   var ts = pts.map(function (p) { return p.temp; });
   var lo = Math.min.apply(null, ts) - 1, hi = Math.max.apply(null, ts) + 1;
-  var x = function (h) { return 14 + h / 23 * (W - 28); };
+  var x = function (h) { return 10 + h / 23 * (W - 20); };
   var y = function (t) { return top + (1 - (t - lo) / (hi - lo)) * (H - top - bot); };
-  var bars = pts.map(function (p) { var bh = (p.pop || 0) / 100 * (H - bot - 4);
-    return '<rect x="' + (x(p.h) - 13).toFixed(1) + '" y="' + (H - bot - bh).toFixed(1) + '" width="26" height="' + bh.toFixed(1) + '" rx="4" fill="var(--rain)" opacity=".22"/>'; }).join("");
+  var bars = pts.map(function (p) { var bh = (p.pop || 0) / 100 * (H - bot - 2);
+    return '<rect x="' + (x(p.h) - 7).toFixed(1) + '" y="' + (H - bot - bh).toFixed(1) + '" width="14" height="' + bh.toFixed(1) + '" rx="2" fill="var(--rain)" opacity=".25"/>'; }).join("");
   var line = pts.map(function (p, i) { return (i ? "L" : "M") + x(p.h).toFixed(1) + " " + y(p.temp).toFixed(1); }).join("");
-  var area = line + "L" + x(pts[pts.length - 1].h).toFixed(1) + " " + (H - bot) + "L" + x(pts[0].h).toFixed(1) + " " + (H - bot) + "Z";
-  var labels = [0, 3, 6, 9, 12, 15, 18, 21].map(function (h) { return '<text x="' + x(h) + '" y="' + (H - 2) + '" font-size="13" font-weight="600" fill="var(--sub)" text-anchor="middle">' + h + '時</text>'; }).join("");
+  var labels = [0, 6, 12, 18, 23].map(function (h) { return '<text x="' + x(h) + '" y="' + (H - 1) + '" font-size="10" font-weight="600" fill="var(--sub)" text-anchor="middle">' + h + '時</text>'; }).join("");
   var n = serverNow(), hx = x(n.getUTCHours() + n.getUTCMinutes() / 60);
   var iMax = ts.indexOf(Math.max.apply(null, ts)), iMin = ts.indexOf(Math.min.apply(null, ts));
-  var mark = function (i, col, dy) { return '<text x="' + x(pts[i].h) + '" y="' + (y(pts[i].temp) + dy) + '" font-size="17" font-weight="800" fill="' + col + '" text-anchor="middle">' + Math.round(pts[i].temp) + '°</text>'; };
-  return '<div class="chart"><svg viewBox="0 0 ' + W + ' ' + H + '"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffc93c" stop-opacity=".35"/><stop offset="1" stop-color="#ffc93c" stop-opacity="0"/></linearGradient></defs>' +
-    bars + '<path d="' + area + '" fill="url(#g)"/><path d="' + line + '" fill="none" stroke="var(--sun)" stroke-width="3.5" stroke-linejoin="round"/>' +
-    '<line x1="' + hx + '" x2="' + hx + '" y1="4" y2="' + (H - bot) + '" stroke="#fff" stroke-width="1.5" stroke-dasharray="4 4" opacity=".6"/>' +
-    labels + mark(iMax, "var(--up)", -8) + mark(iMin, "var(--rain)", 20) + '</svg></div>';
+  var mark = function (i, col, dy) { return '<text x="' + x(pts[i].h) + '" y="' + (y(pts[i].temp) + dy) + '" font-size="12" font-weight="800" fill="' + col + '" text-anchor="middle">' + Math.round(pts[i].temp) + '°</text>'; };
+  $("chart").innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' + bars +
+    '<line x1="' + hx + '" x2="' + hx + '" y1="2" y2="' + (H - bot) + '" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" opacity=".6"/>' +
+    '<path d="' + line + '" fill="none" stroke="var(--sun)" stroke-width="2.5" stroke-linejoin="round"/>' + labels +
+    mark(iMax, "var(--up)", -3) + mark(iMin, "var(--rain)", 11) + '</svg>';
 }
 
-function pageDays() {
-  return '<div class="days">' + data.weather.daily.map(function (d) {
-    return '<div class="d">' + icon(d.icon, true) + '<div><div class="dt' + (d.weekend ? " we" : "") + '">' + d.date + '（' + d.weekday + '）</div>' +
-      '<div class="tt num"><span class="hi">' + deg(d.max) + '</span> <span class="lo">' + deg(d.min) + '</span></div>' +
-      '<div class="lb">' + esc(d.label) + (d.pop == null ? "" : '　☂' + d.pop + '%') + '</div></div></div>'; }).join("") + '</div>';
-}
-
-function pageMarket() {
-  var qs = data.quotes.slice(0, 3);
-  return '<div class="quotes" style="grid-template-columns:repeat(' + qs.length + ',1fr)">' + qs.map(function (q) {
+// ---- マーケット・予定（予定が無ければマーケットを横いっぱいに）
+function drawMarket(qs) {
+  var times = qs.map(function (q) { return q.note; }).filter(function (n) { return /^\d+:\d+$/.test(n || ""); });
+  $("mtime").textContent = times.length ? times.sort().pop() + " 時点" : "";
+  $("quotes").innerHTML = qs.length ? qs.slice(0, 3).map(function (q) {
     if (q.missing) return '<div class="q"><div class="lb">' + esc(q.label) + '</div><div class="pr">—</div></div>';
     var cls = q.dir > 0 ? "up" : q.dir < 0 ? "down" : "flat", arrow = q.dir > 0 ? "▲" : q.dir < 0 ? "▼" : "";
-    return '<div class="q"><div class="lb">' + esc(q.label) + '<small>' + esc(q.note) + '</small></div>' +
-      '<div class="pr num">' + q.price + '<small>' + esc(q.unit) + '</small></div>' +
-      '<div class="ch num ' + cls + '"><span class="arrow">' + arrow + '</span>' + q.change.replace(/^[+−]/, "") + '（' + q.pct + '）</div></div>'; }).join("") + '</div>';
+    return '<div class="q"><div class="lb">' + esc(q.label) + (/基準/.test(q.note) ? '<small>' + esc(q.note) + '</small>' : "") + '</div>' +
+      '<div><div class="pr num">' + q.price + '<small>' + esc(q.unit) + '</small></div>' +
+      '<div class="ch num ' + cls + '">' + arrow + q.change.replace(/^[+−]/, "") + '（' + q.pct + '）</div></div></div>'; }).join("")
+    : '<div class="empty">市況を取得できません</div>';
 }
-
-function pageEvents() {
-  return '<div class="events">' + data.events.slice(0, 4).map(function (e) {
+function drawEvents(evs) {
+  $("row2").className = evs.length ? "" : "wide";
+  $("elist").innerHTML = evs.slice(0, 8).map(function (e) {
     return '<div class="e' + (e.today ? " today" : "") + (e.holiday ? " hol" : "") + '"><div class="w">' +
-      (e.today ? "今日" : e.date + "（" + e.weekday + "）") + '<br>' + esc(e.time) + '</div><div class="ti">' + esc(e.title) + '</div></div>'; }).join("") + '</div>';
+      (e.today ? "今日" : e.date + "(" + e.weekday + ")") + '<br>' + esc(e.time) + '</div><div class="ti">' + esc(e.title) + '</div></div>'; }).join("");
 }
 
-var pIdx = 0, pTimer = null, pList = [];
-function showPanel(advance) {
-  pList = panels();
-  if (!pList.length) { $("tabs").innerHTML = ""; $("pages").innerHTML = '<div class="page on"><div class="empty">データを待っています</div></div>'; return; }
-  if (advance) pIdx = (pIdx + 1) % pList.length; else pIdx = Math.min(pIdx, pList.length - 1);
-  $("tabs").innerHTML = pList.map(function (p, i) { return '<span class="tab' + (i === pIdx ? " on" : "") + '">' + esc(p[0]) + '</span>'; }).join("") + '<span class="bar"><i></i></span>';
-  var old = $("pages").firstChild, el = document.createElement("div");
-  el.className = "page";
-  el.innerHTML = pList[pIdx][1]();
-  $("pages").appendChild(el);
-  if (old && advance) { old.className = "page out"; setTimeout(function () { if (old.parentNode) old.parentNode.removeChild(old); }, 700); }
-  else if (old) old.parentNode.removeChild(old);
-  requestAnimationFrame(function () { requestAnimationFrame(function () { el.className = "page on"; }); });
-  progress(document.querySelector("#tabs .bar i"), PANEL_SEC);
+// カードからはみ出す行は消す（途中で切れた行を出さない。画面の大きさに合わせて行数が変わる）
+function trimOverflow(list) {
+  var card = list.parentNode, limit = card.getBoundingClientRect().bottom - 4;
+  for (var i = list.children.length - 1; i > 0; i--) {
+    if (list.children[i].getBoundingClientRect().bottom > limit) list.removeChild(list.children[i]); else break;
+  }
 }
-function progress(bar, sec) {
-  if (!bar) return;
-  bar.style.transition = "none"; bar.style.width = "0";
-  void bar.offsetWidth;
-  bar.style.transition = "width " + sec + "s linear"; bar.style.width = "100%";
-}
-function startPanels() { clearInterval(pTimer); pTimer = setInterval(function () { showPanel(true); }, PANEL_SEC * 1000); }
-$("panel").addEventListener("click", function () { showPanel(true); startPanels(); });  // タップで次へ
 
-// ---- 下段: ヘッドライン
+// ---- 今月のカレンダー
+function drawMonth(m) {
+  if (!m) { $("cal").style.display = "none"; return; }
+  $("cal").style.display = "";
+  $("mtitle").textContent = m.title;
+  var html = m.head.split("").map(function (h) { return '<div class="hd">' + h + '</div>'; }).join("");
+  m.weeks.forEach(function (w) { w.forEach(function (c) {
+    var cls = "c" + (c.in ? "" : " out") + (c.past ? " past" : "") + (c.today ? " today" : "") +
+      (c.holiday ? " hol" : c.wd === 6 ? " sun" : c.wd === 5 ? " sat" : "");
+    html += '<div class="' + cls + '"' + (c.holiday ? ' title="' + esc(c.holiday) + '"' : "") + '><span>' + c.d + '</span>' +
+      (c.in && c.garbage && !c.past ? '<i class="g"></i>' : "") + (c.in && c.event && !c.past ? '<i class="e"></i>' : "") + '</div>';
+  }); });
+  $("mgrid").innerHTML = html;
+}
+
+// ---- ニュース（ヘッドラインを 1 本ずつ）
 var hIdx = -1, hTimer = null;
-function showHeadline(advance) {
+function showNews(advance) {
   var list = (data && data.news) || [];
-  $("newslabel").textContent = (data && data.news_label) || "";
-  if (!list.length) { $("hl").innerHTML = '<div class="item"><span style="color:var(--dim);font-size:22px">ニュースを取得できません</span></div>'; $("hlcnt").textContent = ""; return; }
-  hIdx = advance || hIdx < 0 ? (hIdx + 1) % list.length : Math.min(hIdx, list.length - 1);
-  $("hlcnt").textContent = (hIdx + 1) + " / " + list.length;
+  if (!list.length) { $("hl").innerHTML = '<div class="item"><span style="color:var(--dim)">ニュースを取得できません</span></div>'; $("ncnt").textContent = ""; return; }
+  if (!advance && hIdx >= 0) { hIdx = Math.min(hIdx, list.length - 1); $("ncnt").textContent = (hIdx + 1) + " / " + list.length; return; }
+  hIdx = (hIdx + 1) % list.length;
+  $("ncnt").textContent = (hIdx + 1) + " / " + list.length;
   var old = $("hl").firstChild, el = document.createElement("div");
   el.className = "item in";
   el.innerHTML = "<span>" + esc(list[hIdx]) + "</span>";
   $("hl").appendChild(el);
-  if (old) { old.className = "item gone"; setTimeout(function () { if (old.parentNode) old.parentNode.removeChild(old); }, 800); }
+  if (old) { old.className = "item gone"; setTimeout(function () { if (old.parentNode) old.parentNode.removeChild(old); }, 700); }
   requestAnimationFrame(function () { requestAnimationFrame(function () { el.className = "item"; }); });
-  progress(document.querySelector("#hlbar i"), HEADLINE_SEC);
 }
-function startHeadlines() { clearInterval(hTimer); hTimer = setInterval(function () { showHeadline(true); }, HEADLINE_SEC * 1000); }
-$("news").addEventListener("click", function () { showHeadline(true); startHeadlines(); });  // タップで次へ
+function startNews() { clearInterval(hTimer); hTimer = setInterval(function () { showNews(true); }, HEADLINE_SEC * 1000); }
+$("news").addEventListener("click", function () { showNews(true); startNews(); });  // タップで次へ
 
 // ---- 状態表示
 function drawStatus() {
@@ -473,8 +477,10 @@ function drawStatus() {
 
 var started = false;
 function render() {
-  drawNow(data.weather); drawIndoor(data.indoor); drawStatus(); applyBackground(); drawChips();
-  if (!started) { started = true; showPanel(false); startPanels(); showHeadline(true); startHeadlines(); }
+  drawNow(data.weather); drawIndoor(data.indoor); drawDays(data.weather); drawHourly(data.weather);
+  drawMarket(data.quotes || []); drawEvents(data.events || []); drawMonth(data.month);
+  trimOverflow($("dlist")); trimOverflow($("elist")); drawStatus(); applyBackground(); drawChips();
+  if (!started) { started = true; showNews(true); startNews(); } else showNews(false);
 }
 
 // 時計の数字のフォント（config の clock.font）
@@ -508,6 +514,9 @@ function load() {
 }
 
 tick(); drawStatus(); load();
+// フォントが読み込まれると行の高さが変わるので描き直す（はみ出し行の判定をやり直す）
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (data) render(); });
+addEventListener("resize", function () { if (data) setTimeout(render, 100); });
 setInterval(tick, 1000);
 setInterval(load, 60000);
 // 長時間つけっぱなしでも重くならないよう、6 時間ごとに読み込み直す

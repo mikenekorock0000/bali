@@ -377,7 +377,7 @@ LEFT_X0, LEFT_X1 = M, 470
 def draw_daily(c: Canvas, w: Weather | None):
     x0, x1, y = LEFT_X0, LEFT_X1, LOWER_TOP
     draw_heading(c, x0, x1, y, "この先の天気")
-    for i, d in enumerate(w.daily if w else []):
+    for i, d in enumerate(w.daily[:3] if w else []):
         mid = y + HEADING_H + i * ROW_H + ROW_H / 2
         c.text(x0 + 6, mid, f"{d.date.month}/{d.date.day}({WEEKDAYS[d.date.weekday()]})", 18, "Medium", anchor="lm")
         c.weather_icon(d.code, x0 + 150, mid, 30)

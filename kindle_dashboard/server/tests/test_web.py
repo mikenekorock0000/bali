@@ -100,3 +100,16 @@ def test_http_fire_page_data_and_fonts(fonts):
             assert e.value.code == 404
     finally:
         server.shutdown()
+
+
+def test_month_info():
+    cfg = {"garbage": {"rules": [{"name": "燃えるゴミ", "weekdays": ["月"]}]}}
+    ev = [Event("旅行", datetime(2026, 11, 20, tzinfo=TZ), datetime(2026, 11, 22, tzinfo=TZ), True)]
+    m = web.month_info(cfg, NOW, ev)
+    assert m["title"] == "2026年11月" and m["head"] == "日月火水木金土"
+    days = {(c["d"], c["in"]): c for w in m["weeks"] for c in w}
+    assert len(m["weeks"]) == 5 and m["weeks"][0][0]["d"] == 1  # 2026/11/1 は日曜
+    assert days[(7, True)]["today"] and days[(6, True)]["past"]
+    assert days[(3, True)]["holiday"] == "文化の日" and days[(23, True)]["holiday"] == "勤労感謝の日"
+    assert days[(9, True)]["garbage"] and not days[(10, True)]["garbage"]
+    assert days[(20, True)]["event"] and days[(21, True)]["event"] and not days[(22, True)]["event"]

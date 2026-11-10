@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 SERVER_DIR = Path(__file__).resolve().parent.parent
 
 # /health に出す。NAS に新しいプログラムが反映されたかの確認用（変更したら上げる）
-VERSION = "2026.11.08-almanac"
+VERSION = "2026.11.10-dense"
 
 FIRE_HTML = Path(__file__).resolve().parent / "fire.html"
 LIVE_HTML = Path(__file__).resolve().parent / "live.html"
@@ -148,7 +148,9 @@ class Dashboard:
             data = self.data()
             events = self.store.get("calendar") if "calendar" in self.store.sources else None
         out = web.payload(data, events, VERSION, self.cfg)
-        if demo:  # 見た目の確認用に、今日・明日のゴミと暦を必ず出す
+        if demo:  # 見た目の確認用に、ゴミの日（月・木）と今日・明日のゴミ、暦を必ず出す
+            demo_cfg = {**self.cfg, "garbage": {"rules": [{"name": "燃えるゴミ", "weekdays": ["月", "木"]}]}}
+            out["month"] = web.month_info(demo_cfg, now, events)
             out["today"].update(garbage=["燃えるゴミ"], garbage_tomorrow=["プラスチック資源"],
                                 sekki=out["today"]["sekki"] or "立冬",
                                 zassetsu=out["today"]["zassetsu"] or ["八十八夜"])

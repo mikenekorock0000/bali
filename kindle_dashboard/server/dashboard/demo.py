@@ -58,7 +58,8 @@ def demo_data(now: datetime) -> DashboardData:
 
     today = now.date()
     daily = [DaySlot(today + timedelta(days=i + 1), code, hi, lo, pop)
-             for i, (code, hi, lo, pop) in enumerate([(3, 24, 16, 98), (2, 16, 10, 2), (51, 17, 8, 5)])]
+             for i, (code, hi, lo, pop) in enumerate([(3, 24, 16, 98), (2, 16, 10, 2), (51, 17, 8, 5),
+                                                       (0, 19, 9, 0), (61, 15, 11, 70), (1, 18, 10, 10)])]
 
     weather = Weather(
         current=Current(temperature=19.6, apparent=21.0, humidity=93, code=61,

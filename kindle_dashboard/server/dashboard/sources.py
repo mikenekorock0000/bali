@@ -135,13 +135,13 @@ def open_meteo_url(latitude: float, longitude: float, timezone: str) -> str:
         "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
         "timezone": timezone,
         "wind_speed_unit": "ms",
-        "forecast_days": 4,
+        "forecast_days": 7,  # Kindle は 3 日、Fire（/fire）は 5 日まで使う
     }
     return "https://api.open-meteo.com/v1/forecast?" + urllib.parse.urlencode(params)
 
 
 def parse_open_meteo(data: dict, now: datetime, hourly_count: int = 8,
-                     hourly_step: int = 3, daily_count: int = 3) -> Weather:
+                     hourly_step: int = 3, daily_count: int = 6) -> Weather:
     tz = now.tzinfo
     c = data["current"]
     current = Current(

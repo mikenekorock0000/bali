@@ -39,7 +39,7 @@ def _weather(data: DashboardData) -> dict | None:
                     "temp": _r(h.temperature), "pop": h.precip_prob} for h in w.hourly[:8]],
         "daily": [{"date": f"{d.date.month}/{d.date.day}", "weekday": WEEKDAYS[d.date.weekday()],
                    "weekend": d.date.weekday() >= 5, "icon": icon_kind(d.code), "label": weather_label(d.code),
-                   "max": _r(d.t_max), "min": _r(d.t_min), "pop": d.precip_prob} for d in w.daily[:3]],
+                   "max": _r(d.t_max), "min": _r(d.t_min), "pop": d.precip_prob} for d in w.daily[:5]],
         "chart_label": w.day_label,
         "chart": [{"h": p.time.hour, "temp": round(p.temperature, 1), "pop": p.precip_prob}
                   for p in w.day_hours],
@@ -104,10 +104,29 @@ def today_info(cfg: dict, now: datetime) -> dict:
     }
 
 
+def month_info(cfg: dict, now: datetime, events: list[Event] | None) -> dict:
+    """今月のカレンダー: 週ごとの日付と、祝日・ゴミの日・予定の有無。"""
+    week_start = (cfg.get("calendar") or {}).get("week_start", "sunday")
+    grid = gcal.month_grid(now.date(), week_start)
+    hol = {e.start.date(): e.title for e in gcal.holidays(grid[0][0], grid[-1][-1], now.tzinfo)}
+    busy = set()
+    for e in events or []:
+        d, last = e.start.date(), max(e.start, e.end - timedelta(seconds=1)).date()
+        while d <= last:
+            busy.add(d)
+            d += timedelta(days=1)
+    weeks = [[{"d": d.day, "in": d.month == now.month, "wd": d.weekday(), "today": d == now.date(),
+               "past": d < now.date(), "holiday": hol.get(d, ""), "garbage": bool(almanac.garbage_on(cfg, d)),
+               "event": d in busy} for d in week] for week in grid]
+    head = "日月火水木金土" if week_start == "sunday" else "月火水木金土日"
+    return {"title": f"{now.year}年{now.month}月", "head": head, "weeks": weeks}
+
+
 def payload(data: DashboardData, events: list[Event] | None = None, version: str = "",
             cfg: dict | None = None) -> dict:
     now = data.now
     return {
+        "month": month_info(cfg or {}, now, events),
         "today": today_info(cfg or {}, now),
         "version": version,
         "now": now.isoformat(),
