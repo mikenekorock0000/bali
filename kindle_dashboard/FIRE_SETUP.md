@@ -126,6 +126,36 @@ Fire 7（1024×600）など他の Fire でもそのまま使える。
 
 ![背景の例](../docs/kindle-dashboard/fire7_skies.png)
 
+### 背景を写真にする
+
+NAS の `config/` フォルダの中に **`backgrounds`** フォルダを作り、写真を置くと背景が写真になる
+（`docker/kindle-dashboard/config/backgrounds/`）。置いた写真はページの再読み込み（または 1 分以内）で使われる。再起動は不要。
+
+**ファイル名で、いつ使うかを決める**（小文字の英字。拡張子は .jpg / .jpeg / .png / .webp、大文字の .JPG も可）:
+
+| 天気 | 名前 |  | 時間帯 | 名前 |
+|---|---|---|---|---|
+| 晴れ | `clear` | | 朝（日の出〜9 時） | `morning` |
+| 晴れ時々曇り | `partly` | | 昼（9〜16 時） | `day` |
+| 曇り | `cloudy` | | 夕方（16 時〜日の入り） | `evening` |
+| 霧 | `fog` | | 夜 | `night` |
+| 雨 | `rain` | | | |
+| 雷 | `thunder` | | | |
+| 雪 | `snow` | | | |
+
+- `clear-day.jpg`（晴れの昼）・`rain-night.jpg`（雨の夜）のように **天気-時間帯**
+- `rain.jpg`（雨ならいつでも）・`night.jpg`（夜ならどの天気でも）・`default.jpg`（何にも当てはまらないとき）も使える
+- 探す順番: 例えば雨の夜なら `rain-night` → `rain` → `night` → `default` → 無ければ色のグラデーション
+  - 晴れ時々曇りは晴れの写真、雷は雨の写真、霧と雪は曇りの写真でも代わりに使う
+- 同じ組み合わせを何枚か置くなら `clear-day-2.jpg`, `clear-day-3.jpg` … → **1 時間ごとに入れ替わる**
+- スマホで撮った大きな写真をそのまま置いてよい（NAS が画面に合わせて 1600×1000 に切り抜き・縮小して送る）
+- 写真の上でも文字が読めるよう、写真は少し暗くし、カードも少し濃くしている。雨・雪のときは雨筋・雪を重ねる
+
+**最初はこの 8 枚くらいがおすすめ**: `clear-morning`・`clear-day`・`clear-evening`・`night`・`cloudy`・`rain`・`snow`・`default`
+
+写真は自分で撮ったもののほか、無料で使える写真サイト（Unsplash・Pexels など。「blue sky」「sunset」「rainy window」
+「snow landscape」「night city」などで探せる）からダウンロードしてもよい。各サイトの利用条件は確認すること。
+
 ### 今日のお知らせ（日付の下）
 
 | 表示 | いつ |
@@ -175,7 +205,7 @@ Fire 7（1024×600）など他の Fire でもそのまま使える。
    （`config/` と `.env` はそのまま。`dashboard/` に `live.html`・`live.py`・`fire.html`・`web.py` が増え、`Dockerfile` で ffmpeg が入る）。
 2. Container Manager → プロジェクト → 停止 → **ビルド** → 起動（SSH なら `docker compose up -d --build`）。
 3. PC のブラウザで確認:
-   - `http://<NASのIP>:8090/health` の `version` が `2026.11.10-dense`
+   - `http://<NASのIP>:8090/health` の `version` が `2026.11.10-photos`
    - `http://<NASのIP>:8090/live`（ライブ）・`/fire`（ダッシュボード）に画面が出る
 
 ## 2. Fire に表示する

@@ -28,11 +28,11 @@ def lan_ip() -> str:
             return "127.0.0.1"
 
 
-def cmd_serve(cfg: dict, fonts: Fonts) -> None:
+def cmd_serve(cfg: dict, fonts: Fonts, photo_dir: Path | None = None) -> None:
     now = clock(cfg)
     store = build_store(cfg, now)
     store.run_forever()
-    server = make_server(Dashboard(cfg, store, fonts, now), cfg["host"], cfg["port"])
+    server = make_server(Dashboard(cfg, store, fonts, now, photo_dir), cfg["host"], cfg["port"])
     host = "<NASのIP>" if Path("/.dockerenv").exists() else lan_ip()  # コンテナ内の IP は外から使えない
     print(f"配信中: http://{host}:{cfg['port']}/dash.png  （確認用: /preview.png, /health）")
     try:
@@ -83,7 +83,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "render":
         cmd_render(cfg, fonts, args.demo, args.out, args.at)
     else:
-        cmd_serve(cfg, fonts)
+        # /fire の背景写真: 設定ファイルと同じ場所の backgrounds/（Docker なら NAS の config/backgrounds/）
+        cmd_serve(cfg, fonts, args.config.parent / "backgrounds")
     return 0
 
 

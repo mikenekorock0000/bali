@@ -10,10 +10,11 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable
+import urllib.parse
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
-from . import gcal, live, sources, web
+from . import gcal, live, photos, sources, web
 from .demo import demo_data, demo_events
 from .render import DashboardData, Fonts, png_bytes, render, to_kindle
 from .store import DataStore
@@ -23,7 +24,7 @@ log = logging.getLogger(__name__)
 SERVER_DIR = Path(__file__).resolve().parent.parent
 
 # /health に出す。NAS に新しいプログラムが反映されたかの確認用（変更したら上げる）
-VERSION = "2026.11.10-dense"
+VERSION = "2026.11.10-photos"
 
 FIRE_HTML = Path(__file__).resolve().parent / "fire.html"
 LIVE_HTML = Path(__file__).resolve().parent / "live.html"
@@ -113,8 +114,11 @@ def build_store(cfg: dict, now: Callable[[], datetime], env=os.environ) -> DataS
 
 
 class Dashboard:
-    def __init__(self, cfg: dict, store: DataStore, fonts: Fonts, now: Callable[[], datetime]):
+    def __init__(self, cfg: dict, store: DataStore, fonts: Fonts, now: Callable[[], datetime],
+                 photo_dir: Path | None = None):
         self.cfg, self.store, self.fonts, self.now = cfg, store, fonts, now
+        self.photo_dir = photo_dir  # /fire の背景写真（config/backgrounds/）
+        self.photos = photos.PhotoCache(photo_dir)
         self._lock = threading.Lock()  # Pillow の描画はスレッドごとに分けず直列化する
 
     def data(self) -> DashboardData:
@@ -156,6 +160,7 @@ class Dashboard:
                                 zassetsu=out["today"]["zassetsu"] or ["八十八夜"])
         out["clock_font"] = Path((self.cfg.get("clock") or {}).get("font") or "").name
         out["web"] = self.cfg.get("web") or {}
+        out["photos"] = photos.list_photos(self.photo_dir)
         return out
 
     def live_payload(self) -> dict:
@@ -213,6 +218,13 @@ def make_handler(dash: Dashboard):
                 demo = parse_qs(url.query).get("demo", ["0"])[0] in ("1", "true")
                 body = json.dumps(dash.web_payload(demo), ensure_ascii=False)
                 self._send(200, "application/json; charset=utf-8", body.encode())
+            elif url.path.startswith("/bg/"):
+                # 背景写真（config/backgrounds/ の中だけ。縮めた JPEG を返す）
+                body = dash.photos.get(urllib.parse.unquote(url.path[len("/bg/"):]))
+                if body:
+                    self._send(200, "image/jpeg", body, cache=3600)
+                else:
+                    self._send(404, "text/plain; charset=utf-8", b"not found")
             elif url.path.startswith("/fonts/"):
                 # fonts/ の中のフォントだけ（../ などは通さない）
                 name = Path(url.path).name
