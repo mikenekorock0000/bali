@@ -67,3 +67,15 @@ def test_http_bg_and_data_json(bgdir):
             assert e.value.code == 404
     finally:
         server.shutdown()
+
+
+def test_user_photos_override_bundled(tmp_path, bgdir):
+    bundled = tmp_path / "bundled"
+    bundled.mkdir()
+    Image.new("RGB", (100, 100), (255, 0, 0)).save(bundled / "rain.jpg")   # 自分の rain.JPG が優先
+    Image.new("RGB", (100, 100), (0, 255, 0)).save(bundled / "night.jpg")  # 自分のに無いので使う
+    dirs = [bgdir, bundled, tmp_path / "missing"]
+    assert photos.list_photos(dirs) == ["clear-day-2.png", "clear-day.jpg", "night.jpg", "rain.JPG"]
+    cache = photos.PhotoCache(dirs)
+    assert cache.get("night.jpg") and cache.get("rain.JPG")
+    assert cache.get("rain.jpg") is None

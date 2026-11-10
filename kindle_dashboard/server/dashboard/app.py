@@ -115,7 +115,7 @@ def build_store(cfg: dict, now: Callable[[], datetime], env=os.environ) -> DataS
 
 class Dashboard:
     def __init__(self, cfg: dict, store: DataStore, fonts: Fonts, now: Callable[[], datetime],
-                 photo_dir: Path | None = None):
+                 photo_dir=None):
         self.cfg, self.store, self.fonts, self.now = cfg, store, fonts, now
         self.photo_dir = photo_dir  # /fire の背景写真（config/backgrounds/）
         self.photos = photos.PhotoCache(photo_dir)

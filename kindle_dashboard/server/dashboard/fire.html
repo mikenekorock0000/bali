@@ -272,7 +272,8 @@ function phaseOf(n, w) {
   return "day";
 }
 // ---- 背景写真（NAS の config/backgrounds/。名前は 天気-時間帯 など。無ければグラデーション）
-// 近いものから探す: 雨の夜 → rain-night → rain → night → default。晴れ時々曇りは晴れ、雷は雨、霧と雪は曇りの写真も使う
+// 近いものから探す: 雨の朝 → rain-morning → rain → morning → default、雨の夜 → rain-night → night → default。
+// 晴れ時々曇りは晴れ、雷は雨、霧と雪は曇りの写真も使う
 var ALIAS = { clear: ["clear"], partly: ["partly", "clear"], cloudy: ["cloudy"], fog: ["fog", "cloudy"],
   rain: ["rain"], thunder: ["thunder", "rain"], snow: ["snow", "cloudy"] };
 function pickPhoto(kind, phase) {
@@ -280,8 +281,9 @@ function pickPhoto(kind, phase) {
   files.forEach(function (f) { var key = f.replace(/\.[a-z]+$/i, "").replace(/-\d+$/, ""); (groups[key] = groups[key] || []).push(f); });
   var al = ALIAS[kind] || [kind], keys = [];
   al.forEach(function (a) { keys.push(a + "-" + phase); });
-  al.forEach(function (a) { keys.push(a); });
-  keys.push(phase, "default");
+  if (phase === "night") keys.push("night");           // 夜は昼の写真を使わない
+  else { al.forEach(function (a) { keys.push(a); }); keys.push(phase); }
+  keys.push("default");
   for (var i = 0; i < keys.length; i++) {
     var g = groups[keys[i]];
     if (g) return g[Math.floor((Date.now() + offset) / 3600000) % g.length];  // 同じ組み合わせが何枚かあれば 1 時間ごとに

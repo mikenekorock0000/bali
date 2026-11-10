@@ -28,7 +28,7 @@ def lan_ip() -> str:
             return "127.0.0.1"
 
 
-def cmd_serve(cfg: dict, fonts: Fonts, photo_dir: Path | None = None) -> None:
+def cmd_serve(cfg: dict, fonts: Fonts, photo_dir=None) -> None:
     now = clock(cfg)
     store = build_store(cfg, now)
     store.run_forever()
@@ -84,7 +84,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd_render(cfg, fonts, args.demo, args.out, args.at)
     else:
         # /fire の背景写真: 設定ファイルと同じ場所の backgrounds/（Docker なら NAS の config/backgrounds/）
-        cmd_serve(cfg, fonts, args.config.parent / "backgrounds")
+        # 自分の写真（config/backgrounds/）を優先し、無い組み合わせは標準の写真（dashboard/backgrounds/）
+        cmd_serve(cfg, fonts, [args.config.parent / "backgrounds", SERVER_DIR / "dashboard" / "backgrounds"])
     return 0
 
 
