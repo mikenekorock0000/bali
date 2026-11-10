@@ -6,7 +6,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>ダッシュボード</title>
 <style>
-/* Fire 7（1024x600 横置き）向け。#stage を画面に合わせて拡大縮小するので、他の画面でも崩れない。
+/* Fire HD 8（1280x800 横置き）向け。幅 1024 で組み、高さは画面の縦横比に合わせて伸び縮みする
+   （16:10 なら 640、Fire 7 の 1024x600 なら 600）。#stage ごと画面に合わせて拡大縮小する。
    少し離れても読めるよう、常に出すもの（時計・今の天気・室内）は大きく、
    それ以外（時間ごと・グラフ・この先・マーケット・予定）は 1 枚ずつ大きく順番に出す。 */
 @font-face { font-family: "JP"; src: url("/fonts/NotoSansJP-VF.ttf"); font-weight: 100 900; font-display: swap; }
@@ -36,8 +37,8 @@ html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text
 #fx.sunny { background: radial-gradient(circle at 88% 8%, rgba(255,230,150,.45), rgba(255,230,150,0) 38%); }
 #fx.dusk { background: radial-gradient(ellipse at 50% 110%, rgba(255,150,80,.35), rgba(255,150,80,0) 60%); }
 body { font-family: "JP", "Noto Sans CJK JP", "Noto Sans JP", sans-serif; -webkit-user-select: none; user-select: none; }
-#stage { position: absolute; left: 0; top: 0; width: 1024px; height: 600px; transform-origin: 0 0; padding: 14px 16px;
-  display: grid; grid-template-rows: 242px 160px 140px; gap: 12px; transition: filter 2s; }
+#stage { position: absolute; left: 0; top: 0; width: 1024px; height: 640px; transform-origin: 0 0; padding: 14px 16px;
+  display: grid; grid-template-rows: 242px minmax(160px, 1fr) 150px; gap: 12px; transition: filter 2s; }
 body.night #stage { filter: brightness(.45); }
 .card { background: rgba(8,12,20,.5); border-radius: 18px; position: relative; overflow: hidden;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
@@ -94,7 +95,7 @@ body.night #stage { filter: brightness(.45); }
 #tabs .tab.on { color: var(--bg); background: var(--accent); }
 #tabs .bar { flex: 1; height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin-left: 6px; }
 #tabs .bar i { display: block; height: 100%; width: 0; background: var(--accent); }
-.page { position: absolute; left: 0; right: 0; top: 38px; bottom: 0; padding: 0 18px 10px; opacity: 0;
+.page { position: absolute; left: 0; right: 0; top: 38px; bottom: 0; padding: 0 18px 12px; opacity: 0; display: flex; flex-direction: column; justify-content: center;
   transform: translateX(30px); transition: opacity .6s, transform .6s; }
 .page.on { opacity: 1; transform: none; }
 .page.out { opacity: 0; transform: translateX(-30px); }
@@ -107,6 +108,15 @@ body.night #stage { filter: brightness(.45); }
 .hours .now .t { color: var(--sun); }
 
 .chart svg { width: 100%; height: 118px; display: block; }
+.page > div { flex: 1; min-height: 0; }
+/* 縦に余裕のある画面（Fire HD 8 など 16:10）では中段を一回り大きく */
+body.tall .hours .t { font-size: 18px; } body.tall .hours svg { width: 54px; height: 54px; }
+body.tall .hours .tp { font-size: 32px; } body.tall .hours .pp { font-size: 18px; height: 24px; }
+body.tall .days .d svg { width: 78px; height: 78px; } body.tall .days .d { grid-template-columns: 84px 1fr; }
+body.tall .days .tt { font-size: 36px; } body.tall .days .dt { font-size: 20px; }
+body.tall .quotes .pr { font-size: 40px; } body.tall .quotes .ch { font-size: 19px; }
+body.tall .events .ti { font-size: 23px; } body.tall .events .e { padding: 10px 14px; }
+body.tall .chart svg { height: 148px; }
 
 .days { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; height: 100%; }
 .days .d { background: rgba(255,255,255,.06); border-radius: 14px; display: grid; grid-template-columns: 70px 1fr; align-items: center; padding: 6px 14px; }
@@ -187,12 +197,15 @@ var $ = function (id) { return document.getElementById(id); };
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]; }); }
 function deg(v) { return v == null ? "—" : v + "°"; }
 
-// ---- 画面に合わせて拡大縮小（1024x600 を基準）
+// ---- 画面に合わせて拡大縮小（幅 1024 を基準。高さは画面の縦横比から決める: 16:10 → 640）
 function fit() {
-  var s = Math.min(innerWidth / 1024, innerHeight / 600), st = $("stage");
+  var h = Math.round(Math.min(760, Math.max(600, 1024 * innerHeight / innerWidth)));
+  var s = Math.min(innerWidth / 1024, innerHeight / h), st = $("stage");
+  st.style.height = h + "px";
+  document.body.classList.toggle("tall", h >= 630);
   st.style.transform = "scale(" + s + ")";
   st.style.left = ((innerWidth - 1024 * s) / 2) + "px";
-  st.style.top = ((innerHeight - 600 * s) / 2) + "px";
+  st.style.top = ((innerHeight - h * s) / 2) + "px";
 }
 addEventListener("resize", fit); fit();
 
@@ -363,7 +376,7 @@ function pageHours(w) {
 }
 
 function pageChart() {
-  var pts = data.weather.chart, W = 956, H = 118, top = 18, bot = 18;
+  var pts = data.weather.chart, W = 956, H = document.body.classList.contains("tall") ? 148 : 118, top = 18, bot = 18;
   var ts = pts.map(function (p) { return p.temp; });
   var lo = Math.min.apply(null, ts) - 1, hi = Math.max.apply(null, ts) + 1;
   var x = function (h) { return 14 + h / 23 * (W - 28); };
