@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 SERVER_DIR = Path(__file__).resolve().parent.parent
 
 # /health に出す。NAS に新しいプログラムが反映されたかの確認用（変更したら上げる）
-VERSION = "2026.11.10-photos"
+VERSION = "2026.11.11-photos-bundled"
 
 FIRE_HTML = Path(__file__).resolve().parent / "fire.html"
 LIVE_HTML = Path(__file__).resolve().parent / "live.html"

@@ -126,9 +126,17 @@ Fire 7（1024×600）など他の Fire でもそのまま使える。
 
 ![背景の例](../docs/kindle-dashboard/fire7_skies.png)
 
-### 背景を写真にする
+### 背景の写真
 
-NAS の `config/` フォルダの中に **`backgrounds`** フォルダを作り、写真を置くと背景が写真になる
+**標準で写真が入っている**（晴れの朝・昼・夕方、曇り、霧、夜、雨、雨の夜、曇りの夜、雪、その他。全 14 枚、
+Wikimedia Commons のパブリックドメイン・CC0。出典は [backgrounds/CREDITS.md](server/dashboard/backgrounds/CREDITS.md)）。
+晴れの昼・夕方・夜は 2 枚ずつあり、1 時間ごとに入れ替わる。夜は昼の写真を使わない。
+
+![写真の背景](../docs/kindle-dashboard/fire_photos.png)
+
+#### 自分の写真に差し替える
+
+NAS の `config/` フォルダの中に **`backgrounds`** フォルダを作り、写真を置くと、同じ名前の標準の写真より優先される
 （`docker/kindle-dashboard/config/backgrounds/`）。置いた写真はページの再読み込み（または 1 分以内）で使われる。再起動は不要。
 
 **ファイル名で、いつ使うかを決める**（小文字の英字。拡張子は .jpg / .jpeg / .png / .webp、大文字の .JPG も可）:
@@ -145,13 +153,11 @@ NAS の `config/` フォルダの中に **`backgrounds`** フォルダを作り�
 
 - `clear-day.jpg`（晴れの昼）・`rain-night.jpg`（雨の夜）のように **天気-時間帯**
 - `rain.jpg`（雨ならいつでも）・`night.jpg`（夜ならどの天気でも）・`default.jpg`（何にも当てはまらないとき）も使える
-- 探す順番: 例えば雨の夜なら `rain-night` → `rain` → `night` → `default` → 無ければ色のグラデーション
+- 探す順番: 例えば雨の朝なら `rain-morning` → `rain` → `morning` → `default`、雨の夜なら `rain-night` → `night` → `default`（夜は昼の写真を使わない）
   - 晴れ時々曇りは晴れの写真、雷は雨の写真、霧と雪は曇りの写真でも代わりに使う
 - 同じ組み合わせを何枚か置くなら `clear-day-2.jpg`, `clear-day-3.jpg` … → **1 時間ごとに入れ替わる**
 - スマホで撮った大きな写真をそのまま置いてよい（NAS が画面に合わせて 1600×1000 に切り抜き・縮小して送る）
 - 写真の上でも文字が読めるよう、写真は少し暗くし、カードも少し濃くしている。雨・雪のときは雨筋・雪を重ねる
-
-**最初はこの 8 枚くらいがおすすめ**: `clear-morning`・`clear-day`・`clear-evening`・`night`・`cloudy`・`rain`・`snow`・`default`
 
 写真は自分で撮ったもののほか、無料で使える写真サイト（Unsplash・Pexels など。「blue sky」「sunset」「rainy window」
 「snow landscape」「night city」などで探せる）からダウンロードしてもよい。各サイトの利用条件は確認すること。
@@ -205,7 +211,7 @@ NAS の `config/` フォルダの中に **`backgrounds`** フォルダを作り�
    （`config/` と `.env` はそのまま。`dashboard/` に `live.html`・`live.py`・`fire.html`・`web.py` が増え、`Dockerfile` で ffmpeg が入る）。
 2. Container Manager → プロジェクト → 停止 → **ビルド** → 起動（SSH なら `docker compose up -d --build`）。
 3. PC のブラウザで確認:
-   - `http://<NASのIP>:8090/health` の `version` が `2026.11.10-photos`
+   - `http://<NASのIP>:8090/health` の `version` が `2026.11.11-photos-bundled`
    - `http://<NASのIP>:8090/live`（ライブ）・`/fire`（ダッシュボード）に画面が出る
 
 ## 2. Fire に表示する
