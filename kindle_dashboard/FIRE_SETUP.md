@@ -172,7 +172,7 @@ Fire 7（1024×600）など他の Fire でもそのまま使える。
    （`config/` と `.env` はそのまま。`dashboard/` に `live.html`・`live.py`・`fire.html`・`web.py` が増え、`Dockerfile` で ffmpeg が入る）。
 2. Container Manager → プロジェクト → 停止 → **ビルド** → 起動（SSH なら `docker compose up -d --build`）。
 3. PC のブラウザで確認:
-   - `http://<NASのIP>:8090/health` の `version` が `2026.11.08-live-fallback`
+   - `http://<NASのIP>:8090/health` の `version` が `2026.11.08-almanac`
    - `http://<NASのIP>:8090/live`（ライブ）・`/fire`（ダッシュボード）に画面が出る
 
 ## 2. Fire に表示する
